@@ -7,7 +7,7 @@ import PersonaTestPage from "./pages/PersonaTestPage.js";
 import TrainingPage from "./pages/TrainingPage.js";
 import ProfilePage from "./pages/ProfilePage.js";
 import RecordsPage from "./pages/RecordsPage.js";
-import { njutiPersonalities, njutiPersonalityWeights } from "./data/njutiQuizData.js";
+import { personaTestQuestions } from "./data/njutiQuizData.js";
 import {
   buildPersonaChatTurn,
   buildTempChatTurn,
@@ -134,59 +134,42 @@ export default class App {
       await this.generateDistillPersona();
       return;
     }
-
     if (action === "save-distill-persona") {
       this.saveDistillPersona();
       return;
     }
-
     if (action === "reset-distill-result") {
-      this.setState({
-        proxyPersona: {
-          ...this.state.proxyPersona,
-          distillResult: null,
-          distillStatus: "idle",
-          message: ""
-        }
-      });
+      this.updateProxyPersona({ distillResult: null, distillStatus: "idle", message: "" });
       return;
     }
-
     if (action === "submit-persona-test") {
       this.createPersonaFromTest();
       return;
     }
-
     if (action === "set-current-profile") {
       this.setCurrentProfile(actionTarget.dataset.profileId);
       return;
     }
-
     if (action === "delete-profile-result") {
       this.deleteProfileResult(actionTarget.dataset.profileId);
       return;
     }
-
     if (action === "generate-proxy-reply") {
       await this.generateProxyReply();
       return;
     }
-
     if (action === "start-temp-chat") {
       this.setState({ temp: { ...this.state.temp, step: "chat", input: this.state.temp.latest || "" } });
       return;
     }
-
     if (action === "edit-temp-setup") {
       this.setState({ temp: { ...this.state.temp, step: "setup" } });
       return;
     }
-
     if (action === "temp-reply") {
       await this.handleTempReply();
       return;
     }
-
     if (action === "start-persona-chat") {
       this.setState({
         activePersona: this.state.persona.who,
@@ -194,12 +177,10 @@ export default class App {
       });
       return;
     }
-
     if (action === "edit-persona-setup") {
       this.setState({ persona: { ...this.state.persona, step: "setup" } });
       return;
     }
-
     if (action === "persona-reply") {
       const text = this.state.persona.input.trim();
       if (!text) return;
@@ -209,18 +190,15 @@ export default class App {
       });
       return;
     }
-
     if (action === "start-training-chat") {
       const opponent = makeOpeningOpponent(this.state.training.scene);
       this.setState({ training: { ...this.state.training, step: "chat", opponent } });
       return;
     }
-
     if (action === "edit-training-setup") {
       this.setState({ training: { ...this.state.training, step: "setup" } });
       return;
     }
-
     if (action === "training-submit") {
       await this.handleTrainingSubmit();
     }
@@ -313,7 +291,7 @@ export default class App {
     } catch (error) {
       this.updateProxyPersona({
         distillStatus: "done",
-        distillResult: makeDistillResult(makeMockDistillProfile(), upload),
+        distillResult: makeDistillResult(makeMockDistillProfile().personaProfile, upload),
         message: `${error.message}。先用本地模拟结果跑通流程。`
       });
     }
@@ -549,7 +527,7 @@ function createProxyPersonaState() {
       background: "他最近经常不回消息，临时改约后说我太敏感。",
       chatText: "我不是想吵架，我只是希望你尊重之前说好的约定。你先别把问题说成我太敏感。"
     },
-    testAnswers: {},
+    testAnswers: Object.fromEntries(personaTestQuestions.map((question) => [question.id, ""])),
     distillResults,
     testResults,
     personas,
@@ -591,8 +569,8 @@ function makeDistillResult(personaProfile, upload) {
 
 function makeMockDistillProfile() {
   return {
-    profileName: "我的蒸馏嘴替",
-    styleProfile: {
+    personaProfile: {
+      profileName: "我的蒸馏嘴替",
       tone: "冷静但有压迫感",
       emotionLevel: 3,
       logicStyle: "先指出问题，再反问对方逻辑漏洞，最后给出边界",
@@ -605,30 +583,19 @@ function makeMockDistillProfile() {
 }
 
 function makeTestResult(testAnswers) {
-  const scores = Object.fromEntries(Object.keys(njutiPersonalities).map((key) => [key, 0]));
-
-  Object.entries(testAnswers).forEach(([questionId, answer]) => {
-    const index = Number(questionId) - 1;
-    const weights = njutiPersonalityWeights[index]?.[answer];
-    if (!weights) return;
-    Object.entries(weights).forEach(([key, value]) => {
-      scores[key] = (scores[key] || 0) + value;
-    });
-  });
-
-  let resultKey = "VEGE";
-  Object.entries(scores).forEach(([key, value]) => {
-    if (value > scores[resultKey]) resultKey = key;
-  });
-
-  const baseProfile = njutiPersonalities[resultKey] || njutiPersonalities.VEGE;
-  const base = {
-    typeName: baseProfile.name,
-    nickname: baseProfile.category,
-    subtitle: baseProfile.description,
-    dimensions: [baseProfile.category, baseProfile.emoji],
-    scores
-  };
+  const pool = [
+    { typeName: "冷面判官", nickname: "逻辑处刑台", subtitle: "你不是在吵架，你是在宣判对方逻辑死刑。", tags: ["冷静", "逻辑", "压迫", "证据"] },
+    { typeName: "阴阳补刀王", nickname: "笑面小刀", subtitle: "你不一定骂人，但你每句话都像带了小倒刺。", tags: ["阴阳", "反讽", "补刀", "轻刺"] },
+    { typeName: "边界封门员", nickname: "人际门禁系统", subtitle: "你不是不好惹，你只是所有越界行为都会被系统拦截。", tags: ["边界", "拒绝", "稳定", "不内耗"] },
+    { typeName: "反问审讯官", nickname: "证据席管理员", subtitle: "你不会急着解释，你会先让对方上证据席。", tags: ["反问", "证据", "审讯", "拆招"] },
+    { typeName: "主线追杀者", nickname: "跑题终结机", subtitle: "对方每转移一次话题，你就把他拖回案发现场一次。", tags: ["主线", "控场", "追问", "回拉"] },
+    { typeName: "双标反杀机", nickname: "规则回旋镖", subtitle: "对方定规则，你负责把规则原样砸回去。", tags: ["双标", "反杀", "规则", "回旋镖"] },
+    { typeName: "发疯炮台", nickname: "精神状态领先版", subtitle: "你的精神状态很稳定，稳定地准备开炮。", tags: ["高能", "爆发", "压制", "戏剧感"] },
+    { typeName: "体面绝杀师", nickname: "优雅封口器", subtitle: "你不脏嘴，但你一句话能把这段对话钉进棺材里。", tags: ["体面", "收口", "绝杀", "克制"] }
+  ];
+  const answers = Object.values(testAnswers).filter(Boolean);
+  const score = answers.reduce((sum, answer) => sum + answer.charCodeAt(0), 0);
+  const base = pool[score % pool.length] || pool[0];
   return normalizeTestResult({
     id: `test-${Date.now()}`,
     createdAt: new Date().toISOString(),
@@ -659,29 +626,26 @@ function normalizeDistillResult(result) {
 }
 
 function normalizeTestResult(result) {
-  const fallback = {
-    typeName: result.typeName || result.name || "冷面判官",
-    nickname: result.nickname || "逻辑处刑台",
-    subtitle: result.subtitle || "你不是在吵架，你是在宣判对方逻辑死刑。",
-    tags: result.tags || ["冷静", "逻辑", "压迫", "证据"]
-  };
+  const typeName = result.typeName || result.name || "冷面判官";
+  const nickname = result.nickname || "逻辑处刑台";
+  const subtitle = result.subtitle || "你不是在吵架，你是在宣判对方逻辑死刑。";
+  const tags = result.tags || result.dimensions || ["冷静", "逻辑", "压迫", "证据"];
   return {
     id: String(result.id || `test-${Date.now()}`),
     createdAt: result.createdAt || new Date().toISOString(),
     sourceType: "test",
-    typeName: fallback.typeName,
-    nickname: fallback.nickname,
-    subtitle: fallback.subtitle,
-    dimensions: result.dimensions || result.tags || fallback.tags,
-    scores: result.scores || {},
+    typeName,
+    nickname,
+    subtitle,
+    tags,
     styleProfile: {
-      tone: fallback.typeName,
+      tone: typeName,
       emotionLevel: 3,
-      logicStyle: fallback.nickname,
-      commonPhrases: result.dimensions || result.tags || fallback.tags,
+      logicStyle: nickname,
+      commonPhrases: tags,
       avoidWords: ["脏话", "人身攻击"],
-      replyStrategy: fallback.subtitle,
-      profileSummary: fallback.subtitle
+      replyStrategy: subtitle,
+      profileSummary: subtitle
     }
   };
 }

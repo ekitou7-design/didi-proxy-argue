@@ -8,20 +8,30 @@ export default function PersonaPage(state) {
         <div class="brand-lockup">
           <p class="hero-kana">PROXY PERSONA</p>
           <h2>专属嘴替</h2>
-          <p>做一套人格测试，生成你的嘴替战斗皮肤。</p>
+          <p>训练一个像你的吵架分身，替你稳定输出。</p>
         </div>
       </section>
 
       ${CurrentProfile(state.currentProfile)}
 
       <section class="feature-list two-entry">
+        <button class="feature-card pink" data-page="personaDistill">
+          <span class="feature-tone">蒸馏</span>
+          <div><h3>蒸馏自己</h3><p>跳到独立蒸馏页，粘贴聊天记录生成表达风格。</p></div>
+          <span class="feature-arrow">›</span>
+        </button>
+        ${DistillHistory(state.distillResults)}
+
         <button class="feature-card blue" data-page="personaTest">
           <span class="feature-tone">测试</span>
-          <div><h3>做个测试题</h3><p>跳到独立测试页，22 道题生成嘴替人格。</p></div>
+          <div><h3>做个测试题</h3><p>跳到独立测试页，生成嘴替人格。</p></div>
           <span class="feature-arrow">›</span>
         </button>
         ${TestHistory(state.testResults)}
       </section>
+
+      ${PersonaList(state)}
+      ${ReplyGenerator(state)}
     </div>
   `;
 }
@@ -30,7 +40,6 @@ function CurrentProfile(profile) {
   if (!profile) {
     return `<section class="empty-chat">当前嘴替：还没设置。可以先蒸馏自己，或者做一次测试。</section>`;
   }
-
   return `
     <section class="chat-status persona-status">
       <strong>当前嘴替：${escapeHtml(profile.profileName || profile.typeName)}</strong>
@@ -43,7 +52,6 @@ function DistillHistory(results) {
   if (!results.length) {
     return `<div class="empty-chat compact-empty">还没有蒸馏结果。完成蒸馏后会显示在这里。</div>`;
   }
-
   return `
     <section class="persona-history">
       <h2>蒸馏结果</h2>
@@ -54,7 +62,6 @@ function DistillHistory(results) {
 
 function DistillCard(result) {
   const profile = result.styleProfile || {};
-  const phrases = (profile.commonPhrases || []).slice(0, 3);
   return `
     <article class="persona-summary">
       <div class="card-title-row">
@@ -65,7 +72,7 @@ function DistillCard(result) {
       <p><strong>关系：</strong>${escapeHtml(result.relationship || "未填写")}</p>
       <p>${escapeHtml(profile.profileSummary)}</p>
       <div class="tag-row">
-        ${phrases.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+        ${(profile.commonPhrases || []).slice(0, 3).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
       </div>
       <div class="button-row result-actions-stack">
         <button class="secondary-button warm" data-action="set-current-profile" data-profile-id="${escapeAttr(result.id)}">设为当前嘴替</button>
@@ -79,7 +86,6 @@ function TestHistory(results) {
   if (!results.length) {
     return `<div class="empty-chat compact-empty">还没有历史测评结果。做完测试后会显示在这里。</div>`;
   }
-
   return `
     <section class="persona-history">
       <h2>历史测评结果</h2>
@@ -89,7 +95,6 @@ function TestHistory(results) {
 }
 
 function TestCard(result) {
-  const dimensions = result.dimensions || result.tags || [];
   return `
     <article class="persona-summary">
       <div class="card-title-row">
@@ -98,7 +103,7 @@ function TestCard(result) {
       </div>
       <p>${escapeHtml(result.subtitle)}</p>
       <div class="tag-row">
-        ${dimensions.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+        ${(result.tags || []).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
       </div>
       <p><strong>测试时间：</strong>${formatTime(result.createdAt)}</p>
       <div class="button-row result-actions-stack">
@@ -113,7 +118,6 @@ function PersonaList(state) {
   if (!state.personas.length) {
     return `<section class="empty-chat">还没有嘴替档案。先蒸馏自己，或去做一次测试。</section>`;
   }
-
   return `
     <section class="profile-section">
       <h2>我的嘴替档案</h2>
@@ -154,14 +158,8 @@ function ReplyResult(result) {
     <section class="result-card inner-result">
       <h2>生成结果</h2>
       <div class="speech-paper"><p>${escapeHtml(result.reply)}</p></div>
-      <div class="temp-result-block">
-        <h3>回应策略</h3>
-        <p>${escapeHtml(result.strategy)}</p>
-      </div>
-      <div class="temp-result-block">
-        <h3>语气</h3>
-        <p>${escapeHtml(result.tone)}</p>
-      </div>
+      <div class="temp-result-block"><h3>回应策略</h3><p>${escapeHtml(result.strategy)}</p></div>
+      <div class="temp-result-block"><h3>语气</h3><p>${escapeHtml(result.tone)}</p></div>
     </section>
   `;
 }
