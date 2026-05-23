@@ -26,8 +26,8 @@ export default function PersonaPage(state) {
         </button>
 
         ${Field("对方刚刚说了什么", "proxyPersona.replyForm.opponentMessage", state.replyForm.opponentMessage, "把对方最新一句话粘到这里，嘴替会按当前人格帮你回怼。")}
-        ${Field("填写我的说话风格", "proxyPersona.upload.background", state.upload.background, "比如：我平时会先解释原因，但希望语气更稳。")}
-        ${Field("填写我的雷点和底线", "proxyPersona.replyForm.background", state.replyForm.background, "比如：不要骂脏话、不要提分手、不要攻击家人。")}
+        ${Field("当前前情提要", "proxyPersona.replyForm.background", state.replyForm.background, "比如：他刚刚说我太敏感，但我想说的是他临时改约这件事。")}
+        ${Field("我想达到什么目的", "proxyPersona.replyForm.goal", state.replyForm.goal, "比如：让对方别再转移话题，承认这件事确实处理得不尊重人。")}
 
         <div class="field-title">选择嘴替风格</div>
         <div class="chip-group">
