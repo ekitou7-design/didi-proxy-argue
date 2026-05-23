@@ -1,31 +1,24 @@
-import { trainingDifficulties, trainingScenes } from "../data/mockData.js";
+import { difficultyOptions } from "../data/mockData.js";
 
 export default function TrainingPage(session) {
   if (session.step === "chat") return ChatPage(session);
 
   return `
     <div class="page training-page">
-      <section class="game-setup">
-        <div class="field-title">选择场景</div>
-        <div class="chip-group compact">
-          ${trainingScenes
-            .filter((scene) => ["宿舍卫生大战", "情侣冷战", "商家扯皮", "职场甩锅", "家庭催婚", "网友阴阳怪气"].includes(scene))
-            .map((scene) => Chip(scene, session.scene, "training-scene"))
-            .join("")}
-        </div>
+      <section class="temp-intro training-intro">
+        <strong>不背题，直接练你的真实场景</strong>
+        <p>输入你想训练的冲突，系统会扮演对方。你回一句，系统评分并继续下一轮。</p>
+      </section>
 
-        <div class="field-title">选择难度</div>
+      <section class="game-setup">
+        <label class="long-field">
+          <span>你想训练什么吵架场景？</span>
+          <textarea data-setup-input="training.scene" placeholder="比如：男朋友临时改约还说我太敏感；组员不干活还说我要求太高；室友不打扫卫生还倒打一耙。">${escapeHtml(session.scene)}</textarea>
+        </label>
+
+        <div class="field-title">训练强度</div>
         <div class="difficulty-grid">
-          ${trainingDifficulties
-            .map(
-              (item) => `
-                <button class="difficulty-card ${session.difficulty === item.name ? "active" : ""}" data-training-difficulty="${item.name}">
-                  <strong>${item.name}</strong>
-                  <span>${item.desc}</span>
-                </button>
-              `
-            )
-            .join("")}
+          ${difficultyOptions.map((item) => Difficulty(item, session.difficulty)).join("")}
         </div>
 
         <button class="primary-button" data-action="start-training-chat">开始训练</button>
@@ -38,12 +31,16 @@ function ChatPage(session) {
   return `
     <div class="page chat-page">
       <section class="chat-status training-status">
-        <strong>ROUND ${String(session.round).padStart(2, "0")}</strong>
-        <p>${escapeHtml(session.scene)} / ${escapeHtml(session.difficulty)}</p>
+        <div class="status-head">
+          <strong>ROUND ${String(session.round).padStart(2, "0")}</strong>
+          <button class="tiny-button" data-action="edit-training-setup">修改场景</button>
+        </div>
+        <p>场景：${escapeHtml(session.scene)}</p>
+        <p>强度：${escapeHtml(session.difficulty)}</p>
       </section>
 
       <section class="chat-log">
-        <div class="bubble-card opponent"><span>系统对手</span><p>${escapeHtml(session.opponent)}</p></div>
+        <div class="bubble-card opponent"><span>系统扮演对方</span><p>${escapeHtml(session.opponent)}</p></div>
         ${session.feedbacks.map(FeedbackRound).join("")}
       </section>
 
@@ -62,9 +59,9 @@ function FeedbackRound(item) {
       <div class="ai-panel">
         <h3>本轮评分</h3>
         <div class="score-row"><span>综合</span><div class="score-track"><i style="width:${item.score}%"></i></div><strong>${item.score}</strong></div>
-        <h3>用户回复的优点</h3>
+        <h3>你回复的优点</h3>
         <p>${escapeHtml(item.strengths)}</p>
-        <h3>用户回复的问题</h3>
+        <h3>还能更狠一点的地方</h3>
         <p>${escapeHtml(item.problems)}</p>
         <h3>优化版回复</h3>
         <p>${escapeHtml(item.optimized)}</p>
@@ -75,8 +72,23 @@ function FeedbackRound(item) {
   `;
 }
 
-function Chip(item, active, key) {
-  return `<button class="chip ${active === item ? "active" : ""}" data-${key}="${item}">${item}</button>`;
+function Difficulty(item, active) {
+  return `
+    <button class="difficulty-card ${active === item ? "active" : ""}" data-chip-session="training" data-chip-field="difficulty" data-chip-value="${item}">
+      <strong>${item}</strong>
+      <span>${getDifficultyDesc(item)}</span>
+    </button>
+  `;
+}
+
+function getDifficultyDesc(item) {
+  const map = {
+    热身: "对方讲点道理",
+    普通: "有点嘴硬",
+    嘴硬: "甩锅和反问变多",
+    阴阳大师: "阴阳怪气加情绪压迫"
+  };
+  return map[item] || "自由练习";
 }
 
 function escapeHtml(value) {

@@ -11,7 +11,9 @@ import {
   buildTrainingChatTurn,
   initialPersonaSession,
   initialTempSession,
-  initialTrainingSession
+  initialTrainingSession,
+  makeOpeningOpponent,
+  relationProfiles
 } from "./data/mockData.js";
 
 const pageTitles = {
@@ -28,7 +30,8 @@ export default class App {
     this.root = root;
     this.state = {
       page: "home",
-      activePersona: initialPersonaSession.personaName,
+      profiles: structuredClone(relationProfiles),
+      activePersona: initialPersonaSession.who,
       temp: structuredClone(initialTempSession),
       persona: structuredClone(initialPersonaSession),
       training: structuredClone(initialTrainingSession)
@@ -45,11 +48,19 @@ export default class App {
 
   getPage() {
     if (this.state.page === "temp") return TempArguePage(this.state.temp);
-    if (this.state.page === "persona") return PersonaPage(this.state.persona);
+    if (this.state.page === "persona") {
+      return PersonaPage(this.state.persona, this.state.profiles);
+    }
     if (this.state.page === "training") return TrainingPage(this.state.training);
-    if (this.state.page === "records") return RecordsPage();
+    if (this.state.page === "records") {
+      return RecordsPage({
+        temp: this.state.temp,
+        persona: this.state.persona,
+        training: this.state.training
+      });
+    }
     if (this.state.page === "profile") {
-      return ProfilePage({ activePersona: this.state.activePersona });
+      return ProfilePage({ activePersona: this.state.activePersona, profiles: this.state.profiles });
     }
     return HomePage();
   }
@@ -68,7 +79,36 @@ export default class App {
       return;
     }
 
-    this.handleSetupChoice(event);
+    const chipTarget = event.target.closest("[data-chip-session]");
+    if (chipTarget) {
+      const sessionKey = chipTarget.dataset.chipSession;
+      const field = chipTarget.dataset.chipField;
+      this.setState({
+        [sessionKey]: { ...this.state[sessionKey], [field]: chipTarget.dataset.chipValue }
+      });
+      return;
+    }
+
+    const profileTarget = event.target.closest("[data-load-profile]");
+    if (profileTarget) {
+      const profile = this.state.profiles.find((item) => item.id === profileTarget.dataset.loadProfile);
+      if (!profile) return;
+      this.setState({
+        activePersona: profile.name,
+        persona: {
+          ...this.state.persona,
+          profileId: profile.id,
+          who: profile.name,
+          relation: profile.relation,
+          commonConflict: profile.commonConflict,
+          tactics: profile.tactics,
+          style: profile.style,
+          boundary: profile.boundary,
+          expectation: profile.expectation
+        }
+      });
+      return;
+    }
 
     const actionTarget = event.target.closest("[data-action]");
     if (!actionTarget) return;
@@ -76,7 +116,11 @@ export default class App {
     const action = actionTarget.dataset.action;
 
     if (action === "start-temp-chat") {
-      this.setState({ temp: { ...this.state.temp, step: "chat" } });
+      this.setState({ temp: { ...this.state.temp, step: "chat", input: this.state.temp.latest || "" } });
+    }
+
+    if (action === "edit-temp-setup") {
+      this.setState({ temp: { ...this.state.temp, step: "setup" } });
     }
 
     if (action === "temp-reply") {
@@ -84,19 +128,27 @@ export default class App {
       if (!text) return;
       const turn = buildTempChatTurn(this.state.temp, text);
       this.setState({
-        temp: {
-          ...this.state.temp,
-          input: "",
-          rounds: [...this.state.temp.rounds, turn]
-        }
+        temp: { ...this.state.temp, latest: text, input: "", rounds: [...this.state.temp.rounds, turn] }
       });
+    }
+
+    if (action === "save-persona-profile") {
+      const profile = this.buildProfileFromPersona();
+      const profiles = this.state.profiles.some((item) => item.id === profile.id)
+        ? this.state.profiles.map((item) => (item.id === profile.id ? profile : item))
+        : [profile, ...this.state.profiles];
+      this.setState({ profiles, activePersona: profile.name, persona: { ...this.state.persona, profileId: profile.id } });
     }
 
     if (action === "start-persona-chat") {
       this.setState({
-        activePersona: this.state.persona.personaName,
-        persona: { ...this.state.persona, step: "chat" }
+        activePersona: this.state.persona.who,
+        persona: { ...this.state.persona, step: "chat", input: this.state.persona.latest || "" }
       });
+    }
+
+    if (action === "edit-persona-setup") {
+      this.setState({ persona: { ...this.state.persona, step: "setup" } });
     }
 
     if (action === "persona-reply") {
@@ -104,16 +156,17 @@ export default class App {
       if (!text) return;
       const turn = buildPersonaChatTurn(this.state.persona, text);
       this.setState({
-        persona: {
-          ...this.state.persona,
-          input: "",
-          rounds: [...this.state.persona.rounds, turn]
-        }
+        persona: { ...this.state.persona, latest: text, input: "", rounds: [...this.state.persona.rounds, turn] }
       });
     }
 
     if (action === "start-training-chat") {
-      this.setState({ training: { ...this.state.training, step: "chat" } });
+      const opponent = makeOpeningOpponent(this.state.training.scene);
+      this.setState({ training: { ...this.state.training, step: "chat", opponent } });
+    }
+
+    if (action === "edit-training-setup") {
+      this.setState({ training: { ...this.state.training, step: "setup" } });
     }
 
     if (action === "training-submit") {
@@ -132,63 +185,32 @@ export default class App {
     }
   }
 
-  handleSetupChoice(event) {
-    const tempWho = event.target.closest("[data-temp-who]");
-    if (tempWho) {
-      this.setState({ temp: { ...this.state.temp, who: tempWho.dataset.tempWho } });
-      return;
-    }
-
-    const tempGoal = event.target.closest("[data-temp-goal]");
-    if (tempGoal) {
-      this.setState({ temp: { ...this.state.temp, goal: tempGoal.dataset.tempGoal } });
-      return;
-    }
-
-    const tempTone = event.target.closest("[data-temp-tone]");
-    if (tempTone) {
-      this.setState({ temp: { ...this.state.temp, tone: tempTone.dataset.tempTone } });
-      return;
-    }
-
-    const scene = event.target.closest("[data-training-scene]");
-    if (scene) {
-      this.setState({ training: { ...this.state.training, scene: scene.dataset.trainingScene } });
-      return;
-    }
-
-    const difficulty = event.target.closest("[data-training-difficulty]");
-    if (difficulty) {
-      this.setState({
-        training: { ...this.state.training, difficulty: difficulty.dataset.trainingDifficulty }
-      });
-    }
-  }
-
   handleInput(event) {
-    const setupKey = event.target.dataset.personaSetup;
-    if (setupKey) {
-      this.state.persona = {
-        ...this.state.persona,
-        [setupKey]: event.target.value
-      };
+    const setup = event.target.dataset.setupInput;
+    if (setup) {
+      const [sessionKey, field] = setup.split(".");
+      this.state[sessionKey] = { ...this.state[sessionKey], [field]: event.target.value };
       return;
     }
 
     const inputType = event.target.dataset.sessionInput;
-    if (inputType === "temp") {
-      this.state.temp = { ...this.state.temp, input: event.target.value };
-      return;
+    if (inputType) {
+      this.state[inputType] = { ...this.state[inputType], input: event.target.value };
     }
+  }
 
-    if (inputType === "persona") {
-      this.state.persona = { ...this.state.persona, input: event.target.value };
-      return;
-    }
-
-    if (inputType === "training") {
-      this.state.training = { ...this.state.training, input: event.target.value };
-    }
+  buildProfileFromPersona() {
+    const session = this.state.persona;
+    return {
+      id: session.profileId || `profile-${Date.now()}`,
+      name: session.who || "新的关系对象",
+      relation: session.relation || "",
+      commonConflict: session.commonConflict || "",
+      tactics: session.tactics || "",
+      style: session.style || "",
+      boundary: session.boundary || "",
+      expectation: session.expectation || ""
+    };
   }
 
   render() {
@@ -202,7 +224,7 @@ export default class App {
               <img src="/public/app-logo.svg" alt="" />
             </button>
             <div>
-              <p class="eyebrow">实时对话式吵架嘴替</p>
+              <p class="eyebrow">对方说一句，我帮你接一句</p>
               <h1>${pageTitles[page]}</h1>
             </div>
             <button class="mini-sticker danger" data-page="records">录</button>
