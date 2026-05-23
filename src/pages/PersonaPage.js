@@ -19,6 +19,13 @@ export default function PersonaPage(state) {
           <span class="feature-arrow">›</span>
         </button>
 
+        <button class="feature-card blue upload-entry" data-page="personaTest">
+          <span class="feature-tone">测试</span>
+          <div><h3>做个嘴替人格测试</h3><p>22 道题生成你的回怼人格，并设为当前嘴替。</p></div>
+          <span class="feature-arrow">›</span>
+        </button>
+
+        ${Field("对方刚刚说了什么", "proxyPersona.replyForm.opponentMessage", state.replyForm.opponentMessage, "把对方最新一句话粘到这里，嘴替会按当前人格帮你回怼。")}
         ${Field("填写我的说话风格", "proxyPersona.upload.background", state.upload.background, "比如：我平时会先解释原因，但希望语气更稳。")}
         ${Field("填写我的雷点和底线", "proxyPersona.replyForm.background", state.replyForm.background, "比如：不要骂脏话、不要提分手、不要攻击家人。")}
 
@@ -56,7 +63,7 @@ function CurrentProfile(profile) {
       </div>
       <p>${escapeHtml(style.profileSummary || profile.subtitle || "已准备按你的风格接话。")}</p>
       <div class="tag-row">
-        ${(style.commonPhrases || profile.dimensions || []).slice(0, 4).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+        ${(style.commonPhrases || profile.tags || profile.dimensions || []).slice(0, 4).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
       </div>
     </section>
   `;

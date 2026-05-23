@@ -1,22 +1,23 @@
 import { personaTestQuestions } from "../data/njutiQuizData.js";
 
 export default function PersonaTestPage(state) {
+  const answered = Object.values(state.testAnswers || {}).filter(Boolean).length;
   return `
     <div class="page persona-test-page">
       <section class="temp-intro persona-intro">
-        <strong>嘴替人格测试</strong>
-        <p>选最像你真实反应的答案。提交后会回到专属嘴替页，结果会显示在测试卡片下面。</p>
+        <strong>专属嘴替人格测试</strong>
+        <p>22 道题测出你的回怼人格。提交后会自动设为当前嘴替，用来生成你的专属回怼话术。</p>
       </section>
 
       <section class="input-panel setup-panel">
         <div class="card-title-row">
           <h2>做个测试题</h2>
-          <span class="stamp">${personaTestQuestions.length} 题</span>
+          <span class="stamp">${answered}/${personaTestQuestions.length}</span>
         </div>
         ${personaTestQuestions.map((question) => Question(question, state.testAnswers[question.id])).join("")}
         <div class="button-row">
           <button class="secondary-button warm" data-page="persona">返回</button>
-          <button class="primary-button" data-action="submit-persona-test">提交并生成档案</button>
+          <button class="primary-button" data-action="submit-persona-test">提交并生成嘴替人格</button>
         </div>
       </section>
     </div>
@@ -26,13 +27,13 @@ export default function PersonaTestPage(state) {
 function Question(question, answer) {
   return `
     <div class="test-question" data-test-question="${question.id}">
-      <strong>${question.title}</strong>
+      <strong>${question.id}. ${escapeHtml(question.title)}</strong>
       <div class="answer-grid">
         ${question.options
           .map(
             (option) => `
               <button class="answer-chip ${answer === option.value ? "active" : ""}" data-question-id="${question.id}" data-test-answer="${option.value}">
-                ${option.label}
+                <b>${option.value}</b> ${escapeHtml(option.label)}
               </button>
             `
           )
@@ -40,4 +41,12 @@ function Question(question, answer) {
       </div>
     </div>
   `;
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }

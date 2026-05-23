@@ -7,7 +7,7 @@ import PersonaTestPage from "./pages/PersonaTestPage.js";
 import TrainingPage from "./pages/TrainingPage.js";
 import ProfilePage from "./pages/ProfilePage.js";
 import RecordsPage from "./pages/RecordsPage.js";
-import { personaTestQuestions } from "./data/njutiQuizData.js";
+import { personaPersonalities, personaPersonalityWeights, personaTestQuestions } from "./data/njutiQuizData.js";
 import {
   buildPersonaChatTurn,
   buildTempChatTurn,
@@ -343,9 +343,17 @@ export default class App {
   }
 
   createPersonaFromTest() {
+    const answered = Object.values(this.state.proxyPersona.testAnswers).filter(Boolean).length;
+    const unanswered = personaTestQuestions.length - answered;
+    if (unanswered > 3) {
+      window.alert?.(`还有 ${unanswered} 道题未作答，最多只能空 3 道题。`);
+      return;
+    }
+
     const result = makeTestResult(this.state.proxyPersona.testAnswers);
     const testResults = [result, ...this.state.proxyPersona.testResults];
     writeJson(TEST_RESULTS_KEY, testResults);
+    writeJson(CURRENT_PROFILE_KEY, result);
     this.setState({
       page: "persona",
       proxyPersona: {
@@ -353,7 +361,8 @@ export default class App {
         testResults,
         personas: mergePersonas(this.state.proxyPersona.distillResults, testResults),
         selectedPersonaId: result.id,
-        message: "已生成测试结果。"
+        currentProfile: result,
+        message: `已生成专属嘴替人格：${result.typeName}，并设为当前嘴替。`
       }
     });
     if (window.location.hash !== "#/persona") window.location.hash = "#/persona";
@@ -582,7 +591,8 @@ async function postJson(url, body) {
 function createProxyPersonaState() {
   const distillResults = readJson(DISTILL_RESULTS_KEY, []).map(normalizeDistillResult);
   const testResults = readJson(TEST_RESULTS_KEY, []).map(normalizeTestResult);
-  const currentProfile = readJson(CURRENT_PROFILE_KEY, null);
+  const storedCurrentProfile = readJson(CURRENT_PROFILE_KEY, null);
+  const currentProfile = storedCurrentProfile ? normalizeProfile(storedCurrentProfile) : null;
   const personas = mergePersonas(distillResults, testResults);
 
   return {
@@ -649,23 +659,28 @@ function makeMockDistillProfile() {
 }
 
 function makeTestResult(testAnswers) {
-  const pool = [
-    { typeName: "冷面判官", nickname: "逻辑处刑台", subtitle: "你不是在吵架，你是在宣判对方逻辑死刑。", tags: ["冷静", "逻辑", "压迫", "证据"] },
-    { typeName: "阴阳补刀王", nickname: "笑面小刀", subtitle: "你不一定骂人，但你每句话都像带了小倒刺。", tags: ["阴阳", "反讽", "补刀", "轻刺"] },
-    { typeName: "边界封门员", nickname: "人际门禁系统", subtitle: "你不是不好惹，你只是所有越界行为都会被系统拦截。", tags: ["边界", "拒绝", "稳定", "不内耗"] },
-    { typeName: "反问审讯官", nickname: "证据席管理员", subtitle: "你不会急着解释，你会先让对方上证据席。", tags: ["反问", "证据", "审讯", "拆招"] },
-    { typeName: "主线追杀者", nickname: "跑题终结机", subtitle: "对方每转移一次话题，你就把他拖回案发现场一次。", tags: ["主线", "控场", "追问", "回拉"] },
-    { typeName: "双标反杀机", nickname: "规则回旋镖", subtitle: "对方定规则，你负责把规则原样砸回去。", tags: ["双标", "反杀", "规则", "回旋镖"] },
-    { typeName: "发疯炮台", nickname: "精神状态领先版", subtitle: "你的精神状态很稳定，稳定地准备开炮。", tags: ["高能", "爆发", "压制", "戏剧感"] },
-    { typeName: "体面绝杀师", nickname: "优雅封口器", subtitle: "你不脏嘴，但你一句话能把这段对话钉进棺材里。", tags: ["体面", "收口", "绝杀", "克制"] }
-  ];
-  const answers = Object.values(testAnswers).filter(Boolean);
-  const score = answers.reduce((sum, answer) => sum + answer.charCodeAt(0), 0);
-  const base = pool[score % pool.length] || pool[0];
+  const scores = Object.fromEntries(Object.keys(personaPersonalities).map((key) => [key, 0]));
+
+  Object.entries(testAnswers).forEach(([questionId, answer]) => {
+    const weights = personaPersonalityWeights[questionId]?.[answer];
+    if (!weights) return;
+    Object.entries(weights).forEach(([key, value]) => {
+      scores[key] = (scores[key] || 0) + value;
+    });
+  });
+
+  let resultKey = "VEGE";
+  Object.entries(scores).forEach(([key, value]) => {
+    if (value > scores[resultKey]) resultKey = key;
+  });
+
+  const base = personaPersonalities[resultKey] || personaPersonalities.VEGE;
   return normalizeTestResult({
     id: `test-${Date.now()}`,
     createdAt: new Date().toISOString(),
     sourceType: "test",
+    resultKey,
+    scores,
     ...base
   });
 }
@@ -692,32 +707,43 @@ function normalizeDistillResult(result) {
 }
 
 function normalizeTestResult(result) {
-  const typeName = result.typeName || result.name || "冷面判官";
-  const nickname = result.nickname || "逻辑处刑台";
-  const subtitle = result.subtitle || "你不是在吵架，你是在宣判对方逻辑死刑。";
-  const tags = result.tags || result.dimensions || ["冷静", "逻辑", "压迫", "证据"];
+  const fallback = personaPersonalities.VEGE;
+  const typeName = result.typeName || result.name || fallback.typeName;
+  const nickname = result.nickname || fallback.nickname;
+  const subtitle = result.subtitle || fallback.subtitle;
+  const tags = result.tags || result.dimensions || fallback.tags;
+  const styleProfile = result.styleProfile || fallback.styleProfile;
   return {
     id: String(result.id || `test-${Date.now()}`),
     createdAt: result.createdAt || new Date().toISOString(),
     sourceType: "test",
+    resultKey: result.resultKey || "",
+    emoji: result.emoji || fallback.emoji,
+    category: result.category || fallback.category,
+    scores: result.scores || {},
     typeName,
     nickname,
     subtitle,
     tags,
     styleProfile: {
-      tone: typeName,
-      emotionLevel: 3,
-      logicStyle: nickname,
-      commonPhrases: tags,
-      avoidWords: ["脏话", "人身攻击"],
-      replyStrategy: subtitle,
-      profileSummary: subtitle
+      tone: styleProfile.tone || typeName,
+      emotionLevel: Number(styleProfile.emotionLevel || 3),
+      logicStyle: styleProfile.logicStyle || nickname,
+      commonPhrases: styleProfile.commonPhrases || tags,
+      avoidWords: styleProfile.avoidWords || ["脏话", "人身攻击"],
+      replyStrategy: styleProfile.replyStrategy || subtitle,
+      profileSummary: styleProfile.profileSummary || subtitle
     }
   };
 }
 
 function mergePersonas(distillResults, testResults) {
   return [...distillResults, ...testResults];
+}
+
+function normalizeProfile(profile) {
+  if (profile.sourceType === "chat_upload" || profile.profileName) return normalizeDistillResult(profile);
+  return normalizeTestResult(profile);
 }
 
 function getProfileName(profile) {
@@ -729,9 +755,12 @@ function getProfileTone(profile) {
 }
 
 function makeLocalReply(replyForm, styleProfile) {
+  const profile = styleProfile.styleProfile || styleProfile;
+  const phrase = profile.commonPhrases?.[0] || "你先别转移话题";
+  const strategy = profile.replyStrategy || "拉回主线，压住对方的偷换概念。";
   return {
-    reply: `我先把重点说清楚：你刚才这句话是在把问题转成我的情绪。现在要谈的是${replyForm.goal || "这件事怎么处理"}，不是我有没有资格不舒服。请你正面回应。`,
-    strategy: "本地预览：识别贴标签/转移话题，拉回事实、影响、诉求和边界。",
+    reply: `${phrase}。你刚才这句话是在把问题转成我的情绪。现在要谈的是${replyForm.goal || "这件事怎么处理"}，不是我有没有资格不舒服。请你正面回应。`,
+    strategy: `本地预览：按「${getProfileName(styleProfile)}」人格生成。${strategy}`,
     tone: getProfileTone(styleProfile) || "温柔但有边界"
   };
 }
