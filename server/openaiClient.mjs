@@ -24,15 +24,15 @@ export function createOpenAIClient() {
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 }
 
-export async function requestJsonFromAI({ system, user }) {
+export async function requestJsonFromAI({ system, user, temperature = 0.4, maxCompletionTokens = 900 }) {
   const client = createOpenAIClient();
 
   try {
     const completion = await client.chat.completions.create({
       model: getModelName(),
       response_format: { type: "json_object" },
-      temperature: 0.4,
-      max_completion_tokens: 900,
+      temperature,
+      max_completion_tokens: maxCompletionTokens,
       messages: [
         { role: "system", content: system },
         { role: "user", content: user }

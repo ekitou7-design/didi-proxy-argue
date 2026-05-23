@@ -11,6 +11,7 @@ import {
   buildTrainingScorePrompt
 } from "./prompts.mjs";
 import { requestJsonFromAI } from "./openaiClient.mjs";
+import { extractPersonaProfile } from "./personaExtractorSkill.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
@@ -59,6 +60,15 @@ app.post("/api/training/score", async (request, response) => {
   await handleAIEndpoint(response, buildTrainingScorePrompt(request.body));
 });
 
+app.post("/api/skills/persona-extract", async (request, response) => {
+  try {
+    const result = await extractPersonaProfile(request.body);
+    response.json(result);
+  } catch (error) {
+    handleEndpointError(response, error, "Persona extraction failed");
+  }
+});
+
 app.use(express.static(root));
 
 app.use((request, response) => {
@@ -86,4 +96,23 @@ async function handleAIEndpoint(response, prompt) {
 
     response.status(502).json({ error: "AI request failed" });
   }
+}
+
+function handleEndpointError(response, error, fallbackMessage) {
+  if (error.status) {
+    response.status(error.status).json({ error: error.message });
+    return;
+  }
+
+  if (error.code === "MISSING_OPENAI_API_KEY") {
+    response.status(500).json({ error: "Missing OPENAI_API_KEY" });
+    return;
+  }
+
+  if (error.message === "AI 杩斿洖鏍煎紡瑙ｆ瀽澶辫触") {
+    response.status(502).json({ error: "AI returned invalid JSON" });
+    return;
+  }
+
+  response.status(502).json({ error: fallbackMessage });
 }
