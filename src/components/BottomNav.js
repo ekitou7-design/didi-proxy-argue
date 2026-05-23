@@ -1,12 +1,14 @@
 import { navItems } from "../data/mockData.js";
 
 export default function BottomNav(activePage) {
+  const activeKey = ["temp", "persona", "training"].includes(activePage) ? "home" : activePage;
+
   return `
     <nav class="bottom-nav" aria-label="底部导航">
       ${navItems
         .map(
           (item) => `
-            <button class="nav-item ${activePage === item.key ? "active" : ""}" data-page="${item.key}">
+            <button class="nav-item ${activeKey === item.key ? "active" : ""}" data-page="${item.key}">
               <span class="nav-mark">${item.mark}</span>
               <span>${item.label}</span>
             </button>

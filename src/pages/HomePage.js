@@ -12,15 +12,10 @@ export default function HomePage() {
         </div>
         <div class="hero-illustration" aria-label="漫画占位插画">
           <div class="burst">哔哔</div>
-          <div class="face">
-            <span class="eye left"></span>
-            <span class="eye right"></span>
-            <span class="mouth"></span>
-          </div>
+          <img class="hero-logo" src="/public/app-logo.svg" alt="滴滴代吵 App Logo" />
           <div class="bubble big">逻辑</div>
           <div class="bubble small">边界</div>
         </div>
-        <button class="primary-button" data-page="temp">开始代吵</button>
       </section>
 
       <section class="feature-list">

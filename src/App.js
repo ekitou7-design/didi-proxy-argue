@@ -1,17 +1,17 @@
 import BottomNav from "./components/BottomNav.js";
 import HomePage from "./pages/HomePage.js";
-import TempArguePage, { initialTempForm } from "./pages/TempArguePage.js";
+import TempArguePage from "./pages/TempArguePage.js";
 import PersonaPage from "./pages/PersonaPage.js";
 import TrainingPage from "./pages/TrainingPage.js";
 import ProfilePage from "./pages/ProfilePage.js";
+import RecordsPage from "./pages/RecordsPage.js";
 import {
-  buildPersonaReplyResult,
-  buildTempArgueResult,
-  buildTrainingRound,
-  initialPersonaForm,
-  initialTrainingState,
-  personas,
-  tempIntensities
+  buildPersonaChatTurn,
+  buildTempChatTurn,
+  buildTrainingChatTurn,
+  initialPersonaSession,
+  initialTempSession,
+  initialTrainingSession
 } from "./data/mockData.js";
 
 const pageTitles = {
@@ -19,6 +19,7 @@ const pageTitles = {
   temp: "临时代吵",
   persona: "专属嘴替",
   training: "吵架训练场",
+  records: "记录",
   profile: "我的"
 };
 
@@ -27,22 +28,10 @@ export default class App {
     this.root = root;
     this.state = {
       page: "home",
-      activePersona: "温柔但致命型",
-      selectedPersonaId: personas[0].id,
-      tempForm: { ...initialTempForm },
-      tempPersonaId: personas[0].id,
-      tempIntensity: tempIntensities[0],
-      tempResult: buildTempArgueResult({
-        form: initialTempForm,
-        personaId: personas[0].id,
-        intensity: tempIntensities[0]
-      }),
-      personaForm: { ...initialPersonaForm },
-      personaResult: buildPersonaReplyResult(initialPersonaForm),
-      training: { ...initialTrainingState },
-      copied: false,
-      personaCopied: false,
-      selectedAnswer: null
+      activePersona: initialPersonaSession.personaName,
+      temp: structuredClone(initialTempSession),
+      persona: structuredClone(initialPersonaSession),
+      training: structuredClone(initialTrainingSession)
     };
 
     this.root.addEventListener("click", (event) => this.handleClick(event));
@@ -55,230 +44,151 @@ export default class App {
   }
 
   getPage() {
-    if (this.state.page === "temp") {
-      return TempArguePage({
-        form: this.state.tempForm,
-        personaId: this.state.tempPersonaId,
-        intensity: this.state.tempIntensity,
-        result: this.state.tempResult,
-        copied: this.state.copied
-      });
-    }
-
-    if (this.state.page === "persona") {
-      return PersonaPage({
-        form: this.state.personaForm,
-        result: this.state.personaResult,
-        copied: this.state.personaCopied
-      });
-    }
-
-    if (this.state.page === "training") {
-      return TrainingPage(this.state.training);
-    }
-
+    if (this.state.page === "temp") return TempArguePage(this.state.temp);
+    if (this.state.page === "persona") return PersonaPage(this.state.persona);
+    if (this.state.page === "training") return TrainingPage(this.state.training);
+    if (this.state.page === "records") return RecordsPage();
     if (this.state.page === "profile") {
       return ProfilePage({ activePersona: this.state.activePersona });
     }
-
     return HomePage();
   }
 
   handleClick(event) {
+    const copyTarget = event.target.closest("[data-copy-reply]");
+    if (copyTarget) {
+      navigator.clipboard?.writeText(copyTarget.dataset.copyReply);
+      copyTarget.textContent = "已复制";
+      return;
+    }
+
     const pageTarget = event.target.closest("[data-page]");
     if (pageTarget) {
       this.setState({ page: pageTarget.dataset.page });
       return;
     }
 
-    const intensityTarget = event.target.closest("[data-intensity]");
-    if (intensityTarget) {
-      this.setState({ tempIntensity: intensityTarget.dataset.intensity, copied: false });
-      return;
-    }
-
-    const tempPersonaTarget = event.target.closest("[data-temp-persona]");
-    if (tempPersonaTarget) {
-      this.setState({ tempPersonaId: tempPersonaTarget.dataset.tempPersona, copied: false });
-      return;
-    }
-
-    const trainingSceneTarget = event.target.closest("[data-training-scene]");
-    if (trainingSceneTarget) {
-      this.setState({
-        training: {
-          ...this.state.training,
-          scene: trainingSceneTarget.dataset.trainingScene,
-          round: 1,
-          currentAttack: null,
-          result: null,
-          report: null
-        }
-      });
-      return;
-    }
-
-    const trainingDifficultyTarget = event.target.closest("[data-training-difficulty]");
-    if (trainingDifficultyTarget) {
-      this.setState({
-        training: {
-          ...this.state.training,
-          difficulty: trainingDifficultyTarget.dataset.trainingDifficulty,
-          round: 1,
-          currentAttack: null,
-          result: null,
-          report: null
-        }
-      });
-      return;
-    }
-
-    const trainingOpponentTarget = event.target.closest("[data-training-opponent]");
-    if (trainingOpponentTarget) {
-      this.setState({
-        training: {
-          ...this.state.training,
-          opponentType: trainingOpponentTarget.dataset.trainingOpponent,
-          round: 1,
-          currentAttack: null,
-          result: null,
-          report: null
-        }
-      });
-      return;
-    }
-
-    const answerTarget = event.target.closest("[data-answer]");
-    if (answerTarget) {
-      this.setState({ selectedAnswer: Number(answerTarget.dataset.answer) });
-      return;
-    }
+    this.handleSetupChoice(event);
 
     const actionTarget = event.target.closest("[data-action]");
     if (!actionTarget) return;
 
     const action = actionTarget.dataset.action;
-    if (action === "generate") {
+
+    if (action === "start-temp-chat") {
+      this.setState({ temp: { ...this.state.temp, step: "chat" } });
+    }
+
+    if (action === "temp-reply") {
+      const text = this.state.temp.input.trim();
+      if (!text) return;
+      const turn = buildTempChatTurn(this.state.temp, text);
       this.setState({
-        tempResult: buildTempArgueResult({
-          form: this.state.tempForm,
-          personaId: this.state.tempPersonaId,
-          intensity: this.state.tempIntensity
-        }),
-        copied: false
-      });
-    }
-
-    if (action === "remix") {
-      const nextIndex =
-        (tempIntensities.indexOf(this.state.tempIntensity) + 1) % tempIntensities.length;
-      const nextIntensity = tempIntensities[nextIndex];
-      this.setState({
-        tempIntensity: nextIntensity,
-        tempResult: buildTempArgueResult({
-          form: this.state.tempForm,
-          personaId: this.state.tempPersonaId,
-          intensity: nextIntensity
-        }),
-        copied: false
-      });
-    }
-
-    if (action === "copy") {
-      navigator.clipboard?.writeText(this.state.tempResult.recommended);
-      this.setState({ copied: true });
-    }
-
-    if (action === "generate-persona") {
-      this.setState({
-        personaResult: buildPersonaReplyResult(this.state.personaForm),
-        personaCopied: false
-      });
-    }
-
-    if (action === "copy-persona") {
-      navigator.clipboard?.writeText(this.state.personaResult.myVersion);
-      this.setState({ personaCopied: true });
-    }
-
-    if (action === "gentle-persona") {
-      this.setState({
-        personaResult: {
-          ...this.state.personaResult,
-          myVersion: this.state.personaResult.softer
-        },
-        personaCopied: false
-      });
-    }
-
-    if (action === "score-training") {
-      const result = buildTrainingRound(this.state.training);
-      this.setState({
-        training: {
-          ...this.state.training,
-          result,
-          report: null
+        temp: {
+          ...this.state.temp,
+          input: "",
+          rounds: [...this.state.temp.rounds, turn]
         }
       });
     }
 
-    if (action === "next-round") {
+    if (action === "start-persona-chat") {
+      this.setState({
+        activePersona: this.state.persona.personaName,
+        persona: { ...this.state.persona, step: "chat" }
+      });
+    }
+
+    if (action === "persona-reply") {
+      const text = this.state.persona.input.trim();
+      if (!text) return;
+      const turn = buildPersonaChatTurn(this.state.persona, text);
+      this.setState({
+        persona: {
+          ...this.state.persona,
+          input: "",
+          rounds: [...this.state.persona.rounds, turn]
+        }
+      });
+    }
+
+    if (action === "start-training-chat") {
+      this.setState({ training: { ...this.state.training, step: "chat" } });
+    }
+
+    if (action === "training-submit") {
+      const reply = this.state.training.input.trim();
+      if (!reply) return;
+      const feedback = buildTrainingChatTurn(this.state.training, reply);
       this.setState({
         training: {
           ...this.state.training,
+          input: "",
           round: this.state.training.round + 1,
-          currentAttack: this.state.training.result?.nextAttack || this.state.training.currentAttack,
-          reply: "",
-          result: null,
-          report: null
+          opponent: feedback.nextOpponent,
+          feedbacks: [...this.state.training.feedbacks, feedback]
         }
       });
     }
+  }
 
-    if (action === "finish-training") {
-      const result = this.state.training.result || buildTrainingRound(this.state.training);
+  handleSetupChoice(event) {
+    const tempWho = event.target.closest("[data-temp-who]");
+    if (tempWho) {
+      this.setState({ temp: { ...this.state.temp, who: tempWho.dataset.tempWho } });
+      return;
+    }
+
+    const tempGoal = event.target.closest("[data-temp-goal]");
+    if (tempGoal) {
+      this.setState({ temp: { ...this.state.temp, goal: tempGoal.dataset.tempGoal } });
+      return;
+    }
+
+    const tempTone = event.target.closest("[data-temp-tone]");
+    if (tempTone) {
+      this.setState({ temp: { ...this.state.temp, tone: tempTone.dataset.tempTone } });
+      return;
+    }
+
+    const scene = event.target.closest("[data-training-scene]");
+    if (scene) {
+      this.setState({ training: { ...this.state.training, scene: scene.dataset.trainingScene } });
+      return;
+    }
+
+    const difficulty = event.target.closest("[data-training-difficulty]");
+    if (difficulty) {
       this.setState({
-        training: {
-          ...this.state.training,
-          result,
-          report: result.report
-        }
+        training: { ...this.state.training, difficulty: difficulty.dataset.trainingDifficulty }
       });
-    }
-
-    if (action === "use-persona") {
-      const selected = personas.find((persona) => persona.id === this.state.selectedPersonaId);
-      this.setState({ activePersona: selected.name });
     }
   }
 
   handleInput(event) {
-    const field = event.target.dataset.field;
-    const personaField = event.target.dataset.personaField;
-    const trainingField = event.target.dataset.trainingField;
-
-    if (trainingField) {
-      this.state.training = {
-        ...this.state.training,
-        [trainingField]: event.target.value
+    const setupKey = event.target.dataset.personaSetup;
+    if (setupKey) {
+      this.state.persona = {
+        ...this.state.persona,
+        [setupKey]: event.target.value
       };
       return;
     }
 
-    if (personaField) {
-      this.state.personaForm = {
-        ...this.state.personaForm,
-        [personaField]: event.target.value
-      };
+    const inputType = event.target.dataset.sessionInput;
+    if (inputType === "temp") {
+      this.state.temp = { ...this.state.temp, input: event.target.value };
       return;
     }
 
-    if (!field) return;
+    if (inputType === "persona") {
+      this.state.persona = { ...this.state.persona, input: event.target.value };
+      return;
+    }
 
-    this.state.tempForm = {
-      ...this.state.tempForm,
-      [field]: event.target.value
-    };
+    if (inputType === "training") {
+      this.state.training = { ...this.state.training, input: event.target.value };
+    }
   }
 
   render() {
@@ -288,12 +198,14 @@ export default class App {
       <div class="app-shell">
         <div class="phone-frame">
           <header class="top-bar">
-            <button class="mini-sticker" data-page="home">DD</button>
+            <button class="mini-sticker logo-sticker" data-page="home" aria-label="回到首页">
+              <img src="/public/app-logo.svg" alt="" />
+            </button>
             <div>
-              <p class="eyebrow">AI 情绪表达嘴替工具</p>
+              <p class="eyebrow">实时对话式吵架嘴替</p>
               <h1>${pageTitles[page]}</h1>
             </div>
-            <button class="mini-sticker danger" data-page="persona">替</button>
+            <button class="mini-sticker danger" data-page="records">录</button>
           </header>
           <main class="page-scroll">${this.getPage()}</main>
           ${BottomNav(page)}

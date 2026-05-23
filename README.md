@@ -1,16 +1,17 @@
 # 滴滴代吵
 
-一个移动端 App 原型 Demo，定位是 AI 情绪表达与“嘴替”工具。核心不是鼓励攻击别人，而是帮助用户在冲突场景中整理逻辑、稳定情绪，并生成更有气势但不过界的表达。
+一个移动端 App 原型 Demo，定位是 AI 情绪表达与“嘴替”工具。核心不是鼓励攻击别人，而是帮助用户在冲突场景中整理逻辑、稳定情绪，并在对话里一轮一轮接住对方的话。
 
 当前版本使用本地 mock 数据，不接入真实 AI API。
 
 ## Demo 功能
 
-- 首页：项目名、Slogan、漫画风占位插画、三个主功能入口、底部导航
-- 临时代吵：面向一次性冲突，填写冲突场景、对方原话、表达目的，选择代吵人格和输出强度后生成多段回复
-- 专属嘴替：面向男朋友、朋友、室友、家人、熟人合作等长期关系，粘贴聊天记录后生成更像用户本人的回复
-- 吵架训练场：回合制小游戏，选择场景、难度和对手类型，输入回复后获得评分、优化建议、下一轮反击和最终战斗报告
-- 我的：展示当前嘴替人格、历史记录、偏好设置和隐私说明
+- 首页：项目名、Slogan、App Logo、三个核心功能入口卡片
+- 临时代吵：二级功能页，先设置对象、目标和语气，再进入实时吵架聊天页
+- 专属嘴替：二级功能页，先保存嘴替人格，再按用户风格实时接话
+- 吵架训练场：二级功能页，选择场景和难度后进入多轮训练对话
+- 记录：统一展示临时代吵、专属嘴替和训练场多轮历史记录
+- 我的：只保留我的嘴替人格、偏好设置和账号设置
 
 ## 视觉风格
 
@@ -70,6 +71,7 @@ npm run build
         ├── TempArguePage.js
         ├── PersonaPage.js
         ├── TrainingPage.js
+        ├── RecordsPage.js
         └── ProfilePage.js
 ```
 
@@ -78,13 +80,14 @@ npm run build
 - `src/App.js`：页面状态、简单路由、交互事件分发
 - `src/data/mockData.js`：功能入口、回复示例、人格数据、训练题目
 - `src/styles.css`：统一移动端 UI 样式和漫画风视觉系统
-- `src/pages/TempArguePage.js`：临时代吵页面，包含人格选择、输出强度和多结果卡片
-- `src/pages/PersonaPage.js`：专属嘴替页面，包含聊天记录学习输入和熟人关系多版本回复
-- `src/pages/TrainingPage.js`：吵架训练场页面，包含场景/难度/对手选择、回合输入、评分和战斗报告
+- `src/pages/TempArguePage.js`：临时代吵页面，包含开局设置和实时接话聊天窗口
+- `src/pages/PersonaPage.js`：专属嘴替页面，包含人格设置和按本人风格接话的聊天窗口
+- `src/pages/TrainingPage.js`：吵架训练场页面，包含训练设置和多轮评分反馈
+- `src/pages/RecordsPage.js`：统一历史记录页面
 
 ## 后续接 AI API
 
-可以优先替换 `src/data/mockData.js` 中的写死回复，再把 `src/App.js` 里的 `generate` 逻辑改成异步请求。
+可以优先替换 `src/data/mockData.js` 中的写死回合数据，再把 `src/App.js` 里的每轮接话逻辑改成异步请求。
 
 临时代吵建议后端接口输入：
 
@@ -93,8 +96,7 @@ npm run build
   "scene": "发生了什么",
   "opponent": "对方说了什么",
   "goal": "用户想达到的目的",
-  "persona": "温柔但致命型",
-  "intensity": "强硬"
+  "tone": "强硬"
 }
 ```
 
@@ -114,11 +116,10 @@ npm run build
 
 ```json
 {
-  "chatLog": "用户粘贴的聊天记录",
-  "latest": "对方最新一句话",
-  "state": "我现在的状态",
-  "realMessage": "我真实想表达什么",
-  "goal": "我希望达到什么效果"
+  "style": "我的说话风格",
+  "problem": "我吵架时最容易出现的问题",
+  "expectation": "我希望嘴替帮我做到什么",
+  "boundary": "我不想越过的表达边界"
 }
 ```
 
@@ -141,7 +142,6 @@ npm run build
 {
   "scene": "宿舍卫生大战",
   "difficulty": "黄金",
-  "opponentType": "阴阳型",
   "round": 1,
   "opponentAttack": "对方本轮发言",
   "userReply": "用户输入的回复"

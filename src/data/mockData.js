@@ -1,7 +1,6 @@
 export const navItems = [
   { key: "home", label: "首页", mark: "首" },
-  { key: "temp", label: "代吵", mark: "吵" },
-  { key: "training", label: "训练", mark: "练" },
+  { key: "records", label: "记录", mark: "录" },
   { key: "profile", label: "我的", mark: "我" }
 ];
 
@@ -9,22 +8,25 @@ export const features = [
   {
     key: "temp",
     title: "临时代吵",
-    desc: "填场景、填诉求，直接生成能发出去的回复。",
-    tone: "急救包",
+    desc: "对方说一句，你告诉我一句，App 帮你实时接话、稳住主线。",
+    tone: "开始实时吵",
+    mark: "实时",
     color: "pink"
   },
   {
     key: "persona",
     title: "专属嘴替",
-    desc: "贴聊天记录，生成更像你本人、更有分寸的回复。",
-    tone: "熟人局",
+    desc: "带入你的说话风格、关系背景和表达边界，帮你实时回话。",
+    tone: "创建嘴替并开吵",
+    mark: "嘴替",
     color: "blue"
   },
   {
     key: "training",
     title: "吵架训练场",
-    desc: "小游戏式对练，练逻辑、练气势、练边界。",
-    tone: "开练",
+    desc: "系统扮演难缠对手，你一轮一轮回复，练习不被带偏、守住主线。",
+    tone: "开始训练",
+    mark: "训练",
     color: "yellow"
   }
 ];
@@ -109,32 +111,30 @@ export function buildTempArgueResult({ form, personaId, intensity }) {
 }
 
 export const initialPersonaForm = {
-  chatLog:
-    "我：你今天又临时改时间，我有点不舒服。\n对方：我不是说了吗，我很忙啊，你能不能别这么敏感？\n我：我不是不能理解你忙，但你每次都这样。",
-  latest: "你怎么又开始了？我真的很累，不想吵。",
-  state: "有点委屈，也有点生气，但不想把关系搞僵。",
-  realMessage: "我希望对方知道我不是无理取闹，我是在意被尊重和提前沟通。",
-  goal: "让对方认真回应我，之后不要总是临时变卦。"
+  style: "我平时说话会先解释原因，不太喜欢把话说绝，但情绪上来时容易反复强调自己不是无理取闹。",
+  problem: "吵架时容易解释太多，被对方带偏，最后忘记自己真正想要什么。",
+  expectation: "帮我把感受、事实和诉求说清楚，语气像我本人，但更稳、更有边界。",
+  boundary: "不要辱骂、不要威胁、不要翻旧账攻击对方人格，也不要把关系说死。"
 };
 
 export function buildPersonaReplyResult(form) {
-  const latest = form.latest || "对方最新一句话";
-  const state = form.state || "我现在的状态";
-  const realMessage = form.realMessage || "我真实想表达的内容";
-  const goal = form.goal || "我希望达到的效果";
+  const style = form.style || "我的说话风格";
+  const problem = form.problem || "我吵架时最容易出现的问题";
+  const expectation = form.expectation || "我希望嘴替帮我做到什么";
+  const boundary = form.boundary || "我不想越过的表达边界";
 
   return {
     styleAnalysis:
-      "你的表达风格偏克制，会先解释自己的感受，再补充理由；你不太想把话说绝，但会反复强调“我不是不理解你”。适合用更短的句子把委屈、边界和期待说清楚。",
-    mainLine: `不要顺着“${latest}”去证明自己不是在吵，而是把重点拉回：我现在的状态是“${state}”，真正想说的是“${realMessage}”，希望最后走向“${goal}”。`,
+      `你的嘴替人格会保留这种底色：${style} 但会主动修正这个弱点：${problem}`,
+    mainLine: `核心任务是：${expectation} 表达边界是：${boundary}`,
     myVersion:
-      "我不是想跟你吵，也不是不理解你累。但我真的会在意这种临时改变，因为这会让我觉得我的时间和感受没有被放在心上。我想要的不是你立刻道歉，而是你能认真听我说完，以后如果有变化，提前跟我讲清楚。",
+      "我的专属嘴替人格：平时温和，但关键时刻不退让。先说事实，再说感受，最后落到明确诉求；不靠骂人赢，而是靠把主线拉回来赢。",
     softer:
-      "我知道你现在很累，我也不想继续把气氛弄得更僵。但这件事对我确实有影响，所以我希望你不是把它当成我又在闹，而是能听听我为什么会不舒服。",
+      "温和模式：先承认关系和情绪，再把自己的需求讲清楚，适合还想继续好好沟通的熟人关系。",
     harder:
-      "我可以理解你累，但不能接受每次问题一出现，就变成我“又开始了”。我表达不舒服，不是在找事，而是在告诉你这件事已经反复影响到我了。你可以累，但不能用累来跳过我的感受。",
+      "强硬模式：不接对方扣帽子，不陷入自证，直接指出问题、影响和下一步要求。",
     pause:
-      "我们先暂停一下吧。我现在有情绪，你也很累，继续说下去很容易互相伤人。等我们都冷静一点，再把这件事认真说完。"
+      "暂停模式：当对话开始失控时，先停止互相消耗，保留之后继续沟通的余地。"
   };
 }
 
@@ -212,6 +212,7 @@ export const initialTrainingState = {
   difficulty: trainingDifficulties[1].id,
   opponentType: trainingOpponents[1],
   round: 1,
+  started: false,
   currentAttack: openingAttacks[trainingScenes[0]],
   reply: "我不是要求所有人都按我的标准来，我是在说公共空间需要基本规则。现在的问题不是谁更较真，而是谁在逃避自己该做的部分。",
   result: null,
@@ -279,4 +280,153 @@ export const historyItems = [
   "室友半夜外放视频，已生成冷静反击版",
   "同事甩锅项目延期，已生成职场留痕版",
   "朋友临时爽约，已生成体面收场版"
+];
+
+export const recordGroups = [
+  {
+    title: "临时代吵记录",
+    items: ["商家拒绝退款：强硬版", "路人插队争执：体面收场版", "网友阴阳怪气：阴阳版"]
+  },
+  {
+    title: "专属嘴替记录",
+    items: ["亲密关系嘴替人格：温和但有边界", "室友沟通嘴替人格：规则清晰型"]
+  },
+  {
+    title: "训练场记录",
+    items: ["宿舍卫生大战：胜率 78", "职场甩锅：主线守护值 82", "网友阴阳怪气：失控风险 24"]
+  }
+];
+
+export const tempWhoOptions = ["陌生人", "商家", "网友", "同学", "路人", "其他"];
+export const tempGoalOptions = ["表达不满", "拒绝对方", "要求道歉", "争取权益", "结束对话"];
+export const tempToneOptions = ["冷静有理", "强硬反击", "阴阳怪气", "体面收场", "嘴毒但不脏"];
+
+export const initialTempSession = {
+  step: "setup",
+  who: "商家",
+  goal: "争取权益",
+  tone: "强硬反击",
+  input: "这个问题不是我们造成的，你自己没看清规则。",
+  rounds: []
+};
+
+export function buildTempChatTurn(session, opponentText) {
+  const target = session.goal || "稳住主线";
+  const tone = session.tone || "冷静有理";
+  return {
+    id: Date.now(),
+    opponent: opponentText,
+    analysis: `对方在把责任推回给你，核心话术是“规则/责任不在我”。不要顺着解释自己有没有看清，先把问题拉回事实和${target}。`,
+    mainline: `本轮主线：你面对的是${session.who}，目标是${target}，语气保持“${tone}”。`,
+    replies: [
+      {
+        label: "稳妥版",
+        text: `我理解你提到规则，但现在的问题是实际服务结果没有解决。请你直接说明这件事接下来怎么处理，而不是把责任全部推给我。`
+      },
+      {
+        label: "强硬版",
+        text: `别把问题绕成“我没看清”。我现在讨论的是你们提供的结果和应承担的处理责任。请给明确方案，不要继续转移重点。`
+      },
+      {
+        label: "嘴替版/阴阳版",
+        text: `原来只要一句“你没看清规则”，问题就能自动消失，挺省事的。但我这边需要的是解决方案，不是甩锅模板。`
+      }
+    ]
+  };
+}
+
+export const initialPersonaSession = {
+  step: "setup",
+  style: "我说话会先解释原因，不喜欢把话说绝，但希望对方认真听。",
+  relation: "室友",
+  problem: "容易解释太多，被对方带偏，最后忘记自己的诉求。",
+  expectation: "帮我说得像我本人，但更短、更稳、更有边界。",
+  boundary: "不辱骂、不威胁、不翻旧账，不把关系说死。",
+  personaName: "温和边界型嘴替",
+  input: "你怎么又开始了？这点小事也要上纲上线？",
+  rounds: []
+};
+
+export function buildPersonaChatTurn(session, opponentText) {
+  return {
+    id: Date.now(),
+    opponent: opponentText,
+    styleReminder: `保持你的风格：${session.style} 这轮少解释，多说感受、边界和请求。`,
+    analysis: `对方在用“你又开始了”给你扣情绪标签，容易让你陷入自证。先承认关系还重要，再把问题带回具体事情。`,
+    replies: [
+      {
+        label: "像我本人版",
+        text: `我不是想把事情闹大，也不是要跟你争输赢。但这件事确实影响到我了，我希望你先听我把重点说完，而不是一上来就说我又开始了。`
+      },
+      {
+        label: "更强硬版",
+        text: `别用“你又开始了”来跳过问题。我表达不舒服，不等于我在找事。我们现在说具体事情，不要把话题转成评价我这个人。`
+      },
+      {
+        label: "体面收尾版",
+        text: `如果你现在不想聊，我们可以先停一下。但这件事不能当作没发生，等都冷静一点，我们再把边界和处理方式说清楚。`
+      }
+    ]
+  };
+}
+
+export const initialTrainingSession = {
+  step: "setup",
+  scene: "宿舍卫生大战",
+  difficulty: "白银",
+  round: 1,
+  opponent: "你也太较真了吧？宿舍又不是你一个人的，凭什么都按你的标准来？",
+  input: "我不是要求所有人都按我的标准来，我是在说公共空间需要基本规则。",
+  feedbacks: []
+};
+
+export function buildTrainingChatTurn(session, userReply) {
+  const hasMainline = /规则|重点|现在|问题|责任|处理|解决/.test(userReply);
+  const score = hasMainline ? 84 : 61;
+  const nextOpponent =
+    session.difficulty === "王者"
+      ? "你这么说不就是觉得自己最委屈吗？我们都得围着你转？"
+      : "行，那你说怎么办？反正别什么都算我头上。";
+
+  return {
+    id: Date.now(),
+    userReply,
+    score,
+    strengths: hasMainline
+      ? "你没有被“较真”这个标签带偏，能把话题拉回公共规则。"
+      : "你有表达不满，但主线还可以更明确。",
+    problems: hasMainline
+      ? "可以再补一句具体要求，比如什么时候处理、谁负责哪部分。"
+      : "容易陷入解释自己为什么生气，对方会继续抓你的情绪做文章。",
+    optimized:
+      "重点不是我较不较真，而是公共空间要有基本规则。你可以不喜欢被提醒，但这部分确实需要处理。我们现在只定一件事：今天谁来收拾、以后怎么轮。",
+    nextOpponent
+  };
+}
+
+export const realtimeRecords = [
+  {
+    type: "临时代吵记录",
+    scene: "商家扯皮",
+    time: "今天 14:20",
+    goal: "争取权益",
+    rounds: 4,
+    summary: "最后生成了强硬版：请给明确处理方案，不要继续转移责任。"
+  },
+  {
+    type: "专属嘴替记录",
+    scene: "室友沟通",
+    time: "昨天 22:10",
+    goal: "保持关系但说清边界",
+    rounds: 3,
+    summary: "最后生成了像本人版：我不是要闹大，但这件事需要被认真听见。"
+  },
+  {
+    type: "吵架训练记录",
+    scene: "宿舍卫生大战",
+    time: "周一 19:35",
+    goal: "主线守护训练",
+    rounds: 5,
+    summary: "最终评分 84，主线清楚，建议补充具体要求。"
+  }
 ];
