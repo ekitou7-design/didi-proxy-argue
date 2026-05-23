@@ -11,13 +11,17 @@ import {
   buildPersonaChatTurn,
   buildTempChatTurn,
   buildTrainingChatTurn,
-  initialProxyPersonaState,
   initialPersonaSession,
+  initialProxyPersonaState,
   initialTempSession,
   initialTrainingSession,
   makeOpeningOpponent,
   relationProfiles
 } from "./data/mockData.js";
+
+const DISTILL_RESULTS_KEY = "persona_distill_results";
+const TEST_RESULTS_KEY = "persona_test_results";
+const CURRENT_PROFILE_KEY = "current_persona_profile";
 
 const pageTitles = {
   home: "滴滴代吵",
@@ -59,15 +63,9 @@ export default class App {
 
   getPage() {
     if (this.state.page === "temp") return TempArguePage(this.state.temp);
-    if (this.state.page === "persona") {
-      return PersonaPage(this.state.proxyPersona);
-    }
-    if (this.state.page === "personaDistill") {
-      return PersonaDistillPage(this.state.proxyPersona);
-    }
-    if (this.state.page === "personaTest") {
-      return PersonaTestPage(this.state.proxyPersona);
-    }
+    if (this.state.page === "persona") return PersonaPage(this.state.proxyPersona);
+    if (this.state.page === "personaDistill") return PersonaDistillPage(this.state.proxyPersona);
+    if (this.state.page === "personaTest") return PersonaTestPage(this.state.proxyPersona);
     if (this.state.page === "training") return TrainingPage(this.state.training);
     if (this.state.page === "records") {
       return RecordsPage({
@@ -110,14 +108,6 @@ export default class App {
       return;
     }
 
-    const tabTarget = event.target.closest("[data-persona-tab]");
-    if (tabTarget) {
-      this.setState({
-        proxyPersona: { ...this.state.proxyPersona, activeTab: tabTarget.dataset.personaTab }
-      });
-      return;
-    }
-
     const testTarget = event.target.closest("[data-test-answer]");
     if (testTarget) {
       this.setState({
@@ -132,42 +122,18 @@ export default class App {
       return;
     }
 
-    const profileTarget = event.target.closest("[data-load-profile]");
-    if (profileTarget) {
-      const profile = this.state.profiles.find((item) => item.id === profileTarget.dataset.loadProfile);
-      if (!profile) return;
-      this.setState({
-        activePersona: profile.name,
-        persona: {
-          ...this.state.persona,
-          profileId: profile.id,
-          who: profile.name,
-          relation: profile.relation,
-          commonConflict: profile.commonConflict,
-          tactics: profile.tactics,
-          style: profile.style,
-          boundary: profile.boundary,
-          expectation: profile.expectation
-        }
-      });
-      return;
-    }
-
     const actionTarget = event.target.closest("[data-action]");
     if (!actionTarget) return;
-
     const action = actionTarget.dataset.action;
-
-    if (action === "upload-chat-persona") {
-      await this.createPersonaFromChat();
-    }
 
     if (action === "generate-distill-persona") {
       await this.generateDistillPersona();
+      return;
     }
 
     if (action === "save-distill-persona") {
       this.saveDistillPersona();
+      return;
     }
 
     if (action === "reset-distill-result") {
@@ -179,61 +145,42 @@ export default class App {
           message: ""
         }
       });
+      return;
     }
 
     if (action === "submit-persona-test") {
-      await this.createPersonaFromTest();
+      this.createPersonaFromTest();
+      return;
+    }
+
+    if (action === "set-current-profile") {
+      this.setCurrentProfile(actionTarget.dataset.profileId);
+      return;
+    }
+
+    if (action === "delete-profile-result") {
+      this.deleteProfileResult(actionTarget.dataset.profileId);
+      return;
     }
 
     if (action === "generate-proxy-reply") {
       await this.generateProxyReply();
+      return;
     }
 
     if (action === "start-temp-chat") {
       this.setState({ temp: { ...this.state.temp, step: "chat", input: this.state.temp.latest || "" } });
+      return;
     }
 
     if (action === "edit-temp-setup") {
       this.setState({ temp: { ...this.state.temp, step: "setup" } });
+      return;
     }
 
     if (action === "temp-reply") {
-      const text = this.state.temp.input.trim();
-      if (!text) return;
-      let turn;
-      try {
-        const result = await postJson("/api/temp-argue", {
-          scene: this.state.temp.context,
-          opponent: text,
-          goal: this.state.temp.goal,
-          persona: this.state.temp.tone,
-          intensity: this.state.temp.tone
-        });
-        turn = {
-          id: Date.now(),
-          opponent: text,
-          analysis: result.opponentTactic,
-          mainline: `${result.strategy} ${result.offTopicWarning || ""}`,
-          replies: [
-            { label: "稳妥版", text: result.recommendedReply },
-            { label: "强硬版", text: result.strongerReply },
-            { label: "嘴替版/阴阳版", text: result.sarcasticReply || result.politeFinalReply }
-          ]
-        };
-      } catch {
-        turn = buildTempChatTurn(this.state.temp, text);
-      }
-      this.setState({
-        temp: { ...this.state.temp, latest: text, input: "", rounds: [...this.state.temp.rounds, turn] }
-      });
-    }
-
-    if (action === "save-persona-profile") {
-      const profile = this.buildProfileFromPersona();
-      const profiles = this.state.profiles.some((item) => item.id === profile.id)
-        ? this.state.profiles.map((item) => (item.id === profile.id ? profile : item))
-        : [profile, ...this.state.profiles];
-      this.setState({ profiles, activePersona: profile.name, persona: { ...this.state.persona, profileId: profile.id } });
+      await this.handleTempReply();
+      return;
     }
 
     if (action === "start-persona-chat") {
@@ -241,10 +188,12 @@ export default class App {
         activePersona: this.state.persona.who,
         persona: { ...this.state.persona, step: "chat", input: this.state.persona.latest || "" }
       });
+      return;
     }
 
     if (action === "edit-persona-setup") {
       this.setState({ persona: { ...this.state.persona, step: "setup" } });
+      return;
     }
 
     if (action === "persona-reply") {
@@ -254,51 +203,22 @@ export default class App {
       this.setState({
         persona: { ...this.state.persona, latest: text, input: "", rounds: [...this.state.persona.rounds, turn] }
       });
+      return;
     }
 
     if (action === "start-training-chat") {
       const opponent = makeOpeningOpponent(this.state.training.scene);
       this.setState({ training: { ...this.state.training, step: "chat", opponent } });
+      return;
     }
 
     if (action === "edit-training-setup") {
       this.setState({ training: { ...this.state.training, step: "setup" } });
+      return;
     }
 
     if (action === "training-submit") {
-      const reply = this.state.training.input.trim();
-      if (!reply) return;
-      let feedback;
-      try {
-        const result = await postJson("/api/training/score", {
-          scenario: this.state.training.scene,
-          difficulty: this.state.training.difficulty,
-          opponentType: "嘴硬型",
-          opponentMessage: this.state.training.opponent,
-          userReply: reply,
-          round: this.state.training.round
-        });
-        feedback = {
-          id: Date.now(),
-          userReply: reply,
-          score: result.scores?.winRate || 0,
-          strengths: result.analysis,
-          problems: result.suggestion,
-          optimized: result.betterReply,
-          nextOpponent: result.nextOpponentMessage
-        };
-      } catch {
-        feedback = buildTrainingChatTurn(this.state.training, reply);
-      }
-      this.setState({
-        training: {
-          ...this.state.training,
-          input: "",
-          round: this.state.training.round + 1,
-          opponent: feedback.nextOpponent,
-          feedbacks: [...this.state.training.feedbacks, feedback]
-        }
-      });
+      await this.handleTrainingSubmit();
     }
   }
 
@@ -327,26 +247,18 @@ export default class App {
     const file = fileInput.files?.[0];
     if (!file) return;
     if (!file.name.toLowerCase().endsWith(".txt") && file.type !== "text/plain") {
-      this.setState({
-        proxyPersona: {
-          ...this.state.proxyPersona,
-          message: "目前只支持 txt 文本文件。"
-        }
-      });
+      this.updateProxyPersona({ message: "目前只支持 txt 文本文件。" });
       return;
     }
 
     const reader = new FileReader();
     reader.onload = () => {
-      this.setState({
-        proxyPersona: {
-          ...this.state.proxyPersona,
-          upload: {
-            ...this.state.proxyPersona.upload,
-            chatText: String(reader.result || "")
-          },
-          message: "已读取 txt 文件内容。"
-        }
+      this.updateProxyPersona({
+        upload: {
+          ...this.state.proxyPersona.upload,
+          chatText: String(reader.result || "")
+        },
+        message: "已读取 txt 文件内容。"
       });
     };
     reader.readAsText(file, "utf-8");
@@ -354,10 +266,17 @@ export default class App {
 
   navigate(page) {
     const hash = hashFromPage(page);
-    if (hash && window.location.hash !== hash) {
-      window.location.hash = hash;
-    }
+    if (hash && window.location.hash !== hash) window.location.hash = hash;
     this.setState({ page });
+  }
+
+  updateProxyPersona(partial) {
+    this.setState({
+      proxyPersona: {
+        ...this.state.proxyPersona,
+        ...partial
+      }
+    });
   }
 
   setNestedState(rootKey, groupKey, field, value, render = true) {
@@ -371,61 +290,27 @@ export default class App {
     if (render) this.render();
   }
 
-  async createPersonaFromChat() {
-    const { userId, upload } = this.state.proxyPersona;
-    try {
-      const result = await postJson("/api/persona/analyze-chat", {
-        chatHistory: upload.chatText,
-        relationship: upload.relationship,
-        background: upload.background,
-        userGoal: upload.userGoal || ""
-      });
-      this.addGeneratedPersona(
-        { ...result.personaProfile, id: Date.now(), sourceType: "chat_upload" },
-        "已生成聊天蒸馏嘴替档案"
-      );
-    } catch (error) {
-      this.addGeneratedPersona(
-        makeLocalPersona("chat_upload", upload.relationship),
-        `${error.message}。先用本地示例档案预览，配置 OPENAI_API_KEY 后会生成 AI 档案。`
-      );
-    }
-  }
-
   async generateDistillPersona() {
     const { upload } = this.state.proxyPersona;
-    this.setState({
-      proxyPersona: {
-        ...this.state.proxyPersona,
-        distillStatus: "loading",
-        message: "",
-        distillResult: null
-      }
-    });
+    this.updateProxyPersona({ distillStatus: "loading", distillResult: null, message: "" });
 
     try {
       const result = await postJson("/api/persona/analyze-chat", {
         chatHistory: upload.chatText,
         relationship: upload.relationship,
         background: upload.background,
-        userGoal: upload.userGoal || ""
+        userGoal: "生成用户的专属嘴替表达风格"
       });
-      this.setState({
-        proxyPersona: {
-          ...this.state.proxyPersona,
-          distillStatus: "done",
-          distillResult: makeDistillResult(result.personaProfile, upload),
-          message: "蒸馏完成，可以保存档案。"
-        }
+      this.updateProxyPersona({
+        distillStatus: "done",
+        distillResult: makeDistillResult(result.personaProfile, upload),
+        message: "蒸馏完成，可以保存档案。"
       });
     } catch (error) {
-      this.setState({
-        proxyPersona: {
-          ...this.state.proxyPersona,
-          distillStatus: "done",
-          distillResult: makeDistillResult(makeLocalPersona("chat_upload", upload.relationship), upload),
-          message: `${error.message}。先用本地示例档案预览，配置 OPENAI_API_KEY 后会生成 AI 档案。`
-        }
+      this.updateProxyPersona({
+        distillStatus: "done",
+        distillResult: makeDistillResult(makeMockDistillProfile(), upload),
+        message: `${error.message}。先用本地模拟结果跑通流程。`
       });
     }
   }
@@ -433,52 +318,84 @@ export default class App {
   saveDistillPersona() {
     const result = this.state.proxyPersona.distillResult;
     if (!result) return;
-    this.addGeneratedPersona(flattenDistillPersona(result), "已保存蒸馏嘴替档案");
-  }
-
-  async createPersonaFromTest() {
-    const { userId, testAnswers } = this.state.proxyPersona;
-    const answers = Object.entries(testAnswers).map(([questionId, answer]) => ({
-      questionId: Number(questionId),
-      answer
-    }));
-    try {
-      const result = await postJson("/api/persona/test-result", { userId, answers });
-      this.addGeneratedPersona(
-        { ...result.personaProfile, id: Date.now(), sourceType: "test" },
-        "已生成测试嘴替档案"
-      );
-    } catch (error) {
-      this.addGeneratedPersona(
-        makeLocalPersona("test", "测试生成嘴替"),
-        `${error.message}。先用本地示例档案预览，配置 OPENAI_API_KEY 后会生成 AI 档案。`
-      );
-    }
-  }
-
-  addGeneratedPersona(persona, message) {
+    const distillResults = [result, ...this.state.proxyPersona.distillResults];
+    writeJson(DISTILL_RESULTS_KEY, distillResults);
+    writeJson(CURRENT_PROFILE_KEY, result);
     this.setState({
       page: "persona",
-      activePersona: persona.name,
+      activePersona: result.profileName,
       proxyPersona: {
         ...this.state.proxyPersona,
-        personas: [persona, ...this.state.proxyPersona.personas],
-        selectedPersonaId: String(persona.id),
+        distillResults,
+        personas: mergePersonas(distillResults, this.state.proxyPersona.testResults),
+        selectedPersonaId: result.id,
+        currentProfile: result,
         distillResult: null,
         distillStatus: "idle",
-        message
+        message: "已保存蒸馏嘴替档案，并设为当前嘴替。"
       }
     });
     if (window.location.hash !== "#/persona") window.location.hash = "#/persona";
   }
 
+  createPersonaFromTest() {
+    const result = makeTestResult(this.state.proxyPersona.testAnswers);
+    const testResults = [result, ...this.state.proxyPersona.testResults];
+    writeJson(TEST_RESULTS_KEY, testResults);
+    this.setState({
+      page: "persona",
+      proxyPersona: {
+        ...this.state.proxyPersona,
+        testResults,
+        personas: mergePersonas(this.state.proxyPersona.distillResults, testResults),
+        selectedPersonaId: result.id,
+        message: "已生成测试结果。"
+      }
+    });
+    if (window.location.hash !== "#/persona") window.location.hash = "#/persona";
+  }
+
+  setCurrentProfile(profileId) {
+    const profile = this.state.proxyPersona.personas.find((item) => item.id === profileId);
+    if (!profile) return;
+    writeJson(CURRENT_PROFILE_KEY, profile);
+    this.updateProxyPersona({
+      currentProfile: profile,
+      selectedPersonaId: profile.id,
+      message: `当前嘴替已设为：${getProfileName(profile)}`
+    });
+  }
+
+  deleteProfileResult(profileId) {
+    const distillResults = this.state.proxyPersona.distillResults.filter((item) => item.id !== profileId);
+    const testResults = this.state.proxyPersona.testResults.filter((item) => item.id !== profileId);
+    writeJson(DISTILL_RESULTS_KEY, distillResults);
+    writeJson(TEST_RESULTS_KEY, testResults);
+
+    const currentProfile =
+      this.state.proxyPersona.currentProfile?.id === profileId ? null : this.state.proxyPersona.currentProfile;
+    if (!currentProfile) localStorage.removeItem(CURRENT_PROFILE_KEY);
+
+    this.updateProxyPersona({
+      distillResults,
+      testResults,
+      personas: mergePersonas(distillResults, testResults),
+      currentProfile,
+      selectedPersonaId: currentProfile?.id || "",
+      message: "已删除。"
+    });
+  }
+
   async generateProxyReply() {
     const state = this.state.proxyPersona;
-    if (!state.selectedPersonaId) {
-      this.setState({ proxyPersona: { ...state, message: "请先生成或选择一个嘴替档案" } });
+    const styleProfile =
+      state.personas.find((persona) => String(persona.id) === String(state.selectedPersonaId)) ||
+      state.currentProfile;
+    if (!styleProfile) {
+      this.updateProxyPersona({ message: "请先生成或选择一个嘴替档案。" });
       return;
     }
-    const styleProfile = state.personas.find((persona) => String(persona.id) === String(state.selectedPersonaId));
+
     try {
       const result = await postJson("/api/persona-reply", {
         chatHistory: state.upload.chatText,
@@ -488,45 +405,91 @@ export default class App {
         goal: state.replyForm.goal,
         styleProfile
       });
-      this.setState({
-        proxyPersona: {
-          ...this.state.proxyPersona,
-          replyResult: {
-            reply: result.myStyleReply,
-            strategy: result.styleAnalysis,
-            tone: styleProfile?.tone || ""
-          },
-          message: "回应已生成"
-        }
+      this.updateProxyPersona({
+        replyResult: {
+          reply: result.myStyleReply,
+          strategy: result.styleAnalysis,
+          tone: getProfileTone(styleProfile)
+        },
+        message: "回应已生成。"
       });
     } catch (error) {
-      this.setState({
-        proxyPersona: {
-          ...this.state.proxyPersona,
-          replyResult: makeLocalReply(state.replyForm, styleProfile),
-          message: `${error.message}。先用本地示例回应预览。`
-        }
+      this.updateProxyPersona({
+        replyResult: makeLocalReply(state.replyForm, styleProfile),
+        message: `${error.message}。先用本地示例回应预览。`
       });
     }
   }
 
-  buildProfileFromPersona() {
-    const session = this.state.persona;
-    return {
-      id: session.profileId || `profile-${Date.now()}`,
-      name: session.who || "新的关系对象",
-      relation: session.relation || "",
-      commonConflict: session.commonConflict || "",
-      tactics: session.tactics || "",
-      style: session.style || "",
-      boundary: session.boundary || "",
-      expectation: session.expectation || ""
-    };
+  async handleTempReply() {
+    const text = this.state.temp.input.trim();
+    if (!text) return;
+    let turn;
+    try {
+      const result = await postJson("/api/temp-argue", {
+        scene: this.state.temp.context,
+        opponent: text,
+        goal: this.state.temp.goal,
+        persona: this.state.temp.tone,
+        intensity: this.state.temp.tone
+      });
+      turn = {
+        id: Date.now(),
+        opponent: text,
+        analysis: result.opponentTactic,
+        mainline: `${result.strategy} ${result.offTopicWarning || ""}`,
+        replies: [
+          { label: "稳妥版", text: result.recommendedReply },
+          { label: "强硬版", text: result.strongerReply },
+          { label: "嘴替版/阴阳版", text: result.sarcasticReply || result.politeFinalReply }
+        ]
+      };
+    } catch {
+      turn = buildTempChatTurn(this.state.temp, text);
+    }
+    this.setState({
+      temp: { ...this.state.temp, latest: text, input: "", rounds: [...this.state.temp.rounds, turn] }
+    });
+  }
+
+  async handleTrainingSubmit() {
+    const reply = this.state.training.input.trim();
+    if (!reply) return;
+    let feedback;
+    try {
+      const result = await postJson("/api/training/score", {
+        scenario: this.state.training.scene,
+        difficulty: this.state.training.difficulty,
+        opponentType: "嘴硬型",
+        opponentMessage: this.state.training.opponent,
+        userReply: reply,
+        round: this.state.training.round
+      });
+      feedback = {
+        id: Date.now(),
+        userReply: reply,
+        score: result.scores?.winRate || 0,
+        strengths: result.analysis,
+        problems: result.suggestion,
+        optimized: result.betterReply,
+        nextOpponent: result.nextOpponentMessage
+      };
+    } catch {
+      feedback = buildTrainingChatTurn(this.state.training, reply);
+    }
+    this.setState({
+      training: {
+        ...this.state.training,
+        input: "",
+        round: this.state.training.round + 1,
+        opponent: feedback.nextOpponent,
+        feedbacks: [...this.state.training.feedbacks, feedback]
+      }
+    });
   }
 
   render() {
     const { page } = this.state;
-
     this.root.innerHTML = `
       <div class="app-shell">
         <div class="phone-frame">
@@ -569,6 +532,11 @@ async function postJson(url, body) {
 }
 
 function createProxyPersonaState() {
+  const distillResults = readJson(DISTILL_RESULTS_KEY, []).map(normalizeDistillResult);
+  const testResults = readJson(TEST_RESULTS_KEY, []).map(normalizeTestResult);
+  const currentProfile = readJson(CURRENT_PROFILE_KEY, null);
+  const personas = mergePersonas(distillResults, testResults);
+
   return {
     ...structuredClone(initialProxyPersonaState),
     activeTab: "upload",
@@ -577,15 +545,12 @@ function createProxyPersonaState() {
       background: "他最近经常不回消息，临时改约后说我太敏感。",
       chatText: "我不是想吵架，我只是希望你尊重之前说好的约定。你先别把问题说成我太敏感。"
     },
-    testAnswers: {
-      1: "A",
-      2: "B",
-      3: "A",
-      4: "C",
-      5: "B"
-    },
-    personas: [],
-    selectedPersonaId: "",
+    testAnswers: { 1: "A", 2: "B", 3: "A", 4: "C", 5: "B" },
+    distillResults,
+    testResults,
+    personas,
+    selectedPersonaId: currentProfile?.id || personas[0]?.id || "",
+    currentProfile,
     distillStatus: "idle",
     distillResult: null,
     replyForm: {
@@ -609,59 +574,132 @@ function makeDistillResult(personaProfile, upload) {
     relationship: upload.relationship || "",
     background: upload.background || "",
     styleProfile: {
-      tone: profile.tone || "温柔但有边界",
+      tone: profile.tone || "冷静但有压迫感",
       emotionLevel: Number(profile.emotionLevel || 3),
-      logicStyle: profile.logicStyle || "先说事实，再讲影响，最后落到诉求。",
-      commonPhrases: profile.commonPhrases || [],
-      avoidWords: profile.avoidWords || [],
-      replyStrategy: profile.replyStrategy || "不自证，不跑题，守住事实和边界。",
-      profileSummary: profile.profileSummary || "根据聊天记录生成的嘴替表达风格。"
+      logicStyle: profile.logicStyle || "先指出问题，再反问对方逻辑漏洞，最后给出边界",
+      commonPhrases: profile.commonPhrases || ["你先别转移话题", "我现在说的是这件事本身", "这不是我敏感，是你的处理方式有问题"],
+      avoidWords: profile.avoidWords || ["脏话", "人身攻击", "过度服软"],
+      replyStrategy: profile.replyStrategy || "不跟随对方转移话题，持续围绕核心问题推进",
+      profileSummary: profile.profileSummary || "适合生成冷静、清楚、有边界感的个性化回应。"
     }
   };
 }
 
-function flattenDistillPersona(result) {
-  const profile = result.styleProfile || {};
+function makeMockDistillProfile() {
   return {
-    id: result.id,
-    createdAt: result.createdAt,
-    sourceType: result.sourceType,
-    profileName: result.profileName,
-    name: result.profileName,
-    relationship: result.relationship,
-    background: result.background,
-    styleProfile: profile,
-    tone: profile.tone,
-    emotionLevel: profile.emotionLevel,
-    logicStyle: profile.logicStyle,
-    commonPhrases: profile.commonPhrases,
-    avoidWords: profile.avoidWords,
-    replyStrategy: profile.replyStrategy,
-    profileSummary: profile.profileSummary
+    profileName: "我的蒸馏嘴替",
+    styleProfile: {
+      tone: "冷静但有压迫感",
+      emotionLevel: 3,
+      logicStyle: "先指出问题，再反问对方逻辑漏洞，最后给出边界",
+      commonPhrases: ["你先别转移话题", "我现在说的是这件事本身", "这不是我敏感，是你的处理方式有问题"],
+      avoidWords: ["脏话", "人身攻击", "过度服软"],
+      replyStrategy: "不跟随对方转移话题，持续围绕核心问题推进",
+      profileSummary: "适合生成冷静、清楚、有边界感的个性化回应。"
+    }
   };
 }
 
-function makeLocalPersona(sourceType, nameSeed) {
+function makeTestResult(testAnswers) {
+  const pool = [
+    { typeName: "冷面判官", nickname: "逻辑处刑台", subtitle: "你不是在吵架，你是在宣判对方逻辑死刑。", tags: ["冷静", "逻辑", "压迫", "证据"] },
+    { typeName: "阴阳补刀王", nickname: "笑面小刀", subtitle: "你不一定骂人，但你每句话都像带了小倒刺。", tags: ["阴阳", "反讽", "补刀", "轻刺"] },
+    { typeName: "边界封门员", nickname: "人际门禁系统", subtitle: "你不是不好惹，你只是所有越界行为都会被系统拦截。", tags: ["边界", "拒绝", "稳定", "不内耗"] },
+    { typeName: "反问审讯官", nickname: "证据席管理员", subtitle: "你不会急着解释，你会先让对方上证据席。", tags: ["反问", "证据", "审讯", "拆招"] },
+    { typeName: "主线追杀者", nickname: "跑题终结机", subtitle: "对方每转移一次话题，你就把他拖回案发现场一次。", tags: ["主线", "控场", "追问", "回拉"] },
+    { typeName: "双标反杀机", nickname: "规则回旋镖", subtitle: "对方定规则，你负责把规则原样砸回去。", tags: ["双标", "反杀", "规则", "回旋镖"] },
+    { typeName: "发疯炮台", nickname: "精神状态领先版", subtitle: "你的精神状态很稳定，稳定地准备开炮。", tags: ["高能", "爆发", "压制", "戏剧感"] },
+    { typeName: "体面绝杀师", nickname: "优雅封口器", subtitle: "你不脏嘴，但你一句话能把这段对话钉进棺材里。", tags: ["体面", "收口", "绝杀", "克制"] }
+  ];
+  const score = Object.values(testAnswers).reduce((sum, answer) => sum + answer.charCodeAt(0), 0);
+  const base = pool[score % pool.length];
+  return normalizeTestResult({
+    id: `test-${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    sourceType: "test",
+    ...base
+  });
+}
+
+function normalizeDistillResult(result) {
+  const profile = result.styleProfile || result;
   return {
-    id: Date.now(),
-    name: sourceType === "test" ? "测试生成嘴替" : `${nameSeed || "我的"}嘴替`,
-    sourceType,
-    tone: "温柔但有边界",
-    emotionLevel: 3,
-    logicStyle: "先抓住事实，再说明影响，最后给出明确诉求。",
-    commonPhrases: ["我先把重点说清楚", "这不是情绪问题", "请你正面回应"],
-    avoidWords: ["脏话", "人身攻击", "威胁", "翻旧账"],
-    replyStrategy: "不自证，不跑题，把对方的话术压回事实和责任。",
-    profileSummary: "本地预览档案：用于没有配置 API Key 时先体验页面流程。"
+    id: String(result.id || `distill-${Date.now()}`),
+    createdAt: result.createdAt || new Date().toISOString(),
+    sourceType: "chat_upload",
+    profileName: result.profileName || result.name || "我的蒸馏嘴替",
+    relationship: result.relationship || "",
+    background: result.background || "",
+    styleProfile: {
+      tone: profile.tone || "冷静但有压迫感",
+      emotionLevel: Number(profile.emotionLevel || 3),
+      logicStyle: profile.logicStyle || "",
+      commonPhrases: profile.commonPhrases || [],
+      avoidWords: profile.avoidWords || [],
+      replyStrategy: profile.replyStrategy || "",
+      profileSummary: profile.profileSummary || ""
+    }
   };
+}
+
+function normalizeTestResult(result) {
+  const fallback = {
+    typeName: result.typeName || result.name || "冷面判官",
+    nickname: result.nickname || "逻辑处刑台",
+    subtitle: result.subtitle || "你不是在吵架，你是在宣判对方逻辑死刑。",
+    tags: result.tags || ["冷静", "逻辑", "压迫", "证据"]
+  };
+  return {
+    id: String(result.id || `test-${Date.now()}`),
+    createdAt: result.createdAt || new Date().toISOString(),
+    sourceType: "test",
+    typeName: fallback.typeName,
+    nickname: fallback.nickname,
+    subtitle: fallback.subtitle,
+    tags: fallback.tags,
+    styleProfile: {
+      tone: fallback.typeName,
+      emotionLevel: 3,
+      logicStyle: fallback.nickname,
+      commonPhrases: fallback.tags,
+      avoidWords: ["脏话", "人身攻击"],
+      replyStrategy: fallback.subtitle,
+      profileSummary: fallback.subtitle
+    }
+  };
+}
+
+function mergePersonas(distillResults, testResults) {
+  return [...distillResults, ...testResults];
+}
+
+function getProfileName(profile) {
+  return profile.profileName || profile.typeName || profile.name || "我的嘴替";
+}
+
+function getProfileTone(profile) {
+  return profile.styleProfile?.tone || profile.tone || profile.typeName || "";
 }
 
 function makeLocalReply(replyForm, styleProfile) {
   return {
     reply: `我先把重点说清楚：你刚才这句话是在把问题转成我的情绪。现在要谈的是${replyForm.goal || "这件事怎么处理"}，不是我有没有资格不舒服。请你正面回应。`,
     strategy: "本地预览：识别贴标签/转移话题，拉回事实、影响、诉求和边界。",
-    tone: styleProfile?.tone || "温柔但有边界"
+    tone: getProfileTone(styleProfile) || "温柔但有边界"
   };
+}
+
+function readJson(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeJson(key, value) {
+  localStorage.setItem(key, JSON.stringify(value));
 }
 
 function pageFromHash() {

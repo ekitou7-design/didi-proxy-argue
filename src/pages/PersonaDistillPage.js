@@ -26,7 +26,7 @@ export default function PersonaDistillPage(state) {
 
         <section class="upload-strip">
           <strong>上传聊天记录文件</strong>
-          <p>目前建议使用 txt 文本文件。截图识别功能后续再支持。</p>
+          <p>上传聊天记录文件，目前建议使用 txt 文本文件。截图识别功能后续再支持。</p>
           <label class="file-button">
             <span>选择 txt 文件</span>
             <input type="file" accept=".txt,text/plain" data-file-input="persona-distill" />
@@ -50,20 +50,31 @@ function DistillResult(result) {
     <section class="result-card">
       <div class="card-title-row">
         <h2>${escapeHtml(result.profileName)}</h2>
-        <span class="stamp">已生成</span>
+        <span class="stamp">测出来了</span>
       </div>
       <div class="temp-result-block">
-        <h3>关系</h3>
-        <p>${escapeHtml(result.relationship)}</p>
+        <h3>表达风格</h3>
+        <p>${escapeHtml(profile.tone)}</p>
       </div>
       <div class="temp-result-block">
-        <h3>风格摘要</h3>
-        <p>${escapeHtml(profile.profileSummary)}</p>
+        <h3>情绪强度</h3>
+        <p>${escapeHtml(profile.emotionLevel)} / 5</p>
       </div>
-      <div class="tag-row">
-        <span>${escapeHtml(profile.tone)}</span>
-        <span>情绪 ${profile.emotionLevel || 0}/5</span>
-        <span>${escapeHtml(profile.logicStyle)}</span>
+      <div class="temp-result-block">
+        <h3>逻辑方式</h3>
+        <p>${escapeHtml(profile.logicStyle)}</p>
+      </div>
+      <div class="temp-result-block">
+        <h3>常用表达</h3>
+        <p>${escapeHtml((profile.commonPhrases || []).join(" / "))}</p>
+      </div>
+      <div class="temp-result-block">
+        <h3>避免用语</h3>
+        <p>${escapeHtml((profile.avoidWords || []).join(" / "))}</p>
+      </div>
+      <div class="temp-result-block">
+        <h3>回应策略</h3>
+        <p>${escapeHtml(profile.replyStrategy)}</p>
       </div>
       <div class="button-row result-actions-stack">
         <button class="primary-button" data-action="save-distill-persona">保存档案并返回专属嘴替</button>

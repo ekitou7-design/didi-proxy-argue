@@ -12,20 +12,22 @@ export default function PersonaPage(state) {
         </div>
       </section>
 
+      ${CurrentProfile(state.currentProfile)}
+
       <section class="feature-list two-entry">
         <button class="feature-card pink" data-page="personaDistill">
           <span class="feature-tone">蒸馏</span>
           <div><h3>蒸馏自己</h3><p>跳到独立蒸馏页，粘贴聊天记录生成表达风格。</p></div>
           <span class="feature-arrow">›</span>
         </button>
-        ${DistillHistory(state)}
+        ${DistillHistory(state.distillResults)}
 
         <button class="feature-card blue" data-page="personaTest">
           <span class="feature-tone">测试</span>
           <div><h3>做个测试题</h3><p>跳到独立测试页，5 道题生成嘴替人格。</p></div>
           <span class="feature-arrow">›</span>
         </button>
-        ${TestHistory(state)}
+        ${TestHistory(state.testResults)}
       </section>
 
       ${PersonaList(state)}
@@ -34,40 +36,85 @@ export default function PersonaPage(state) {
   `;
 }
 
-function DistillHistory(state) {
-  const distillPersonas = state.personas.filter((persona) => persona.sourceType === "chat_upload");
-  if (!distillPersonas.length) {
+function CurrentProfile(profile) {
+  if (!profile) {
+    return `<section class="empty-chat">当前嘴替：还没设置。可以先蒸馏自己，或者做一次测试。</section>`;
+  }
+
+  return `
+    <section class="chat-status persona-status">
+      <strong>当前嘴替：${escapeHtml(profile.profileName || profile.typeName)}</strong>
+      <p>${escapeHtml(profile.styleProfile?.profileSummary || profile.subtitle || "")}</p>
+    </section>
+  `;
+}
+
+function DistillHistory(results) {
+  if (!results.length) {
     return `<div class="empty-chat compact-empty">还没有蒸馏结果。完成蒸馏后会显示在这里。</div>`;
   }
-  return HistoryBlock("蒸馏结果", distillPersonas);
-}
 
-function TestHistory(state) {
-  const testPersonas = state.personas.filter((persona) => persona.sourceType === "test");
-  if (!testPersonas.length) {
-    return `<div class="empty-chat compact-empty">还没有历史测评结果。做完测试后会显示在这里。</div>`;
-  }
-  return HistoryBlock("历史测评结果", testPersonas);
-}
-
-function HistoryBlock(title, personas) {
   return `
     <section class="persona-history">
-      <h2>${title}</h2>
-      ${personas
-        .map(
-          (persona) => `
-            <article class="persona-summary">
-              <div class="card-title-row">
-                <h2>${escapeHtml(persona.name || persona.profileName)}</h2>
-                <span class="stamp">${escapeHtml(persona.tone || persona.styleProfile?.tone)}</span>
-              </div>
-              <p>${escapeHtml(persona.profileSummary || persona.styleProfile?.profileSummary)}</p>
-            </article>
-          `
-        )
-        .join("")}
+      <h2>蒸馏结果</h2>
+      ${results.map(DistillCard).join("")}
     </section>
+  `;
+}
+
+function DistillCard(result) {
+  const profile = result.styleProfile || {};
+  const phrases = (profile.commonPhrases || []).slice(0, 3);
+  return `
+    <article class="persona-summary">
+      <div class="card-title-row">
+        <h2>${escapeHtml(result.profileName)}</h2>
+        <span class="stamp">聊天记录蒸馏</span>
+      </div>
+      <p><strong>生成时间：</strong>${formatTime(result.createdAt)}</p>
+      <p><strong>关系：</strong>${escapeHtml(result.relationship || "未填写")}</p>
+      <p>${escapeHtml(profile.profileSummary)}</p>
+      <div class="tag-row">
+        ${phrases.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+      </div>
+      <div class="button-row result-actions-stack">
+        <button class="secondary-button warm" data-action="set-current-profile" data-profile-id="${escapeAttr(result.id)}">设为当前嘴替</button>
+        <button class="secondary-button" data-action="delete-profile-result" data-profile-id="${escapeAttr(result.id)}">删除</button>
+      </div>
+    </article>
+  `;
+}
+
+function TestHistory(results) {
+  if (!results.length) {
+    return `<div class="empty-chat compact-empty">还没有历史测评结果。做完测试后会显示在这里。</div>`;
+  }
+
+  return `
+    <section class="persona-history">
+      <h2>历史测评结果</h2>
+      ${results.map(TestCard).join("")}
+    </section>
+  `;
+}
+
+function TestCard(result) {
+  return `
+    <article class="persona-summary">
+      <div class="card-title-row">
+        <h2>${escapeHtml(result.typeName)}</h2>
+        <span class="stamp">${escapeHtml(result.nickname)}</span>
+      </div>
+      <p>${escapeHtml(result.subtitle)}</p>
+      <div class="tag-row">
+        ${(result.tags || []).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+      </div>
+      <p><strong>测试时间：</strong>${formatTime(result.createdAt)}</p>
+      <div class="button-row result-actions-stack">
+        <button class="secondary-button warm" data-action="set-current-profile" data-profile-id="${escapeAttr(result.id)}">设为当前嘴替</button>
+        <button class="secondary-button" data-action="delete-profile-result" data-profile-id="${escapeAttr(result.id)}">删除</button>
+      </div>
+    </article>
   `;
 }
 
@@ -85,30 +132,12 @@ function PersonaList(state) {
           ${state.personas
             .map(
               (persona) =>
-                `<option value="${persona.id}" ${String(persona.id) === String(state.selectedPersonaId) ? "selected" : ""}>${escapeHtml(persona.name || persona.profileName)} · ${escapeHtml(persona.tone || persona.styleProfile?.tone)}</option>`
+                `<option value="${escapeAttr(persona.id)}" ${String(persona.id) === String(state.selectedPersonaId) ? "selected" : ""}>${escapeHtml(persona.profileName || persona.typeName)} · ${escapeHtml(persona.styleProfile?.tone || persona.nickname || "")}</option>`
             )
             .join("")}
         </select>
       </label>
-      ${state.personas.map(PersonaCard).join("")}
     </section>
-  `;
-}
-
-function PersonaCard(persona) {
-  return `
-    <article class="persona-summary">
-      <div class="card-title-row">
-        <h2>${escapeHtml(persona.name || persona.profileName)}</h2>
-        <span class="stamp">${persona.sourceType === "test" ? "测试" : "蒸馏"}</span>
-      </div>
-      <p>${escapeHtml(persona.profileSummary || persona.styleProfile?.profileSummary)}</p>
-      <div class="tag-row">
-        <span>${escapeHtml(persona.tone || persona.styleProfile?.tone)}</span>
-        <span>情绪 ${persona.emotionLevel || persona.styleProfile?.emotionLevel || 0}/5</span>
-        <span>${escapeHtml(persona.logicStyle || persona.styleProfile?.logicStyle)}</span>
-      </div>
-    </article>
   `;
 }
 
@@ -123,6 +152,7 @@ function ReplyGenerator(state) {
       <div class="field-title">回应强度</div>
       ${ChipGroup("strength", strengths, state.replyForm.strength)}
       <button class="primary-button" data-action="generate-proxy-reply">生成回应</button>
+      ${state.message ? `<p class="section-note">${escapeHtml(state.message)}</p>` : ""}
       ${state.replyResult ? ReplyResult(state.replyResult) : ""}
     </section>
   `;
@@ -165,6 +195,16 @@ function ChipGroup(field, options, active) {
         .join("")}
     </div>
   `;
+}
+
+function formatTime(value) {
+  if (!value) return "刚刚";
+  return new Date(value).toLocaleString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 function escapeHtml(value) {

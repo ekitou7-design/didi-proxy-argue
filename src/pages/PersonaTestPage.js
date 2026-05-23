@@ -69,7 +69,6 @@ export default function PersonaTestPage(state) {
           <button class="secondary-button warm" data-page="persona">返回</button>
           <button class="primary-button" data-action="submit-persona-test">提交并生成档案</button>
         </div>
-        ${state.message ? `<p class="section-note">${escapeHtml(state.message)}</p>` : ""}
       </section>
     </div>
   `;
@@ -92,12 +91,4 @@ function Question(question, answer) {
       </div>
     </div>
   `;
-}
-
-function escapeHtml(value) {
-  return String(value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
 }
