@@ -962,6 +962,25 @@ textarea:focus {
   border-radius: 16px;
 }
 
+.persona-history {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 16px;
+}
+
+.persona-history h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.compact-empty {
+  padding: 12px;
+}
+
 .persona-summary p {
   margin: 0;
   color: var(--muted);
@@ -977,6 +996,50 @@ textarea:focus {
   border-radius: 14px;
   line-height: 1.45;
   font-weight: 900;
+}
+
+.upload-strip {
+  margin: 0 0 14px;
+  padding: 12px;
+  background: var(--blue);
+  border: 2px solid var(--ink);
+  border-radius: 16px;
+}
+
+.upload-strip strong,
+.upload-strip p {
+  display: block;
+  margin: 0;
+}
+
+.upload-strip p {
+  margin-top: 6px;
+  color: var(--muted);
+  line-height: 1.45;
+  font-weight: 900;
+}
+
+.file-button {
+  display: inline-flex;
+  margin: 12px 0 0;
+  padding: 9px 12px;
+  background: var(--yellow);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  box-shadow: 3px 3px 0 var(--ink);
+  cursor: pointer;
+}
+
+.file-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.result-actions-stack {
+  margin-top: 14px;
 }
 
 .test-question {

@@ -1,5 +1,3 @@
-import { personaTestQuestions } from "../data/mockData.js";
-
 const goals = ["反击对方逻辑", "表达不满", "争取道歉", "不吵大但讲清楚"];
 const strengths = ["低强度", "中等强度", "高强度", "直接开怼"];
 
@@ -15,80 +13,81 @@ export default function PersonaPage(state) {
       </section>
 
       <section class="feature-list two-entry">
-        <button class="feature-card pink ${state.activeTab === "upload" ? "selected" : ""}" data-persona-tab="upload">
+        <button class="feature-card pink" data-page="personaDistill">
           <span class="feature-tone">蒸馏</span>
-          <div><h3>蒸馏自己</h3><p>上传或粘贴聊天记录，生成更像你的表达风格。</p></div>
+          <div><h3>蒸馏自己</h3><p>跳到独立蒸馏页，粘贴聊天记录生成表达风格。</p></div>
           <span class="feature-arrow">›</span>
         </button>
-        <button class="feature-card blue ${state.activeTab === "test" ? "selected" : ""}" data-persona-tab="test">
+        ${DistillHistory(state)}
+
+        <button class="feature-card blue" data-page="personaTest">
           <span class="feature-tone">测试</span>
-          <div><h3>做个测试题</h3><p>通过几道题快速生成你的嘴替人格。</p></div>
+          <div><h3>做个测试题</h3><p>跳到独立测试页，5 道题生成嘴替人格。</p></div>
           <span class="feature-arrow">›</span>
         </button>
+        ${TestHistory(state)}
       </section>
 
-      ${state.activeTab === "test" ? TestForm(state) : UploadForm(state)}
       ${PersonaList(state)}
       ${ReplyGenerator(state)}
     </div>
   `;
 }
 
-function UploadForm(state) {
-  return `
-    <section class="input-panel setup-panel">
-      <div class="card-title-row"><h2>蒸馏自己</h2><span class="stamp">更像你</span></div>
-      <p class="privacy-warning">聊天记录可能包含隐私信息，请尽量删除姓名、手机号、地址等敏感内容后再上传。</p>
-      ${Field("我和对方的关系", "proxyPersona.upload.relationship", state.upload.relationship, "比如：谈了 3 个月的男友、总是甩锅的组员")}
-      ${Field("前情提要", "proxyPersona.upload.background", state.upload.background, "比如：最近他经常不回消息，昨天临时改约后说我太敏感。", "long-field")}
-      ${Field("聊天记录文本", "proxyPersona.upload.chatText", state.upload.chatText, "粘贴你自己的聊天记录，越能体现你的说话方式越好。", "chat-log-input")}
-      <button class="primary-button" data-action="upload-chat-persona">生成嘴替档案</button>
-      ${Message(state.message)}
-    </section>
-  `;
+function DistillHistory(state) {
+  const distillPersonas = state.personas.filter((persona) => persona.sourceType === "chat_upload");
+  if (!distillPersonas.length) {
+    return `<div class="empty-chat compact-empty">还没有蒸馏结果。完成蒸馏后会显示在这里。</div>`;
+  }
+  return HistoryBlock("蒸馏结果", distillPersonas);
 }
 
-function TestForm(state) {
-  return `
-    <section class="input-panel setup-panel">
-      <div class="card-title-row"><h2>测试题生成</h2><span class="stamp">5 题</span></div>
-      ${personaTestQuestions.map((question) => Question(question, state.testAnswers[question.id])).join("")}
-      <button class="primary-button" data-action="submit-persona-test">提交并生成档案</button>
-      ${Message(state.message)}
-    </section>
-  `;
+function TestHistory(state) {
+  const testPersonas = state.personas.filter((persona) => persona.sourceType === "test");
+  if (!testPersonas.length) {
+    return `<div class="empty-chat compact-empty">还没有历史测评结果。做完测试后会显示在这里。</div>`;
+  }
+  return HistoryBlock("历史测评结果", testPersonas);
 }
 
-function Question(question, answer) {
+function HistoryBlock(title, personas) {
   return `
-    <div class="test-question">
-      <strong>${question.title}</strong>
-      <div class="answer-grid">
-        ${question.options
-          .map(
-            (option) => `
-              <button class="answer-chip ${answer === option.value ? "active" : ""}" data-question-id="${question.id}" data-test-answer="${option.value}">
-                ${option.label}
-              </button>
-            `
-          )
-          .join("")}
-      </div>
-    </div>
+    <section class="persona-history">
+      <h2>${title}</h2>
+      ${personas
+        .map(
+          (persona) => `
+            <article class="persona-summary">
+              <div class="card-title-row">
+                <h2>${escapeHtml(persona.name || persona.profileName)}</h2>
+                <span class="stamp">${escapeHtml(persona.tone || persona.styleProfile?.tone)}</span>
+              </div>
+              <p>${escapeHtml(persona.profileSummary || persona.styleProfile?.profileSummary)}</p>
+            </article>
+          `
+        )
+        .join("")}
+    </section>
   `;
 }
 
 function PersonaList(state) {
   if (!state.personas.length) {
-    return `<section class="empty-chat">还没有嘴替档案。先用上面的任一入口生成一个。</section>`;
+    return `<section class="empty-chat">还没有嘴替档案。先蒸馏自己，或去做一次测试。</section>`;
   }
+
   return `
     <section class="profile-section">
       <h2>我的嘴替档案</h2>
       <label>
         <span>选择嘴替档案</span>
         <select class="select-field" data-setup-input="proxyPersona.selectedPersonaId">
-          ${state.personas.map((persona) => `<option value="${persona.id}" ${String(persona.id) === String(state.selectedPersonaId) ? "selected" : ""}>${escapeHtml(persona.name)} · ${escapeHtml(persona.tone)}</option>`).join("")}
+          ${state.personas
+            .map(
+              (persona) =>
+                `<option value="${persona.id}" ${String(persona.id) === String(state.selectedPersonaId) ? "selected" : ""}>${escapeHtml(persona.name || persona.profileName)} · ${escapeHtml(persona.tone || persona.styleProfile?.tone)}</option>`
+            )
+            .join("")}
         </select>
       </label>
       ${state.personas.map(PersonaCard).join("")}
@@ -100,14 +99,14 @@ function PersonaCard(persona) {
   return `
     <article class="persona-summary">
       <div class="card-title-row">
-        <h2>${escapeHtml(persona.name)}</h2>
+        <h2>${escapeHtml(persona.name || persona.profileName)}</h2>
         <span class="stamp">${persona.sourceType === "test" ? "测试" : "蒸馏"}</span>
       </div>
-      <p>${escapeHtml(persona.profileSummary)}</p>
+      <p>${escapeHtml(persona.profileSummary || persona.styleProfile?.profileSummary)}</p>
       <div class="tag-row">
-        <span>${escapeHtml(persona.tone)}</span>
-        <span>情绪 ${persona.emotionLevel}/5</span>
-        <span>${escapeHtml(persona.logicStyle)}</span>
+        <span>${escapeHtml(persona.tone || persona.styleProfile?.tone)}</span>
+        <span>情绪 ${persona.emotionLevel || persona.styleProfile?.emotionLevel || 0}/5</span>
+        <span>${escapeHtml(persona.logicStyle || persona.styleProfile?.logicStyle)}</span>
       </div>
     </article>
   `;
@@ -166,10 +165,6 @@ function ChipGroup(field, options, active) {
         .join("")}
     </div>
   `;
-}
-
-function Message(text) {
-  return text ? `<p class="section-note">${escapeHtml(text)}</p>` : "";
 }
 
 function escapeHtml(value) {
