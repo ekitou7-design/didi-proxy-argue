@@ -139,7 +139,10 @@ button {
 .game-board,
 .profile-hero,
 .profile-section,
-.privacy-note {
+.privacy-note,
+.temp-intro,
+.compare-panel,
+.game-setup {
   border: var(--line);
   border-radius: 22px;
   box-shadow: var(--shadow);
@@ -391,13 +394,77 @@ button {
   font-weight: 900;
 }
 
+.temp-intro,
 .input-panel,
 .result-card,
 .detail-panel,
 .game-board,
 .profile-section,
-.privacy-note {
+.privacy-note,
+.compare-panel,
+.game-setup {
   padding: 16px;
+  background: var(--white);
+}
+
+.temp-intro {
+  background: var(--blue);
+}
+
+.persona-intro {
+  background: var(--pink);
+}
+
+.training-intro {
+  background: var(--green);
+}
+
+.temp-intro strong {
+  display: inline-block;
+  padding: 6px 10px;
+  background: var(--yellow);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.temp-intro p {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+  font-weight: 900;
+}
+
+.compare-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  background: var(--yellow);
+}
+
+.compare-panel div {
+  min-width: 0;
+  padding: 12px;
+  background: var(--white);
+  border: 2px solid var(--ink);
+  border-radius: 16px;
+}
+
+.compare-panel strong {
+  display: inline-block;
+  margin-bottom: 8px;
+  font-size: 15px;
+}
+
+.compare-panel p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 900;
+}
+
+.game-setup {
   background: var(--white);
 }
 
@@ -406,6 +473,11 @@ label {
   flex-direction: column;
   gap: 8px;
   margin-bottom: 14px;
+  font-weight: 1000;
+}
+
+.field-title {
+  margin: 16px 0 10px;
   font-weight: 1000;
 }
 
@@ -421,6 +493,10 @@ textarea {
   outline: none;
 }
 
+.chat-log-input {
+  min-height: 148px;
+}
+
 textarea:focus {
   box-shadow: 0 0 0 4px rgba(255, 157, 61, 0.35);
 }
@@ -430,6 +506,10 @@ textarea:focus {
   flex-wrap: wrap;
   gap: 10px;
   margin: 4px 0 16px;
+}
+
+.chip-group.compact {
+  margin-bottom: 10px;
 }
 
 .chip {
@@ -443,6 +523,63 @@ textarea:focus {
 
 .chip.active {
   background: var(--yellow);
+}
+
+.difficulty-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.difficulty-card {
+  min-height: 72px;
+  padding: 10px;
+  text-align: left;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 16px;
+  box-shadow: 3px 3px 0 var(--ink);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.difficulty-card:active {
+  transform: translate(3px, 3px);
+  box-shadow: 0 0 0 var(--ink);
+}
+
+.difficulty-card.active {
+  background: var(--orange);
+}
+
+.difficulty-card strong,
+.difficulty-card span {
+  display: block;
+}
+
+.difficulty-card strong {
+  font-size: 17px;
+}
+
+.difficulty-card span {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.chip.intensity:nth-child(2).active {
+  background: var(--pink);
+}
+
+.chip.intensity:nth-child(3).active {
+  background: var(--orange);
+}
+
+.chip.intensity:nth-child(4).active {
+  background: var(--red);
+  color: white;
 }
 
 .card-title-row {
@@ -479,6 +616,43 @@ textarea:focus {
   margin: 0;
   line-height: 1.65;
   font-weight: 800;
+}
+
+.temp-result-block {
+  padding: 12px;
+  background: var(--white);
+  border: 2px solid var(--ink);
+  border-radius: 15px;
+}
+
+.temp-result-block + .temp-result-block {
+  margin-top: 12px;
+}
+
+.temp-result-block h3 {
+  display: inline-block;
+  margin: 0 0 8px;
+  padding: 4px 8px;
+  background: var(--paper-deep);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.temp-result-block p {
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.65;
+  font-weight: 900;
+}
+
+.temp-result-block.sendable {
+  background: var(--yellow);
+}
+
+.temp-result-block.warning {
+  background: var(--pink);
 }
 
 .result-actions {
@@ -604,6 +778,10 @@ textarea:focus {
   font-weight: 900;
 }
 
+.training-reply-input {
+  min-height: 128px;
+}
+
 .score-row {
   display: grid;
   grid-template-columns: 82px 1fr 34px;
@@ -628,8 +806,14 @@ textarea:focus {
   background: var(--red);
 }
 
+.danger-score .score-track i {
+  background: var(--orange);
+}
+
 .risk-box,
-.better-reply {
+.better-reply,
+.next-attack,
+.battle-report {
   margin-top: 12px;
   padding: 12px;
   background: var(--paper);
@@ -638,9 +822,24 @@ textarea:focus {
 }
 
 .risk-box p,
-.better-reply p {
+.better-reply p,
+.next-attack p,
+.battle-report p {
   margin: 6px 0 0;
   line-height: 1.55;
+}
+
+.next-attack {
+  background: var(--pink);
+}
+
+.battle-report {
+  background: var(--yellow);
+}
+
+.battle-report h3 {
+  margin: 0 0 8px;
+  font-size: 20px;
 }
 
 .profile-hero {
