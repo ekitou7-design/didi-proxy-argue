@@ -457,37 +457,52 @@ export default class App {
   }
 
   async handleTrainingSubmit() {
-    const reply = this.state.training.input.trim();
+    const training = this.state.training;
+    if (training.isSubmitting) return;
+
+    const reply = training.input.trim();
     if (!reply) return;
+
+    this.setState({
+      training: {
+        ...training,
+        input: "",
+        isSubmitting: true
+      }
+    });
+
     let feedback;
+    let fallbackFeedback;
     try {
       const result = await postJson("/api/training/score", {
-        scenario: this.state.training.scene,
-        difficulty: this.state.training.difficulty,
+        scenario: training.scene,
+        difficulty: training.difficulty,
         opponentType: "嘴硬型",
-        opponentMessage: this.state.training.opponent,
+        opponentMessage: training.opponent,
         userReply: reply,
-        round: this.state.training.round
+        round: training.round
       });
+      fallbackFeedback = buildTrainingChatTurn(training, reply);
       feedback = {
         id: Date.now(),
         userReply: reply,
         score: result.scores?.winRate || 0,
-        strengths: result.analysis,
-        problems: result.suggestion,
-        optimized: result.betterReply,
-        nextOpponent: result.nextOpponentMessage
+        strengths: result.analysis || fallbackFeedback.strengths,
+        problems: result.suggestion || fallbackFeedback.problems,
+        optimized: result.betterReply || fallbackFeedback.optimized,
+        nextOpponent: result.nextOpponentMessage || fallbackFeedback.nextOpponent
       };
     } catch {
-      feedback = buildTrainingChatTurn(this.state.training, reply);
+      feedback = buildTrainingChatTurn(training, reply);
     }
     this.setState({
       training: {
         ...this.state.training,
         input: "",
-        round: this.state.training.round + 1,
+        isSubmitting: false,
+        round: training.round + 1,
         opponent: feedback.nextOpponent,
-        feedbacks: [...this.state.training.feedbacks, feedback]
+        feedbacks: [...training.feedbacks, feedback]
       }
     });
   }

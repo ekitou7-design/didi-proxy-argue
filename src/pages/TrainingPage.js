@@ -68,7 +68,9 @@ function ChatPage(session) {
 
       <section class="chat-composer">
         <textarea data-session-input="training" placeholder="输入你的本轮回复">${escapeHtml(session.input)}</textarea>
-        <button class="primary-button" data-action="training-submit">提交回复</button>
+        <button class="primary-button" data-action="training-submit" ${session.isSubmitting ? "disabled" : ""}>
+          ${session.isSubmitting ? "正在评分..." : "提交回复"}
+        </button>
       </section>
     </div>
   `;

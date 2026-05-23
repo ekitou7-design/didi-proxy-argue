@@ -126,6 +126,7 @@ export const initialTrainingSession = {
   round: 1,
   opponent: "",
   input: "",
+  isSubmitting: false,
   feedbacks: []
 };
 
