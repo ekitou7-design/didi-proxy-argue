@@ -14,6 +14,7 @@ export default function PersonaDistillPage(state) {
       <section class="input-panel setup-panel">
         <p class="privacy-warning">聊天记录可能包含隐私信息。上传前建议删除姓名、手机号、地址、学校、公司等敏感内容。本功能仅用于生成你的嘴替表达风格。</p>
 
+        ${Field("要分析的目标人物", "proxyPersona.upload.targetSpeaker", state.upload.targetSpeaker, "例如：我、对方、男朋友、室友、甄嬛、顾里、A同学")}
         ${Field("我和对方的关系", "proxyPersona.upload.relationship", state.upload.relationship, "例如：谈了三个月的男朋友、室友、同学、同事、陌生人、甲方")}
         ${Field("前情提要", "proxyPersona.upload.background", state.upload.background, "例如：他经常已读不回，我表达不满后，他说我太敏感。", "long-field")}
         ${Field(

@@ -5,13 +5,13 @@ import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import {
   buildAnalyzeChatPrompt,
-  buildPersonaReplyPrompt,
   buildTempArguePrompt,
   buildTestResultPrompt,
   buildTrainingScorePrompt
 } from "./prompts.mjs";
 import { requestJsonFromAI } from "./openaiClient.mjs";
 import { extractPersonaProfile } from "./personaExtractorSkill.mjs";
+import { generatePersonaReply } from "./personaReplySkill.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
@@ -53,21 +53,42 @@ app.post("/api/persona/test-result", async (request, response) => {
 });
 
 app.post("/api/persona-reply", async (request, response) => {
-  await handleAIEndpoint(response, buildPersonaReplyPrompt(request.body));
+  await handlePersonaReply(request, response);
+});
+
+app.post("/api/persona/reply", async (request, response) => {
+  await handlePersonaReply(request, response);
 });
 
 app.post("/api/training/score", async (request, response) => {
   await handleAIEndpoint(response, buildTrainingScorePrompt(request.body));
 });
 
+app.post("/api/persona/extract", async (request, response) => {
+  await handlePersonaExtraction(request, response);
+});
+
 app.post("/api/skills/persona-extract", async (request, response) => {
+  await handlePersonaExtraction(request, response);
+});
+
+async function handlePersonaExtraction(request, response) {
   try {
     const result = await extractPersonaProfile(request.body);
     response.json(result);
   } catch (error) {
     handleEndpointError(response, error, "Persona extraction failed");
   }
-});
+}
+
+async function handlePersonaReply(request, response) {
+  try {
+    const result = await generatePersonaReply(request.body);
+    response.json(result);
+  } catch (error) {
+    handleEndpointError(response, error, "Persona reply generation failed");
+  }
+}
 
 app.use(express.static(root));
 

@@ -1,0 +1,163 @@
+import { requestJsonFromAI } from "./openaiClient.mjs";
+
+const validModes = new Set(["like_me", "clearer", "stronger", "sarcastic", "boundary"]);
+const strengthMap = new Map([
+  ["soft", "soft"],
+  ["balanced", "balanced"],
+  ["strong", "strong"],
+  ["低强度", "soft"],
+  ["中等强度", "balanced"],
+  ["高强度", "strong"],
+  ["温和", "soft"],
+  ["中等", "balanced"],
+  ["强硬", "strong"]
+]);
+
+export function preparePersonaReplyInput(body = {}) {
+  const personaProfile = body.personaProfile || body.styleProfile || body.profile;
+  const opponentMessage = textOf(body.opponentMessage || body.latestOpponentMessage || body.opponent);
+  const background = textOf(body.background || body.currentState || body.context || body.scene);
+  const goal = textOf(body.goal || body.userGoal || body.expectation);
+  const strength = normalizeStrength(body.strength || body.toneStrength || body.intensity);
+  const mode = validModes.has(body.mode) ? body.mode : validModes.has(body.generationMode) ? body.generationMode : "like_me";
+
+  if (!personaProfile || typeof personaProfile !== "object" || Array.isArray(personaProfile)) {
+    const error = new Error("personaProfile is required");
+    error.status = 400;
+    throw error;
+  }
+
+  if (!opponentMessage) {
+    const error = new Error("opponentMessage is required");
+    error.status = 400;
+    throw error;
+  }
+
+  return {
+    personaProfile,
+    background,
+    opponentMessage,
+    goal,
+    strength,
+    mode,
+    realThought: textOf(body.realThought),
+    chatHistory: textOf(body.chatHistory).slice(0, 8000)
+  };
+}
+
+export function buildPersonaSkillReplyPrompt(input) {
+  return {
+    system: `
+You are PersonaReplySkill for a Chinese mobile app called Didi Proxy Argue.
+Return only one valid JSON object. Do not use markdown or code fences.
+
+Your task: use a structured persona profile plus a new conflict scene to generate replies that sound like the target speaker.
+Core principle:
+1. First sound like the persona. Preserve habits, sentence rhythm, emotional temperature, logic pattern, sarcasm style, and closing style.
+2. Then help the user say the point more clearly.
+3. Increase attack only moderately and only when it fits the persona profile and requested strength.
+
+Do not turn every reply into web-novel drama, CEO romance, costume-drama diction, TVB diction, or rage-posting.
+Use those styles only when the persona profile clearly supports them.
+Do not produce threats, slurs, doxxing, sexual harassment, instructions for harm, or direct personal degradation.
+Keep conflict language sharp if needed, but grounded in facts, impact, request, and boundary.
+`,
+    user: `
+Input:
+${JSON.stringify(input, null, 2)}
+
+Return this exact JSON shape:
+{
+  "styleAnalysis": "",
+  "mainline": {
+    "fact": "",
+    "impact": "",
+    "request": "",
+    "boundary": ""
+  },
+  "usedPersonaSignals": [],
+  "usedTechniques": [],
+  "reply": "",
+  "myStyleReply": "",
+  "variants": {
+    "softer": "",
+    "balanced": "",
+    "stronger": "",
+    "sarcastic": "",
+    "finalBoundary": ""
+  },
+  "softerReply": "",
+  "strongerReply": "",
+  "pauseReply": "",
+  "riskNotes": [],
+  "copyableReplies": []
+}
+
+Field rules:
+- styleAnalysis: explain briefly which persona signals you used.
+- usedPersonaSignals: 3-6 concrete style features from personaProfile.
+- reply and myStyleReply: same best recommended reply for the requested mode and strength.
+- variants: safe alternatives with different intensity.
+- copyableReplies: 2-4 short ready-to-send replies.
+- If evidence is weak, still generate, but state the limitation in riskNotes and avoid over-stylizing.
+`
+  };
+}
+
+export async function generatePersonaReply(body) {
+  const input = preparePersonaReplyInput(body);
+  const result = await requestJsonFromAI({
+    ...buildPersonaSkillReplyPrompt(input),
+    temperature: 0.45,
+    maxCompletionTokens: 1300
+  });
+
+  return normalizePersonaReplyResult(result);
+}
+
+export function normalizePersonaReplyResult(result) {
+  if (!result || typeof result !== "object" || Array.isArray(result)) {
+    const error = new Error("AI returned invalid persona reply JSON");
+    error.status = 502;
+    throw error;
+  }
+
+  const variants = result.variants && typeof result.variants === "object" ? result.variants : {};
+  const reply = textOf(result.reply || result.myStyleReply || variants.balanced || variants.stronger || variants.softer);
+
+  if (!reply) {
+    const error = new Error("AI persona reply JSON missing reply");
+    error.status = 502;
+    throw error;
+  }
+
+  return {
+    styleAnalysis: textOf(result.styleAnalysis),
+    mainline: result.mainline || { fact: "", impact: "", request: "", boundary: "" },
+    usedPersonaSignals: Array.isArray(result.usedPersonaSignals) ? result.usedPersonaSignals : [],
+    usedTechniques: Array.isArray(result.usedTechniques) ? result.usedTechniques : [],
+    reply,
+    myStyleReply: textOf(result.myStyleReply || reply),
+    variants: {
+      softer: textOf(variants.softer || result.softerReply),
+      balanced: textOf(variants.balanced || reply),
+      stronger: textOf(variants.stronger || result.strongerReply),
+      sarcastic: textOf(variants.sarcastic),
+      finalBoundary: textOf(variants.finalBoundary || result.pauseReply)
+    },
+    softerReply: textOf(result.softerReply || variants.softer),
+    strongerReply: textOf(result.strongerReply || variants.stronger),
+    pauseReply: textOf(result.pauseReply || variants.finalBoundary),
+    riskNotes: Array.isArray(result.riskNotes) ? result.riskNotes : [],
+    copyableReplies: Array.isArray(result.copyableReplies) ? result.copyableReplies : [reply]
+  };
+}
+
+function normalizeStrength(value) {
+  const normalized = textOf(value);
+  return strengthMap.get(normalized) || "balanced";
+}
+
+function textOf(value) {
+  return typeof value === "string" ? value.trim() : "";
+}

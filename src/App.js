@@ -299,15 +299,14 @@ export default class App {
     this.updateProxyPersona({ distillStatus: "loading", distillResult: null, message: "" });
 
     try {
-      const result = await postJson("/api/persona/analyze-chat", {
-        chatHistory: upload.chatText,
-        relationship: upload.relationship,
-        background: upload.background,
-        userGoal: "生成用户的专属嘴替表达风格"
+      const result = await postJson("/api/persona/extract", {
+        rawText: upload.chatText,
+        targetSpeaker: upload.targetSpeaker || "我",
+        sourceType: upload.sourceType || "chat"
       });
       this.updateProxyPersona({
         distillStatus: "done",
-        distillResult: makeDistillResult(result.personaProfile, upload),
+        distillResult: makeDistillResult(result, upload),
         message: "蒸馏完成，可以保存档案。"
       });
     } catch (error) {
@@ -418,17 +417,19 @@ export default class App {
     });
 
     try {
-      const result = await postJson("/api/persona-reply", {
+      const result = await postJson("/api/persona/reply", {
         chatHistory: state.upload.chatText,
-        latestOpponentMessage: state.replyForm.opponentMessage,
-        currentState: state.replyForm.background,
+        personaProfile: styleProfile.personaProfile || styleProfile,
+        opponentMessage: state.replyForm.opponentMessage,
+        background: state.replyForm.background,
         realThought: "",
         goal: state.replyForm.goal,
-        styleProfile
+        strength: state.replyForm.strength,
+        mode: "like_me"
       });
       this.updateProxyPersona({
         replyResult: {
-          reply: result.myStyleReply,
+          reply: result.reply || result.myStyleReply,
           strategy: result.styleAnalysis,
           tone: getProfileTone(styleProfile)
         },
@@ -599,6 +600,8 @@ function createProxyPersonaState() {
     ...structuredClone(initialProxyPersonaState),
     activeTab: "upload",
     upload: {
+      targetSpeaker: "我",
+      sourceType: "chat",
       relationship: "谈了 3 个月的男友",
       background: "他最近经常不回消息，临时改约后说我太敏感。",
       chatText: "我不是想吵架，我只是希望你尊重之前说好的约定。你先别把问题说成我太敏感。"
@@ -629,16 +632,22 @@ function makeDistillResult(personaProfile, upload) {
     createdAt: new Date().toISOString(),
     sourceType: "chat_upload",
     profileName: personaProfile.profileName || personaProfile.name || "我的蒸馏嘴替",
+    targetSpeaker: personaProfile.targetSpeaker || upload.targetSpeaker || "",
     relationship: upload.relationship || "",
     background: upload.background || "",
+    personaProfile,
     styleProfile: {
-      tone: profile.tone || "冷静但有压迫感",
+      tone: profile.tone || personaProfile.languageFeatures?.tone || "冷静但有压迫感",
       emotionLevel: Number(profile.emotionLevel || 3),
-      logicStyle: profile.logicStyle || "先指出问题，再反问对方逻辑漏洞，最后给出边界",
-      commonPhrases: profile.commonPhrases || ["你先别转移话题", "我现在说的是这件事本身", "这不是我敏感，是你的处理方式有问题"],
-      avoidWords: profile.avoidWords || ["脏话", "人身攻击", "过度服软"],
-      replyStrategy: profile.replyStrategy || "不跟随对方转移话题，持续围绕核心问题推进",
-      profileSummary: profile.profileSummary || "适合生成冷静、清楚、有边界感的个性化回应。"
+      logicStyle: profile.logicStyle || personaProfile.argumentStyle?.logicPattern || "先指出问题，再反问对方逻辑漏洞，最后给出边界",
+      commonPhrases:
+        profile.commonPhrases ||
+        personaProfile.languageFeatures?.sampleLines ||
+        personaProfile.languageFeatures?.vocabulary ||
+        ["你先别转移话题", "我现在说的是这件事本身", "这不是我敏感，是你的处理方式有问题"],
+      avoidWords: profile.avoidWords || personaProfile.safetyBoundary?.doNotImitate || ["脏话", "人身攻击", "过度服软"],
+      replyStrategy: profile.replyStrategy || personaProfile.imitationGuide?.replyFormula || "不跟随对方转移话题，持续围绕核心问题推进",
+      profileSummary: profile.profileSummary || personaProfile.sourceSummary || personaProfile.corePersonality?.summary || "适合生成冷静、清楚、有边界感的个性化回应。"
     }
   };
 }
@@ -692,8 +701,10 @@ function normalizeDistillResult(result) {
     createdAt: result.createdAt || new Date().toISOString(),
     sourceType: "chat_upload",
     profileName: result.profileName || result.name || "我的蒸馏嘴替",
+    targetSpeaker: result.targetSpeaker || "",
     relationship: result.relationship || "",
     background: result.background || "",
+    personaProfile: result.personaProfile || result,
     styleProfile: {
       tone: profile.tone || "冷静但有压迫感",
       emotionLevel: Number(profile.emotionLevel || 3),

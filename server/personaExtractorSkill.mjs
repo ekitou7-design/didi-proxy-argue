@@ -23,6 +23,13 @@ export function preparePersonaExtractionInput(body = {}) {
   const sourceType = validSourceTypes.has(body.sourceType) ? body.sourceType : "unknown";
   const extractionMode = validExtractionModes.has(body.extractionMode) ? body.extractionMode : "single";
   const targetSpeaker = typeof body.targetSpeaker === "string" ? body.targetSpeaker.trim() : "";
+
+  if (!targetSpeaker) {
+    const error = new Error("targetSpeaker is required");
+    error.status = 400;
+    throw error;
+  }
+
   const analyzedPartOnly = rawText.length > MAX_ANALYZED_TEXT_LENGTH;
 
   return {
@@ -43,12 +50,17 @@ export function buildPersonaExtractionPrompt(input) {
 You are PersonaExtractorSkill, a backend-only analyzer for a Chinese mobile app.
 Return only one valid JSON object. Do not use markdown or code fences.
 
-Your job is to infer personality, communication habits, and style-transfer guidance from the provided chat log or script.
+Your job is to extract the target speaker's arguing and speaking persona from the provided chat log or script.
+Focus on the named targetSpeaker. Do not summarize the whole text unless it helps explain that speaker.
+If the source has multiple speakers, separate the target speaker's language material from other people's lines.
+Analyze what the target speaker says, how they express emotion, how they counterattack, explain, tease sarcastically,
+reason, escalate conflict, and end arguments.
 Do not generate insults, threats, discriminatory phrases, sexual content, private data, doxxing details, or instructions for harm.
 When the source contains unsafe or private content, summarize it abstractly and put the constraint in safetyBoundary.
 sampleLines must be original, newly written examples that demonstrate style. Do not copy any sentence from the source text.
 Keep all generated examples safe, non-abusive, non-threatening, and non-discriminatory.
 If evidence is insufficient, say so instead of inventing exact facts.
+Core principle for future use: first preserve the target speaker's habits, then make the user's point clearer; strengthen attack only within the extracted style.
 `,
     user: `
 Input:
@@ -71,6 +83,11 @@ Return this exact JSON shape:
   "profileName": "",
   "sourceSummary": "",
   "targetSpeaker": "",
+  "targetEvidence": {
+    "speakerDetection": "",
+    "usableMaterialSummary": "",
+    "evidenceLimitations": []
+  },
   "personalityTags": [],
   "corePersonality": {
     "summary": "",
@@ -86,10 +103,16 @@ Return this exact JSON shape:
     "rhythm": "",
     "emojiAndPunctuation": "",
     "commonMoves": [],
+    "emotionMoves": [],
+    "sarcasmPattern": "",
     "sampleLines": []
   },
   "argumentStyle": {
     "logicPattern": "",
+    "counterattackPattern": "",
+    "explanationPattern": "",
+    "conflictEscalationPattern": "",
+    "closingPattern": "",
     "pressureStyle": "",
     "boundaryStyle": "",
     "weaknesses": [],
@@ -117,9 +140,11 @@ Return this exact JSON shape:
 Field rules:
 - profileName: short Chinese name for this persona profile.
 - targetSpeaker: use the requested speaker if present; otherwise infer the main speaker or return "unknown".
+- targetEvidence: explain how you identified usable material for this speaker.
 - personalityTags: 4-8 short tags.
 - sampleLines: 3-5 original safe lines, not copied from source.
 - systemPromptFragment: concise Chinese instruction fragment that future reply generation can reuse.
+- Do not force the style into melodrama, CEO romance, costume-drama diction, TVB diction, or rage-posting unless the evidence clearly supports it.
 `
   };
 }
@@ -167,6 +192,11 @@ export function normalizePersonaExtractionResult(result, input) {
     profileName: result.profileName,
     sourceSummary: result.sourceSummary,
     targetSpeaker: result.targetSpeaker || input.targetSpeaker || "unknown",
+    targetEvidence: result.targetEvidence || {
+      speakerDetection: "",
+      usableMaterialSummary: "",
+      evidenceLimitations: []
+    },
     personalityTags: Array.isArray(result.personalityTags) ? result.personalityTags : [],
     corePersonality: result.corePersonality,
     languageFeatures: result.languageFeatures,
