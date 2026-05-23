@@ -8,10 +8,10 @@ export default function HomePage() {
         <div class="brand-lockup">
           <p class="hero-kana">DIDI DAICHAO</p>
           <h2>滴滴代吵</h2>
-          <p>吵不赢？让我来。</p>
+          <p>对方说一句，我帮你接一句。</p>
         </div>
         <div class="hero-illustration" aria-label="漫画占位插画">
-          <div class="burst">哔哔</div>
+          <div class="burst">别带偏</div>
           <img class="hero-logo" src="/public/app-logo.svg" alt="滴滴代吵 App Logo" />
           <div class="bubble big">逻辑</div>
           <div class="bubble small">边界</div>

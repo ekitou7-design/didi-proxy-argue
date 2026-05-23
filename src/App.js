@@ -9,6 +9,7 @@ import {
   buildPersonaChatTurn,
   buildTempChatTurn,
   buildTrainingChatTurn,
+  initialProxyPersonaState,
   initialPersonaSession,
   initialTempSession,
   initialTrainingSession,
@@ -31,6 +32,7 @@ export default class App {
     this.state = {
       page: "home",
       profiles: structuredClone(relationProfiles),
+      proxyPersona: structuredClone(initialProxyPersonaState),
       activePersona: initialPersonaSession.who,
       temp: structuredClone(initialTempSession),
       persona: structuredClone(initialPersonaSession),
@@ -49,7 +51,7 @@ export default class App {
   getPage() {
     if (this.state.page === "temp") return TempArguePage(this.state.temp);
     if (this.state.page === "persona") {
-      return PersonaPage(this.state.persona, this.state.profiles);
+      return PersonaPage(this.state.proxyPersona);
     }
     if (this.state.page === "training") return TrainingPage(this.state.training);
     if (this.state.page === "records") {
@@ -65,7 +67,7 @@ export default class App {
     return HomePage();
   }
 
-  handleClick(event) {
+  async handleClick(event) {
     const copyTarget = event.target.closest("[data-copy-reply]");
     if (copyTarget) {
       navigator.clipboard?.writeText(copyTarget.dataset.copyReply);
@@ -83,8 +85,34 @@ export default class App {
     if (chipTarget) {
       const sessionKey = chipTarget.dataset.chipSession;
       const field = chipTarget.dataset.chipField;
+      if (sessionKey === "proxyPersona.replyForm") {
+        this.setNestedState("proxyPersona", "replyForm", field, chipTarget.dataset.chipValue);
+        return;
+      }
       this.setState({
         [sessionKey]: { ...this.state[sessionKey], [field]: chipTarget.dataset.chipValue }
+      });
+      return;
+    }
+
+    const tabTarget = event.target.closest("[data-persona-tab]");
+    if (tabTarget) {
+      this.setState({
+        proxyPersona: { ...this.state.proxyPersona, activeTab: tabTarget.dataset.personaTab }
+      });
+      return;
+    }
+
+    const testTarget = event.target.closest("[data-test-answer]");
+    if (testTarget) {
+      this.setState({
+        proxyPersona: {
+          ...this.state.proxyPersona,
+          testAnswers: {
+            ...this.state.proxyPersona.testAnswers,
+            [testTarget.dataset.questionId]: testTarget.dataset.testAnswer
+          }
+        }
       });
       return;
     }
@@ -114,6 +142,18 @@ export default class App {
     if (!actionTarget) return;
 
     const action = actionTarget.dataset.action;
+
+    if (action === "upload-chat-persona") {
+      await this.createPersonaFromChat();
+    }
+
+    if (action === "submit-persona-test") {
+      await this.createPersonaFromTest();
+    }
+
+    if (action === "generate-proxy-reply") {
+      await this.generateProxyReply();
+    }
 
     if (action === "start-temp-chat") {
       this.setState({ temp: { ...this.state.temp, step: "chat", input: this.state.temp.latest || "" } });
@@ -188,7 +228,12 @@ export default class App {
   handleInput(event) {
     const setup = event.target.dataset.setupInput;
     if (setup) {
-      const [sessionKey, field] = setup.split(".");
+      const parts = setup.split(".");
+      if (parts.length === 3) {
+        this.setNestedState(parts[0], parts[1], parts[2], event.target.value, false);
+        return;
+      }
+      const [sessionKey, field] = parts;
       this.state[sessionKey] = { ...this.state[sessionKey], [field]: event.target.value };
       return;
     }
@@ -197,6 +242,65 @@ export default class App {
     if (inputType) {
       this.state[inputType] = { ...this.state[inputType], input: event.target.value };
     }
+  }
+
+  setNestedState(rootKey, groupKey, field, value, render = true) {
+    this.state[rootKey] = {
+      ...this.state[rootKey],
+      [groupKey]: {
+        ...this.state[rootKey][groupKey],
+        [field]: value
+      }
+    };
+    if (render) this.render();
+  }
+
+  async createPersonaFromChat() {
+    const { userId, upload } = this.state.proxyPersona;
+    const result = await postJson("/api/proxy-persona/upload-chat", { userId, ...upload });
+    this.addGeneratedPersona(result.persona, "已生成聊天蒸馏嘴替档案");
+  }
+
+  async createPersonaFromTest() {
+    const { userId, testAnswers } = this.state.proxyPersona;
+    const answers = Object.entries(testAnswers).map(([questionId, answer]) => ({
+      questionId: Number(questionId),
+      answer
+    }));
+    const result = await postJson("/api/proxy-persona/test-result", { userId, answers });
+    this.addGeneratedPersona(result.persona, "已生成测试嘴替档案");
+  }
+
+  addGeneratedPersona(persona, message) {
+    this.setState({
+      activePersona: persona.name,
+      proxyPersona: {
+        ...this.state.proxyPersona,
+        personas: [persona, ...this.state.proxyPersona.personas],
+        selectedPersonaId: String(persona.id),
+        message
+      }
+    });
+  }
+
+  async generateProxyReply() {
+    const state = this.state.proxyPersona;
+    if (!state.selectedPersonaId) {
+      this.setState({ proxyPersona: { ...state, message: "请先生成或选择一个嘴替档案" } });
+      return;
+    }
+    const result = await postJson("/api/proxy-reply/generate", {
+      userId: state.userId,
+      personaId: Number(state.selectedPersonaId),
+      ...state.replyForm
+    });
+    this.setState({
+      proxyPersona: {
+        ...this.state.proxyPersona,
+        replyResult: result,
+        message: "回应已生成"
+      }
+    });
   }
 
   buildProfileFromPersona() {
@@ -235,4 +339,14 @@ export default class App {
       </div>
     `;
   }
+}
+
+async function postJson(url, body) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+  return response.json();
 }
