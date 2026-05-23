@@ -1,216 +1,138 @@
 import { difficultyOptions } from "../data/mockData.js";
 
-const trainingCards = [
-  { title: "今日训练卡片", desc: "今日目标：不解释自己配不配生气，只抓事实和诉求。" },
-  { title: "随机场景挑战", desc: "系统随机扮演难缠对手，训练临场反应。" },
-  { title: "主线锁定训练", desc: "对方跑题一次，你就把他拖回案发现场一次。" },
-  { title: "气势稳定训练", desc: "有压迫感，但不失控、不脏嘴。" },
-  { title: "阴阳怪气训练", desc: "练习轻刺反击，点到为止但很难忘。" }
-];
-
 const randomCategories = ["随机", "宿舍卫生", "情侣冷战", "朋友借钱不还", "小组作业", "商家扯皮", "职场甩锅", "家庭催婚", "网友阴阳怪气"];
 const randomDifficulties = ["随机", "青铜", "白银", "黄金", "王者"];
 const opponentTypes = ["随机", "讲道理型", "嘴硬型", "阴阳怪气型", "偷换概念型", "情绪勒索型"];
 
 export default function TrainingPage(session) {
-  if (session.step === "chat") return ChatPage(session);
-
   return `
-    <div class="page training-page">
-      <section class="temp-intro training-intro">
-        <strong>吵架训练</strong>
-        <p>把吵架变成反应力训练。</p>
-      </section>
-
-      <section class="input-panel setup-panel">
-        <div class="card-title-row">
-          <div>
-            <h2>AI 随机场景</h2>
-            <p class="section-note">不知道练什么？让 AI 生成一个真实冲突场景。</p>
-          </div>
-        </div>
-
-        <label>
-          <span>场景类型选择</span>
-          <select class="select-field" data-setup-input="training.randomScenarioForm.category">
-            ${randomCategories.map((item) => Option(item, session.randomScenarioForm?.category)).join("")}
-          </select>
-        </label>
-
-        <label>
-          <span>难度选择</span>
-          <select class="select-field" data-setup-input="training.randomScenarioForm.difficulty">
-            ${randomDifficulties.map((item) => Option(item, session.randomScenarioForm?.difficulty)).join("")}
-          </select>
-        </label>
-
-        <label>
-          <span>对手类型选择</span>
-          <select class="select-field" data-setup-input="training.randomScenarioForm.opponentType">
-            ${opponentTypes.map((item) => Option(item, session.randomScenarioForm?.opponentType)).join("")}
-          </select>
-        </label>
-
-        <label class="long-field">
-          <span>我想训练的目标</span>
-          <textarea data-setup-input="training.randomScenarioForm.userGoal" placeholder="例如：练习不被对方带偏、练习强硬拒绝、练习表达边界">${escapeHtml(session.randomScenarioForm?.userGoal)}</textarea>
-        </label>
-
-        <button class="primary-button" data-action="generate-random-training-scenario" ${session.scenarioStatus === "loading" ? "disabled" : ""}>
-          ${session.scenarioStatus === "loading" ? "正在生成真实吵架现场..." : session.generatedScenario ? "换一个场景" : "AI 随机生成场景"}
-        </button>
-        ${session.scenarioMessage ? `<p class="section-note">${escapeHtml(session.scenarioMessage)}</p>` : ""}
-      </section>
-
-      ${session.generatedScenario ? ScenarioCard(session.generatedScenario) : ""}
-
-      <section class="game-setup">
-        <label class="long-field">
-          <span>随机场景挑战</span>
-          <textarea data-setup-input="training.scene" placeholder="也可以自己输入想练的场景。">${escapeHtml(session.scene)}</textarea>
-        </label>
-
-        <div class="field-title">训练强度</div>
-        <div class="difficulty-grid">
-          ${difficultyOptions.map((item) => Difficulty(item, session.difficulty)).join("")}
-        </div>
-
-        <button class="primary-button" data-action="start-training-chat">${session.generatedScenario ? "开始这一局" : "开始挑战"}</button>
-      </section>
-
-      <section class="training-card-list">
-        ${trainingCards.map(TrainingCard).join("")}
-      </section>
+    <div class="page realtime-chat-page training-chat-page">
+      ${TrainingSettings(session)}
+      ${TrainingChatPanel(session)}
+      ${TrainingInputBar(session)}
     </div>
   `;
 }
 
-function ScenarioCard(scenario) {
+function TrainingSettings(session) {
+  const scenario = session.generatedScenario;
   return `
-    <section class="result-card">
-      <div class="card-title-row">
-        <h2>${escapeHtml(scenario.title)}</h2>
-        <span class="stamp">${escapeHtml(scenario.difficulty)}</span>
+    <section class="realtime-settings-card training-settings-card">
+      <div class="settings-title-row training-random-head">
+        <div>
+          <span class="persona-kicker">AI 随机场景</span>
+          <h2>${escapeHtml(scenario?.title || session.scene || "随机场景挑战")}</h2>
+          <p>${escapeHtml(scenario?.background || "选择一个场景和对手类型，开始练习不被带偏。")}</p>
+        </div>
+        <button class="primary-button random-scenario-button" data-action="generate-random-training-scenario" ${session.scenarioStatus === "loading" ? "disabled" : ""}>
+          ${session.scenarioStatus === "loading" ? "生成中..." : session.generatedScenario ? "换一个场景" : "AI 随机生成"}
+        </button>
       </div>
-      <div class="tag-row">
-        <span>${escapeHtml(scenario.category)}</span>
-        <span>${escapeHtml(scenario.opponentProfile?.type)}</span>
-        <span>${escapeHtml(scenario.relationship)}</span>
-      </div>
-      ${Block("冲突前情", scenario.background)}
-      ${Block("对方开场话术", scenario.openingMessage)}
-      ${Block("本局目标", scenario.userGoal)}
-      ${Block("本局主线", scenario.realMainline)}
-      <div class="temp-result-block">
-        <h3>FIRB 主线</h3>
-        <p><strong>事实：</strong>${escapeHtml(scenario.mainline?.fact)}</p>
-        <p><strong>影响：</strong>${escapeHtml(scenario.mainline?.impact)}</p>
-        <p><strong>诉求：</strong>${escapeHtml(scenario.mainline?.request)}</p>
-        <p><strong>边界：</strong>${escapeHtml(scenario.mainline?.boundary)}</p>
-      </div>
-      ${ListBlock("对方话术陷阱", scenario.traps)}
-      ${ListBlock("训练重点", scenario.trainingFocus)}
-      ${Block("第一句提示", scenario.suggestedFirstReplyHint)}
+      ${session.scenarioMessage ? `<p class="section-note compact-status-note">${escapeHtml(session.scenarioMessage)}</p>` : ""}
+      <details class="top-settings-detail compact-training-options">
+        <summary>细调场景和对手</summary>
+        <div class="settings-grid">
+          ${SelectField("场景类型", "training.randomScenarioForm.category", randomCategories, session.randomScenarioForm?.category)}
+          ${SelectField("难度", "training.randomScenarioForm.difficulty", randomDifficulties, session.randomScenarioForm?.difficulty)}
+          ${SelectField("对手人设", "training.randomScenarioForm.opponentType", opponentTypes, session.randomScenarioForm?.opponentType)}
+          ${SelectField("训练强度", "training.difficulty", difficultyOptions, session.difficulty)}
+          ${SmallField("前情提要", "training.scene", session.scene, "也可以自己输入想练的场景。", "wide")}
+          ${SmallField("我想练什么效果", "training.randomScenarioForm.userGoal", session.randomScenarioForm?.userGoal, "例如：不被带偏、强硬拒绝、表达边界", "wide")}
+        </div>
+      </details>
     </section>
   `;
 }
 
-function Block(title, text) {
+function TrainingChatPanel(session) {
+  const visibleFeedbacks = [...session.feedbacks];
+  const opponent = session.opponent || session.generatedScenario?.openingMessage || "选好场景后，系统会扮演对方开第一句。";
   return `
-    <div class="temp-result-block">
-      <h3>${title}</h3>
-      <p>${escapeHtml(text)}</p>
-    </div>
-  `;
-}
-
-function ListBlock(title, items = []) {
-  return `
-    <div class="temp-result-block">
-      <h3>${title}</h3>
-      <p>${items.map(escapeHtml).join(" / ")}</p>
-    </div>
-  `;
-}
-
-function Option(item, active) {
-  return `<option value="${escapeAttr(item)}" ${item === active ? "selected" : ""}>${escapeHtml(item)}</option>`;
-}
-
-function TrainingCard(card) {
-  return `
-    <article class="training-mini-card">
-      <h3>${card.title}</h3>
-      <p>${card.desc}</p>
-    </article>
-  `;
-}
-
-function ChatPage(session) {
-  const visibleFeedbacks = [...session.feedbacks].reverse();
-  return `
-    <div class="page chat-page">
-      <section class="chat-status training-status">
-        <div class="status-head">
-          <strong>ROUND ${String(session.round).padStart(2, "0")}</strong>
-          <button class="tiny-button" data-action="edit-training-setup">修改场景</button>
-        </div>
-        <p>场景：${escapeHtml(session.scene)}</p>
-        <p>强度：${escapeHtml(session.difficulty)}</p>
-      </section>
-
-      <section class="chat-log">
-        <div class="bubble-card opponent"><span>系统扮演对方</span><p>${escapeHtml(session.opponent)}</p></div>
+    <section class="realtime-chat-panel training-dialog-panel" aria-label="吵架训练对话">
+      <div class="persona-chat-scroll realtime-chat-scroll">
+        <article class="persona-bubble from-user">
+          <span>系统扮演对方</span>
+          <p>${escapeHtml(opponent)}</p>
+        </article>
         ${visibleFeedbacks.map(FeedbackRound).join("")}
-      </section>
+      </div>
+    </section>
+  `;
+}
 
-      <section class="chat-composer">
-        <textarea data-session-input="training" placeholder="输入你的本轮回复">${escapeHtml(session.input)}</textarea>
-        <button class="primary-button" data-action="training-submit" ${session.isSubmitting ? "disabled" : ""}>
-          ${session.isSubmitting ? "正在评分..." : "提交我的回复"}
-        </button>
+function TrainingInputBar(session) {
+  if (session.step !== "chat") {
+    return `
+      <section class="realtime-input-bar training-start-bar">
+        <p>${escapeHtml(session.generatedScenario?.suggestedFirstReplyHint || "准备好后开始这一局，对方会先出招。")}</p>
+        <button class="primary-button" data-action="start-training-chat">${session.generatedScenario ? "开始这一局" : "开始挑战"}</button>
       </section>
-    </div>
+    `;
+  }
+
+  return `
+    <section class="realtime-input-bar">
+      <textarea data-session-input="training" placeholder="输入你的本轮回复">${escapeHtml(session.input)}</textarea>
+      <button class="primary-button" data-action="training-submit" ${session.isSubmitting ? "disabled" : ""}>
+        ${session.isSubmitting ? "正在评分..." : "提交回复"}
+      </button>
+    </section>
   `;
 }
 
 function FeedbackRound(item) {
   return `
-    <article class="chat-round">
-      <div class="bubble-card user"><span>你</span><p>${escapeHtml(item.userReply)}</p></div>
-      <div class="ai-panel">
-        <h3>本轮评分</h3>
-        <div class="score-row"><span>综合</span><div class="score-track"><i style="width:${item.score}%"></i></div><strong>${item.score}</strong></div>
-        <h3>你回复的优点</h3>
-        <p>${escapeHtml(item.strengths)}</p>
-        <h3>还能更狠一点的地方</h3>
-        <p>${escapeHtml(item.problems)}</p>
-        <h3>优化版回复</h3>
-        <p>${escapeHtml(item.optimized)}</p>
-        <h3>下一轮对方继续发言</h3>
+    <article class="realtime-round">
+      <div class="persona-bubble from-proxy">
+        <span>你</span>
+        <p>${escapeHtml(item.userReply)}</p>
+      </div>
+      <details class="round-more">
+        <summary>看评分和优化</summary>
+        <div class="score-row">
+          <span>胜率</span>
+          <div class="score-track"><i style="width:${Number(item.score || 0)}%"></i></div>
+          <b>${Number(item.score || 0)}</b>
+        </div>
+        ${Block("做得好的地方", item.strengths)}
+        ${Block("容易被带偏的点", item.problems)}
+        ${Block("更稳的说法", item.optimized)}
+      </details>
+      <div class="persona-bubble from-user">
+        <span>系统扮演对方</span>
         <p>${escapeHtml(item.nextOpponent)}</p>
       </div>
     </article>
   `;
 }
 
-function Difficulty(item, active) {
+function Block(title, text) {
   return `
-    <button class="difficulty-card ${active === item ? "active" : ""}" data-chip-session="training" data-chip-field="difficulty" data-chip-value="${item}">
-      <strong>${item}</strong>
-      <span>${getDifficultyDesc(item)}</span>
-    </button>
+    <div class="temp-result-block">
+      <h3>${escapeHtml(title)}</h3>
+      <p>${escapeHtml(text)}</p>
+    </div>
   `;
 }
 
-function getDifficultyDesc(item) {
-  const map = {
-    热身: "对方讲点道理",
-    普通: "有点嘴硬",
-    嘴硬: "甩锅和反问变多",
-    阴阳大师: "阴阳怪气加情绪压迫"
-  };
-  return map[item] || "自由练习";
+function SelectField(label, path, options, active) {
+  return `
+    <label class="compact-field">
+      <span>${escapeHtml(label)}</span>
+      <select class="select-field compact-select" data-setup-input="${path}">
+        ${options.map((item) => `<option value="${escapeAttr(item)}" ${item === active ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}
+      </select>
+    </label>
+  `;
+}
+
+function SmallField(label, path, value, placeholder, className = "") {
+  return `
+    <label class="compact-field ${className}">
+      <span>${escapeHtml(label)}</span>
+      <textarea data-setup-input="${path}" placeholder="${escapeAttr(placeholder)}">${escapeHtml(value)}</textarea>
+    </label>
+  `;
 }
 
 function escapeHtml(value) {

@@ -1,90 +1,123 @@
-import { goalOptions, makeContextSummary, toneOptions } from "../data/mockData.js";
+import { goalOptions, tempScenarioPresets, toneOptions } from "../data/mockData.js";
 
 export default function TempArguePage(session) {
-  if (session.step === "chat") return ChatPage(session);
-
   return `
-    <div class="page form-page">
-      <section class="temp-intro">
-        <strong>临时吵</strong>
-        <p>马上遇事，马上开吵。</p>
-      </section>
-
-      <section class="input-panel setup-panel">
-        ${Field({
-          label: "对方是谁",
-          path: "temp.who",
-          value: session.who,
-          placeholder: "比如：客服、同学、路人、网友、商家"
-        })}
-        ${Field({
-          label: "对方说了什么",
-          path: "temp.latest",
-          value: session.latest,
-          placeholder: "把对方刚刚说的话粘到这里。"
-        })}
-        ${Field({
-          label: "前情提要",
-          path: "temp.context",
-          value: session.context,
-          placeholder: "简单说一下为什么吵起来。",
-          className: "long-field"
-        })}
-
-        <div class="field-title">我想达到的效果</div>
-        ${ChipGroup("temp", "goal", goalOptions, session.goal)}
-
-        <div class="field-title">攻击力选择</div>
-        ${ChipGroup("temp", "tone", toneOptions, session.tone)}
-
-        <button class="primary-button" data-action="start-temp-chat">生成话术</button>
-      </section>
+    <div class="page realtime-chat-page temp-chat-page">
+      ${TempSettings(session)}
+      ${TempChatPanel(session)}
+      ${TempInputBar(session)}
     </div>
   `;
 }
 
-function ChatPage(session) {
-  const summary = makeContextSummary(session);
-  const visibleRounds = [...session.rounds].reverse();
+function TempSettings(session) {
   return `
-    <div class="page chat-page">
-      <section class="chat-status">
-        <div class="status-head">
-          <strong>临时吵</strong>
-          <button class="tiny-button" data-action="edit-temp-setup">修改</button>
-        </div>
-        <p>对象：${escapeHtml(summary.object)}</p>
-        <p>目标：${escapeHtml(summary.goal)} / 攻击力：${escapeHtml(summary.tone)}</p>
-      </section>
-
-      <section class="chat-log">
-        ${visibleRounds.length ? visibleRounds.map(ChatRound).join("") : EmptyChat("对方说一句，你告诉我一句，App 帮你实时接话。")}
-      </section>
-
-      <section class="chat-composer">
-        <textarea data-session-input="temp" placeholder="对方又说了什么？">${escapeHtml(session.input)}</textarea>
-        <button class="primary-button" data-action="temp-reply" ${session.isSubmitting ? "disabled" : ""}>
-          ${session.isSubmitting ? "正在接话..." : "帮我接一句"}
-        </button>
-      </section>
-    </div>
-  `;
-}
-
-export function ChatRound(round) {
-  return `
-    <article class="chat-round">
-      <div class="bubble-card opponent"><span>对方</span><p>${escapeHtml(round.opponent)}</p></div>
-      <div class="ai-panel">
-        <h3>对方话术分析</h3>
-        <p>${escapeHtml(round.analysis)}</p>
-        <h3>本轮主线提醒</h3>
-        <p>${escapeHtml(round.mainline)}</p>
-        <div class="reply-list">
-          ${round.replies.map(ReplyOption).join("")}
+    <section class="realtime-settings-card temp-settings-card">
+      <div class="settings-title-row">
+        <div>
+          <span class="persona-kicker">当前对手</span>
+          <h2>${escapeHtml(session.who || "临时对手")}</h2>
+          <p>${escapeHtml(session.context || "先补一下前情，嘴替才好接话。")}</p>
         </div>
       </div>
+
+      <details class="top-settings-detail" open>
+        <summary>创建 / 切换对面场景和人设</summary>
+        <div class="preset-row">
+          ${tempScenarioPresets
+            .map(
+              (item, index) => `
+                <button class="chip tiny-chip" data-action="use-temp-scenario" data-scenario-index="${index}">
+                  ${escapeHtml(item.label)}
+                </button>
+              `
+            )
+            .join("")}
+        </div>
+        <div class="settings-grid">
+          ${SmallField("目前对方是谁？", "temp.who", session.who, "比如：客服、同学、对象、室友")}
+          ${SmallField("对方说了什么？", "temp.latest", session.latest, "把对方刚刚说的话放这里")}
+          ${SmallField("前情提要", "temp.context", session.context, "简单说一下为什么吵起来", "wide")}
+        </div>
+        <div class="settings-inline-groups">
+          <div>
+            <span class="mini-field-title">我想要的效果</span>
+            ${ChipGroup("goal", goalOptions, session.goal)}
+          </div>
+          <div>
+            <span class="mini-field-title">攻击力</span>
+            ${ChipGroup("tone", toneOptions, session.tone, "intensity")}
+          </div>
+        </div>
+      </details>
+    </section>
+  `;
+}
+
+function TempChatPanel(session) {
+  const visibleRounds = [...session.rounds];
+  return `
+    <section class="realtime-chat-panel temp-dialog-panel" aria-label="临时吵实时对话">
+      <div class="persona-chat-scroll realtime-chat-scroll">
+        ${
+          visibleRounds.length
+            ? visibleRounds.map(ChatRound).join("")
+            : `
+              <article class="persona-bubble from-user">
+                <span>对方</span>
+                <p>${escapeHtml(session.latest || "对方说一句，你告诉我一句。")}</p>
+              </article>
+              <article class="persona-bubble from-proxy">
+                <span>代吵助手</span>
+                <p>我会根据上面的场景、人设、目标和攻击力，帮你实时接下一句。</p>
+              </article>
+            `
+        }
+      </div>
+    </section>
+  `;
+}
+
+function ChatRound(round) {
+  const bestReply = round.replies?.[0]?.text || "";
+  const otherReplies = (round.replies || []).slice(1);
+  return `
+    <article class="realtime-round">
+      <div class="persona-bubble from-user">
+        <span>对方</span>
+        <p>${escapeHtml(round.opponent)}</p>
+      </div>
+      <div class="persona-bubble from-proxy">
+        <span>代吵助手</span>
+        <p>${escapeHtml(bestReply)}</p>
+        ${bestReply ? `<button class="mini-copy inline-copy" data-copy-reply="${escapeAttr(bestReply)}">复制</button>` : ""}
+      </div>
+      <details class="round-more">
+        <summary>看分析和备选</summary>
+        <div class="temp-result-block">
+          <h3>对方话术</h3>
+          <p>${escapeHtml(round.analysis)}</p>
+        </div>
+        <div class="temp-result-block">
+          <h3>主线提醒</h3>
+          <p>${escapeHtml(round.mainline)}</p>
+        </div>
+        <div class="reply-list compact-replies">
+          ${otherReplies.map(ReplyOption).join("")}
+        </div>
+      </details>
     </article>
+  `;
+}
+
+function TempInputBar(session) {
+  return `
+    <section class="realtime-input-bar">
+      <textarea data-session-input="temp" placeholder="对方又说了什么？继续发给我……">${escapeHtml(session.input)}</textarea>
+      <button class="primary-button" data-action="temp-reply" ${session.isSubmitting ? "disabled" : ""}>
+        ${session.isSubmitting ? "正在接话..." : "帮我接一句"}
+      </button>
+    </section>
   `;
 }
 
@@ -98,30 +131,26 @@ function ReplyOption(reply) {
   `;
 }
 
-function Field({ label, path, value, placeholder, className = "" }) {
+function SmallField(label, path, value, placeholder, className = "") {
   return `
-    <label class="${className}">
+    <label class="compact-field ${className}">
       <span>${label}</span>
       <textarea data-setup-input="${path}" placeholder="${escapeAttr(placeholder)}">${escapeHtml(value)}</textarea>
     </label>
   `;
 }
 
-function ChipGroup(sessionKey, field, options, active) {
+function ChipGroup(field, options, active, extraClass = "") {
   return `
-    <div class="chip-group">
+    <div class="chip-group compact">
       ${options
         .map(
           (item) =>
-            `<button class="chip ${active === item ? "active" : ""}" data-chip-session="${sessionKey}" data-chip-field="${field}" data-chip-value="${escapeAttr(item)}">${item}</button>`
+            `<button class="chip tiny-chip ${extraClass} ${active === item ? "active" : ""}" data-chip-session="temp" data-chip-field="${field}" data-chip-value="${escapeAttr(item)}">${item}</button>`
         )
         .join("")}
     </div>
   `;
-}
-
-function EmptyChat(text) {
-  return `<div class="empty-chat">${text}</div>`;
 }
 
 function escapeHtml(value) {

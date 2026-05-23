@@ -21,7 +21,8 @@ import {
   initialTempSession,
   initialTrainingSession,
   makeOpeningOpponent,
-  relationProfiles
+  relationProfiles,
+  tempScenarioPresets
 } from "./data/mockData.js";
 
 const DISTILL_RESULTS_KEY = "persona_distill_results";
@@ -212,6 +213,10 @@ export default class App {
       await this.handleTempReply();
       return;
     }
+    if (action === "use-temp-scenario") {
+      this.useTempScenario(actionTarget.dataset.scenarioIndex);
+      return;
+    }
     if (action === "start-persona-chat") {
       this.setState({
         activePersona: this.state.persona.who,
@@ -322,6 +327,19 @@ export default class App {
       proxyPersona: {
         ...this.state.proxyPersona,
         ...partial
+      }
+    });
+  }
+
+  useTempScenario(index) {
+    const preset = tempScenarioPresets[Number(index)];
+    if (!preset) return;
+    this.setState({
+      temp: {
+        ...this.state.temp,
+        ...preset,
+        input: "",
+        rounds: []
       }
     });
   }
@@ -525,7 +543,7 @@ export default class App {
     const temp = this.state.temp;
     if (temp.isSubmitting) return;
 
-    const text = temp.input.trim();
+    const text = temp.input.trim() || temp.latest.trim();
     if (!text) return;
 
     this.setState({
@@ -680,7 +698,7 @@ export default class App {
             </div>
             <button class="mini-sticker danger" data-page="persona">替</button>
           </header>
-          <main class="page-scroll">${this.getPage()}</main>
+          <main class="page-scroll ${["temp", "persona", "training"].includes(page) ? "realtime-scroll" : ""} ${page === "persona" ? "persona-scroll" : ""}">${this.getPage()}</main>
           ${BottomNav(page)}
         </div>
       </div>

@@ -39,6 +39,40 @@ export const goalOptions = [
   "体面结束"
 ];
 export const toneOptions = ["低", "中", "高"];
+export const tempScenarioPresets = [
+  {
+    label: "客服扯皮",
+    who: "态度很差的客服",
+    context: "我买的东西有明显质量问题，联系客服后对方一直让我自己看规则，不正面处理退款。",
+    latest: "这个不是我们的问题，你自己也没有看清楚规则。",
+    goal: "要道歉",
+    tone: "中"
+  },
+  {
+    label: "对象改约",
+    who: "临时改约的对象",
+    context: "昨天约好一起吃饭，他临时说要和朋友出去，我表达不满后他说我太敏感。",
+    latest: "你怎么又开始了？这点小事也要上纲上线？",
+    goal: "讲清楚",
+    tone: "中"
+  },
+  {
+    label: "室友装傻",
+    who: "经常装没看见的室友",
+    context: "公共卫生说好轮流做，对方经常跳过，被提醒后说我要求太多。",
+    latest: "你也别说得自己多守规矩，宿舍又不是你一个人的。",
+    goal: "压回去",
+    tone: "中"
+  },
+  {
+    label: "同事甩锅",
+    who: "项目里甩锅的同事",
+    context: "对方没按时交付，影响了我的部分，现在想把延期说成大家都有责任。",
+    latest: "这也不能全怪我吧，你要求这么高，那你来做不是更快吗？",
+    goal: "讲清楚",
+    tone: "高"
+  }
+];
 export const proxyStyleOptions = ["冷静拆台", "阴阳怪气", "高压控场", "体面反击"];
 export const proxyReplyModes = ["像我本人", "说得更清楚", "攻击力加强"];
 export const proxyReplyStrengths = ["低", "中", "高"];
