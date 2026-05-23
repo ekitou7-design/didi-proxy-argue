@@ -1,6 +1,6 @@
 import { requestJsonFromAI } from "./openaiClient.mjs";
 
-const validModes = new Set(["like_me", "clearer", "stronger", "sarcastic", "boundary"]);
+const validModes = new Set(["close_to_user", "like_me", "clearer", "stronger", "sarcastic", "boundary"]);
 const strengthMap = new Map([
   ["soft", "soft"],
   ["balanced", "balanced"],
@@ -19,7 +19,13 @@ export function preparePersonaReplyInput(body = {}) {
   const background = textOf(body.background || body.currentState || body.context || body.scene);
   const goal = textOf(body.goal || body.userGoal || body.expectation);
   const strength = normalizeStrength(body.strength || body.toneStrength || body.intensity);
-  const mode = validModes.has(body.mode) ? body.mode : validModes.has(body.generationMode) ? body.generationMode : "like_me";
+  const requestedMode = body.mode === "like_me" ? "close_to_user" : body.mode;
+  const requestedGenerationMode = body.generationMode === "like_me" ? "close_to_user" : body.generationMode;
+  const mode = validModes.has(requestedMode)
+    ? requestedMode
+    : validModes.has(requestedGenerationMode)
+      ? requestedGenerationMode
+      : "close_to_user";
 
   if (!personaProfile || typeof personaProfile !== "object" || Array.isArray(personaProfile)) {
     const error = new Error("personaProfile is required");
@@ -52,14 +58,29 @@ You are PersonaReplySkill for a Chinese mobile app called Didi Proxy Argue.
 Return only one valid JSON object. Do not use markdown or code fences.
 
 Your task: use a structured persona profile plus a new conflict scene to generate replies that sound like the target speaker.
+Read personaProfile in this priority order when available:
+1. expressionDNA
+2. languageFingerprint
+3. sentencePatterns
+4. emotionalPattern
+5. conflictStrategies
+6. conflictHeuristics
+7. antiPatterns
+8. honestBoundaries
+9. styleReproductionGuide
+
 Core principle:
-1. First sound like the persona. Preserve habits, sentence rhythm, emotional temperature, logic pattern, sarcasm style, and closing style.
-2. Then help the user say the point more clearly.
-3. Increase attack only moderately and only when it fits the persona profile and requested strength.
+1. First sound like the target speaker. Preserve expression habits, sentence patterns, emotional path, and logic order.
+2. In close_to_user mode, prioritize sounding like the target person, not extra catharsis.
+3. In clearer mode, keep the target style but make the logic easier to follow.
+4. In stronger mode, keep the target style and moderately increase attack only within the persona's own range.
+5. Do not copy source text or sample lines directly. Create new safe sentences that follow the pattern.
 
 Do not turn every reply into web-novel drama, CEO romance, costume-drama diction, TVB diction, or rage-posting.
 Use those styles only when the persona profile clearly supports them.
-Do not produce threats, slurs, doxxing, sexual harassment, instructions for harm, or direct personal degradation.
+Do not turn the answer into generic AI essay language, over-polished summaries, or bullet-point scolding.
+Respect antiPatterns and honestBoundaries. If confidence is low, imitate conservatively.
+Do not produce threats, slurs, doxxing, sexual harassment, sustained harassment, severe personal attacks, instructions for harm, or direct personal degradation.
 Keep conflict language sharp if needed, but grounded in facts, impact, request, and boundary.
 `,
     user: `
@@ -99,6 +120,8 @@ Field rules:
 - reply and myStyleReply: same best recommended reply for the requested mode and strength.
 - variants: safe alternatives with different intensity.
 - copyableReplies: 2-4 short ready-to-send replies.
+- usedPersonaSignals: mention concrete fields used from expressionDNA, sentencePatterns, emotionalPattern, conflictHeuristics, antiPatterns, or styleReproductionGuide.
+- riskNotes: include honest boundary notes if the profile sample is weak or likely to drift.
 - If evidence is weak, still generate, but state the limitation in riskNotes and avoid over-stylizing.
 `
   };
@@ -111,7 +134,7 @@ export async function generatePersonaReply(body) {
     const result = await requestJsonFromAI({
       ...buildPersonaSkillReplyPrompt(input),
       temperature: 0.45,
-      maxCompletionTokens: 1300
+      maxCompletionTokens: 1700
     });
 
     return normalizePersonaReplyResult(result);
@@ -167,7 +190,9 @@ export function normalizePersonaReplyResult(result) {
     throw error;
   }
 
-  return {
+  const normalized = {
+    success: true,
+    isMock: false,
     styleAnalysis: textOf(result.styleAnalysis),
     mainline: result.mainline || { fact: "", impact: "", request: "", boundary: "" },
     usedPersonaSignals: Array.isArray(result.usedPersonaSignals) ? result.usedPersonaSignals : [],
@@ -187,6 +212,16 @@ export function normalizePersonaReplyResult(result) {
     riskNotes: Array.isArray(result.riskNotes) ? result.riskNotes : [],
     copyableReplies: Array.isArray(result.copyableReplies) ? result.copyableReplies : [reply]
   };
+
+  normalized.data = {
+    isMock: normalized.isMock,
+    reply: normalized.reply,
+    alternatives: normalized.copyableReplies.filter((item) => item && item !== normalized.reply).slice(0, 3),
+    styleMatchNotes: normalized.usedPersonaSignals,
+    riskLevel: normalized.riskNotes.length ? "review" : "safe"
+  };
+
+  return normalized;
 }
 
 function normalizeStrength(value) {
@@ -200,6 +235,7 @@ function textOf(value) {
 
 function shouldUseMockReply(error) {
   return (
+    error?.code === "MISSING_AI_API_KEY" ||
     error?.code === "MISSING_OPENAI_API_KEY" ||
     error?.code === "AI_REQUEST_FAILED" ||
     error?.message === "AI 返回格式解析失败" ||
