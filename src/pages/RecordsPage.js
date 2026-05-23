@@ -53,10 +53,11 @@ function RecordCard(record) {
         <h2>${escapeHtml(record.type)}</h2>
         <span class="stamp">${record.rounds} 轮</span>
       </div>
-      <p><strong>关系对象：</strong>${escapeHtml(record.object)}</p>
-      <p><strong>前情摘要：</strong>${escapeHtml(record.context)}</p>
-      <p><strong>目标：</strong>${escapeHtml(record.goal)}</p>
-      <p><strong>最近一次：</strong>${escapeHtml(record.time)}</p>
+      <div class="record-meta">
+        <span>${escapeHtml(record.object)}</span>
+        <span>${escapeHtml(record.time)}</span>
+      </div>
+      <p><strong>${escapeHtml(record.goal)}</strong> · ${escapeHtml(record.context)}</p>
     </section>
   `;
 }

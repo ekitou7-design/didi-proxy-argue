@@ -988,6 +988,40 @@ textarea:focus {
   font-weight: 900;
 }
 
+.persona-reply-panel {
+  background: var(--pink);
+}
+
+.persona-reply-panel .inner-result {
+  background: var(--white);
+}
+
+.compact-style-card,
+.compact-history .persona-summary {
+  padding: 12px;
+  border-radius: 16px;
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.compact-style-card h2,
+.compact-history h2,
+.compact-history .persona-summary h2 {
+  font-size: 17px;
+}
+
+.compact-style-card p,
+.compact-history .persona-summary p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.compact-history {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .privacy-warning {
   margin: 0 0 14px;
   padding: 10px 12px;
@@ -1104,6 +1138,53 @@ textarea:focus {
   box-shadow: var(--shadow);
 }
 
+.records-page {
+  gap: 12px;
+}
+
+.records-page .profile-section {
+  padding: 12px;
+  border-radius: 18px;
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.records-page .record-card {
+  padding: 10px 12px;
+  border-radius: 16px;
+  border-width: 2px;
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.records-page .card-title-row {
+  margin-bottom: 6px;
+}
+
+.records-page .record-card h2 {
+  font-size: 16px;
+}
+
+.records-page .stamp {
+  padding: 4px 7px;
+  font-size: 11px;
+}
+
+.record-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.record-meta span {
+  padding: 3px 7px;
+  background: var(--white);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 1000;
+}
+
 .chat-status.persona-status {
   background: var(--pink);
 }
@@ -1141,6 +1222,16 @@ textarea:focus {
   color: var(--muted);
   line-height: 1.45;
   font-weight: 900;
+}
+
+.records-page .record-card p {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .chat-log {

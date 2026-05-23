@@ -43,6 +43,12 @@ export default class App {
       profiles: structuredClone(relationProfiles),
       proxyPersona: createProxyPersonaState(),
       activePersona: initialPersonaSession.who,
+      profilePreferences: {
+        tone: "冷静反击",
+        strength: "中等",
+        length: "中等",
+        mainlineLock: "开启"
+      },
       temp: structuredClone(initialTempSession),
       persona: structuredClone(initialPersonaSession),
       training: structuredClone(initialTrainingSession)
@@ -76,7 +82,7 @@ export default class App {
       });
     }
     if (this.state.page === "profile") {
-      return ProfilePage({ activePersona: this.state.activePersona, profiles: this.state.profiles });
+      return ProfilePage({ preferences: this.state.profilePreferences });
     }
     return HomePage();
   }
@@ -126,6 +132,18 @@ export default class App {
       return;
     }
 
+    const profilePrefTarget = event.target.closest("[data-profile-pref]");
+    if (profilePrefTarget) {
+      const field = profilePrefTarget.dataset.profilePref;
+      this.setState({
+        profilePreferences: {
+          ...this.state.profilePreferences,
+          [field]: profilePrefTarget.dataset.profileValue
+        }
+      });
+      return;
+    }
+
     const actionTarget = event.target.closest("[data-action]");
     if (!actionTarget) return;
     const action = actionTarget.dataset.action;
@@ -156,6 +174,10 @@ export default class App {
     }
     if (action === "generate-proxy-reply") {
       await this.generateProxyReply();
+      return;
+    }
+    if (action === "go-persona-distill") {
+      this.navigate("personaDistill");
       return;
     }
     if (action === "start-temp-chat") {
