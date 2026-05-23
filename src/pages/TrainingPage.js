@@ -1,19 +1,31 @@
 import { difficultyOptions } from "../data/mockData.js";
 
+const trainingCards = [
+  { title: "今日训练卡片", desc: "今日目标：不解释自己配不配生气，只抓事实和诉求。" },
+  { title: "随机场景挑战", desc: "系统随机扮演难缠对手，训练临场反应。" },
+  { title: "主线锁定训练", desc: "对方跑题一次，你就把他拖回案发现场一次。" },
+  { title: "气势稳定训练", desc: "有压迫感，但不失控、不脏嘴。" },
+  { title: "阴阳怪气训练", desc: "练习轻刺反击，点到为止但很难忘。" }
+];
+
 export default function TrainingPage(session) {
   if (session.step === "chat") return ChatPage(session);
 
   return `
     <div class="page training-page">
       <section class="temp-intro training-intro">
-        <strong>不背题，直接练你的真实场景</strong>
-        <p>输入你想训练的冲突，系统会扮演对方。你回一句，系统评分并继续下一轮。</p>
+        <strong>吵架训练</strong>
+        <p>把吵架变成反应力训练。</p>
+      </section>
+
+      <section class="training-card-list">
+        ${trainingCards.map(TrainingCard).join("")}
       </section>
 
       <section class="game-setup">
         <label class="long-field">
-          <span>你想训练什么吵架场景？</span>
-          <textarea data-setup-input="training.scene" placeholder="比如：男朋友临时改约还说我太敏感；组员不干活还说我要求太高；室友不打扫卫生还倒打一耙。">${escapeHtml(session.scene)}</textarea>
+          <span>随机场景挑战</span>
+          <textarea data-setup-input="training.scene" placeholder="也可以自己输入想练的场景。">${escapeHtml(session.scene)}</textarea>
         </label>
 
         <div class="field-title">训练强度</div>
@@ -21,9 +33,18 @@ export default function TrainingPage(session) {
           ${difficultyOptions.map((item) => Difficulty(item, session.difficulty)).join("")}
         </div>
 
-        <button class="primary-button" data-action="start-training-chat">开始训练</button>
+        <button class="primary-button" data-action="start-training-chat">开始挑战</button>
       </section>
     </div>
+  `;
+}
+
+function TrainingCard(card) {
+  return `
+    <article class="training-mini-card">
+      <h3>${card.title}</h3>
+      <p>${card.desc}</p>
+    </article>
   `;
 }
 

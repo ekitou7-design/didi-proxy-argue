@@ -25,12 +25,12 @@ const TEST_RESULTS_KEY = "persona_test_results";
 const CURRENT_PROFILE_KEY = "current_persona_profile";
 
 const pageTitles = {
-  home: "滴滴代吵",
-  temp: "临时代吵",
+  home: "临时吵",
+  temp: "临时吵",
   persona: "专属嘴替",
   personaDistill: "蒸馏自己",
   personaTest: "嘴替测试",
-  training: "吵架训练场",
+  training: "吵架训练",
   records: "记录",
   profile: "我的"
 };
@@ -39,7 +39,7 @@ export default class App {
   constructor(root) {
     this.root = root;
     this.state = {
-      page: pageFromHash() || "home",
+      page: pageFromHash() || "temp",
       profiles: structuredClone(relationProfiles),
       proxyPersona: createProxyPersonaState(),
       activePersona: initialPersonaSession.who,
@@ -505,7 +505,7 @@ export default class App {
               <p class="eyebrow">对方说一句，我帮你接一句</p>
               <h1>${pageTitles[page]}</h1>
             </div>
-            <button class="mini-sticker danger" data-page="records">录</button>
+            <button class="mini-sticker danger" data-page="persona">替</button>
           </header>
           <main class="page-scroll">${this.getPage()}</main>
           ${BottomNav(page)}
@@ -713,9 +713,7 @@ function pageFromHash() {
     "persona-test": "personaTest",
     temp: "temp",
     training: "training",
-    records: "records",
-    profile: "profile",
-    home: "home"
+    home: "temp"
   };
   return map[value] || "";
 }
@@ -729,7 +727,7 @@ function hashFromPage(page) {
     training: "#/training",
     records: "#/records",
     profile: "#/profile",
-    home: "#/home"
+    home: "#/temp"
   };
   return map[page] || "";
 }

@@ -1,7 +1,7 @@
 export const navItems = [
-  { key: "home", label: "首页", mark: "首" },
-  { key: "records", label: "记录", mark: "录" },
-  { key: "profile", label: "我的", mark: "我" }
+  { key: "temp", label: "临时吵", mark: "吵" },
+  { key: "persona", label: "专属嘴替", mark: "替" },
+  { key: "training", label: "吵架训练", mark: "练" }
 ];
 
 export const features = [
@@ -33,25 +33,13 @@ export const features = [
 
 export const whoOptions = ["情侣", "朋友", "室友", "同事", "家人", "商家", "陌生人", "网友", "同学"];
 export const goalOptions = [
-  "让对方道歉",
-  "表达不满",
-  "拒绝对方",
-  "争取权益",
-  "结束对话",
-  "不想吵大",
-  "让对方别再甩锅",
-  "让对方承认问题"
+  "压回去",
+  "要道歉",
+  "讲清楚",
+  "体面结束"
 ];
-export const toneOptions = [
-  "冷静有理",
-  "强硬反击",
-  "阴阳怪气",
-  "温柔但有边界",
-  "体面收场",
-  "嘴毒但不脏",
-  "不撕破脸",
-  "直接开怼"
-];
+export const toneOptions = ["低", "中", "高"];
+export const proxyStyleOptions = ["冷静拆台", "阴阳怪气", "高压控场", "体面反击"];
 export const difficultyOptions = ["热身", "普通", "嘴硬", "阴阳大师"];
 
 export const relationProfiles = [
@@ -104,8 +92,8 @@ export const initialTempSession = {
   who: "态度很差的客服",
   context: "我买的东西有明显质量问题，联系客服后对方一直让我自己看规则，不正面处理退款。",
   latest: "这个不是我们的问题，你自己也没有看清楚规则。",
-  goal: "争取权益",
-  tone: "强硬反击",
+  goal: "压回去",
+  tone: "中",
   boundary: "不要骂脏话，不要人身攻击，只要求对方给明确处理方案。",
   input: "",
   rounds: []

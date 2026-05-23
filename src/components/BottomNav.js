@@ -1,7 +1,7 @@
 import { navItems } from "../data/mockData.js";
 
 export default function BottomNav(activePage) {
-  const activeKey = ["temp", "persona", "training"].includes(activePage) ? "home" : activePage;
+  const activeKey = ["temp", "persona", "training"].includes(activePage) ? activePage : "temp";
 
   return `
     <nav class="bottom-nav" aria-label="底部导航">

@@ -992,6 +992,10 @@ textarea:focus {
   background: var(--pink);
 }
 
+.upload-entry {
+  margin-bottom: 16px;
+}
+
 .persona-reply-panel .inner-result {
   background: var(--white);
 }
@@ -1020,6 +1024,31 @@ textarea:focus {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.training-card-list {
+  display: grid;
+  gap: 10px;
+}
+
+.training-mini-card {
+  padding: 12px;
+  background: var(--white);
+  border: 2px solid var(--ink);
+  border-radius: 16px;
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.training-mini-card h3 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.training-mini-card p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+  font-weight: 900;
 }
 
 .privacy-warning {
