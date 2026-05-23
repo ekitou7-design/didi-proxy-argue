@@ -32,7 +32,9 @@ export default function PersonaPage(state) {
             .join("")}
         </div>
 
-        <button class="primary-button" data-action="${activeProfile ? "generate-proxy-reply" : "go-persona-distill"}">开始专属代吵</button>
+        <button class="primary-button" data-action="${activeProfile ? "generate-proxy-reply" : "go-persona-distill"}" ${state.isReplyGenerating ? "disabled" : ""}>
+          ${state.isReplyGenerating ? "生成中..." : "开始专属代吵"}
+        </button>
         ${state.message ? `<p class="section-note">${escapeHtml(state.message)}</p>` : ""}
         ${state.replyResult ? ReplyResult(state.replyResult) : ""}
       </section>

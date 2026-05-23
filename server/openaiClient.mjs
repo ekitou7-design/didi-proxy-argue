@@ -31,6 +31,8 @@ export async function requestJsonFromAI({ system, user }) {
     const completion = await client.chat.completions.create({
       model: getModelName(),
       response_format: { type: "json_object" },
+      temperature: 0.4,
+      max_completion_tokens: 900,
       messages: [
         { role: "system", content: system },
         { role: "user", content: user }

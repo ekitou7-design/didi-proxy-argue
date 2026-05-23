@@ -83,6 +83,7 @@ export const initialProxyPersonaState = {
     strength: "中等强度"
   },
   replyResult: null,
+  isReplyGenerating: false,
   message: ""
 };
 
@@ -96,6 +97,7 @@ export const initialTempSession = {
   tone: "中",
   boundary: "不要骂脏话，不要人身攻击，只要求对方给明确处理方案。",
   input: "",
+  isSubmitting: false,
   rounds: []
 };
 

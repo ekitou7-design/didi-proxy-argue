@@ -392,6 +392,8 @@ export default class App {
 
   async generateProxyReply() {
     const state = this.state.proxyPersona;
+    if (state.isReplyGenerating) return;
+
     const styleProfile =
       state.personas.find((persona) => String(persona.id) === String(state.selectedPersonaId)) ||
       state.currentProfile;
@@ -399,6 +401,12 @@ export default class App {
       this.updateProxyPersona({ message: "请先生成或选择一个嘴替档案。" });
       return;
     }
+
+    this.updateProxyPersona({
+      isReplyGenerating: true,
+      replyResult: null,
+      message: "正在生成回应..."
+    });
 
     try {
       const result = await postJson("/api/persona-reply", {
@@ -415,44 +423,65 @@ export default class App {
           strategy: result.styleAnalysis,
           tone: getProfileTone(styleProfile)
         },
+        isReplyGenerating: false,
         message: "回应已生成。"
       });
     } catch (error) {
       this.updateProxyPersona({
         replyResult: makeLocalReply(state.replyForm, styleProfile),
+        isReplyGenerating: false,
         message: `${error.message}。先用本地示例回应预览。`
       });
     }
   }
 
   async handleTempReply() {
-    const text = this.state.temp.input.trim();
+    const temp = this.state.temp;
+    if (temp.isSubmitting) return;
+
+    const text = temp.input.trim();
     if (!text) return;
+
+    this.setState({
+      temp: {
+        ...temp,
+        input: "",
+        isSubmitting: true
+      }
+    });
+
     let turn;
     try {
       const result = await postJson("/api/temp-argue", {
-        scene: this.state.temp.context,
+        scene: temp.context,
         opponent: text,
-        goal: this.state.temp.goal,
-        persona: this.state.temp.tone,
-        intensity: this.state.temp.tone
+        goal: temp.goal,
+        persona: temp.tone,
+        intensity: temp.tone
       });
       turn = {
         id: Date.now(),
         opponent: text,
         analysis: result.opponentTactic,
         mainline: `${result.strategy} ${result.offTopicWarning || ""}`,
-        replies: [
+        replies: uniqueReplyOptions([
           { label: "稳妥版", text: result.recommendedReply },
           { label: "强硬版", text: result.strongerReply },
           { label: "嘴替版/阴阳版", text: result.sarcasticReply || result.politeFinalReply }
-        ]
+        ])
       };
     } catch {
-      turn = buildTempChatTurn(this.state.temp, text);
+      turn = buildTempChatTurn(temp, text);
+      turn.replies = uniqueReplyOptions(turn.replies);
     }
     this.setState({
-      temp: { ...this.state.temp, latest: text, input: "", rounds: [...this.state.temp.rounds, turn] }
+      temp: {
+        ...this.state.temp,
+        latest: text,
+        input: "",
+        isSubmitting: false,
+        rounds: [...temp.rounds, turn]
+      }
     });
   }
 
@@ -705,6 +734,16 @@ function makeLocalReply(replyForm, styleProfile) {
     strategy: "本地预览：识别贴标签/转移话题，拉回事实、影响、诉求和边界。",
     tone: getProfileTone(styleProfile) || "温柔但有边界"
   };
+}
+
+function uniqueReplyOptions(replies) {
+  const seen = new Set();
+  return replies.filter((reply) => {
+    const text = String(reply.text || "").trim();
+    if (!text || seen.has(text)) return false;
+    seen.add(text);
+    return true;
+  });
 }
 
 function readJson(key, fallback) {
