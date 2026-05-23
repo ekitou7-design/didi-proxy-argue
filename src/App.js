@@ -176,6 +176,10 @@ export default class App {
       await this.generateProxyReply();
       return;
     }
+    if (action === "generate-random-training-scenario") {
+      await this.generateRandomTrainingScenario();
+      return;
+    }
     if (action === "go-persona-distill") {
       this.navigate("personaDistill");
       return;
@@ -213,8 +217,17 @@ export default class App {
       return;
     }
     if (action === "start-training-chat") {
-      const opponent = makeOpeningOpponent(this.state.training.scene);
-      this.setState({ training: { ...this.state.training, step: "chat", opponent } });
+      const scenario = this.state.training.generatedScenario;
+      const opponent = scenario?.openingMessage || this.state.training.opponent || makeOpeningOpponent(this.state.training.scene);
+      this.setState({
+        training: {
+          ...this.state.training,
+          step: "chat",
+          opponent,
+          round: 1,
+          feedbacks: []
+        }
+      });
       return;
     }
     if (action === "edit-training-setup") {
@@ -246,6 +259,20 @@ export default class App {
   }
 
   handleChange(event) {
+    const setup = event.target.dataset.setupInput;
+    if (setup) {
+      const parts = setup.split(".");
+      if (parts.length === 3) {
+        this.setNestedState(parts[0], parts[1], parts[2], event.target.value);
+        return;
+      }
+      const [sessionKey, field] = parts;
+      this.setState({
+        [sessionKey]: { ...this.state[sessionKey], [field]: event.target.value }
+      });
+      return;
+    }
+
     const fileInput = event.target.closest("[data-file-input='persona-distill']");
     if (!fileInput) return;
     const file = fileInput.files?.[0];
@@ -495,6 +522,45 @@ export default class App {
     });
   }
 
+  async generateRandomTrainingScenario() {
+    const training = this.state.training;
+    if (training.scenarioStatus === "loading") return;
+
+    this.setState({
+      training: {
+        ...training,
+        scenarioStatus: "loading",
+        scenarioMessage: "正在生成真实吵架现场..."
+      }
+    });
+
+    try {
+      const result = await postJson("/api/training/scenario/random", training.randomScenarioForm || {});
+      const scenario = result.scenario;
+      if (!scenario?.openingMessage) throw new Error("场景生成结果为空");
+
+      this.setState({
+        training: {
+          ...this.state.training,
+          scene: scenario.title || scenario.background,
+          difficulty: scenario.difficulty || this.state.training.difficulty,
+          opponent: scenario.openingMessage,
+          generatedScenario: scenario,
+          scenarioStatus: "done",
+          scenarioMessage: "场景已生成，可以开始这一局。"
+        }
+      });
+    } catch (error) {
+      this.setState({
+        training: {
+          ...this.state.training,
+          scenarioStatus: "error",
+          scenarioMessage: error.message || "场景生成失败，请再试一次。"
+        }
+      });
+    }
+  }
+
   async handleTrainingSubmit() {
     const training = this.state.training;
     if (training.isSubmitting) return;
@@ -512,14 +578,18 @@ export default class App {
 
     let feedback;
     let fallbackFeedback;
+    const generatedScenario = training.generatedScenario;
     try {
       const result = await postJson("/api/training/score", {
-        scenario: training.scene,
+        scenario: generatedScenario?.title || generatedScenario?.background || training.scene,
         difficulty: training.difficulty,
-        opponentType: "嘴硬型",
+        opponentType: generatedScenario?.opponentProfile?.type || "嘴硬型",
         opponentMessage: training.opponent,
         userReply: reply,
-        round: training.round
+        round: training.round,
+        mainline: generatedScenario?.mainline,
+        traps: generatedScenario?.traps,
+        trainingFocus: generatedScenario?.trainingFocus
       });
       fallbackFeedback = buildTrainingChatTurn(training, reply);
       feedback = {

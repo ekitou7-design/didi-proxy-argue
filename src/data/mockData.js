@@ -125,6 +125,15 @@ export const initialTrainingSession = {
   step: "setup",
   scene: "男朋友临时改约还说我太敏感",
   difficulty: "普通",
+  randomScenarioForm: {
+    category: "随机",
+    difficulty: "随机",
+    opponentType: "随机",
+    userGoal: ""
+  },
+  generatedScenario: null,
+  scenarioStatus: "idle",
+  scenarioMessage: "",
   round: 1,
   opponent: "",
   input: "",

@@ -1,15 +1,27 @@
+const invalidJsonMessage = "AI returned invalid JSON";
+
 export function parseJsonSafely(text) {
+  return safeParseJson(text);
+}
+
+export function safeParseJson(text) {
   if (!text || typeof text !== "string") {
-    throw new Error("AI 返回格式解析失败");
+    throw new Error(invalidJsonMessage);
   }
 
+  const cleanedText = stripMarkdownCodeFence(text);
+
   try {
-    return JSON.parse(text);
+    return JSON.parse(cleanedText);
   } catch {
-    const jsonText = extractFirstJsonObject(text);
-    if (!jsonText) throw new Error("AI 返回格式解析失败");
+    const jsonText = extractJsonFromText(cleanedText);
+    if (!jsonText) throw new Error(invalidJsonMessage);
     return JSON.parse(jsonText);
   }
+}
+
+export function extractJsonFromText(text) {
+  return extractFirstJsonObject(stripMarkdownCodeFence(text || ""));
 }
 
 export function extractFirstJsonObject(text) {
@@ -50,6 +62,14 @@ export function extractFirstJsonObject(text) {
   return "";
 }
 
+export function stripMarkdownCodeFence(text) {
+  return String(text || "")
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+}
+
 export function jsonParseErrorResponse(response) {
-  return response.status(502).json({ error: "AI 返回格式解析失败" });
+  return response.status(502).json({ error: invalidJsonMessage });
 }

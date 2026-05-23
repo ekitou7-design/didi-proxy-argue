@@ -12,6 +12,7 @@ import {
 import { requestJsonFromAI } from "./openaiClient.mjs";
 import { extractPersonaProfile } from "./personaExtractorSkill.mjs";
 import { generatePersonaReply } from "./personaReplySkill.mjs";
+import { generateRandomTrainingScenario } from "./services/trainingScenarioService.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
@@ -64,6 +65,16 @@ app.post("/api/training/score", async (request, response) => {
   await handleAIEndpoint(response, buildTrainingScorePrompt(request.body));
 });
 
+app.post("/api/training/scenario/random", async (request, response) => {
+  try {
+    const result = await generateRandomTrainingScenario(request.body);
+    response.json(result);
+  } catch (error) {
+    console.error("[training/scenario/random] failed:", error);
+    handleEndpointError(response, error, "Random training scenario generation failed");
+  }
+});
+
 app.post("/api/persona/extract", async (request, response) => {
   await handlePersonaExtraction(request, response);
 });
@@ -78,15 +89,7 @@ async function handlePersonaExtraction(request, response) {
     response.json(result);
   } catch (error) {
     console.error("[persona/extract] failed:", error);
-    console.error("[persona/extract] stack:", error?.stack);
-    response.status(error.status || 502).json({
-      success: false,
-      error: {
-        code: "PERSONA_EXTRACTION_FAILED",
-        message: "Persona extraction failed",
-        detail: error.message
-      }
-    });
+    handleEndpointError(response, error, "Persona extraction failed");
   }
 }
 
@@ -95,6 +98,7 @@ async function handlePersonaReply(request, response) {
     const result = await generatePersonaReply(request.body);
     response.json(result);
   } catch (error) {
+    console.error("[persona/reply] failed:", error);
     handleEndpointError(response, error, "Persona reply generation failed");
   }
 }
@@ -114,13 +118,14 @@ async function handleAIEndpoint(response, prompt) {
     const result = await requestJsonFromAI(prompt);
     response.json(result);
   } catch (error) {
+    console.error("[ai] failed:", error);
     if (error.code === "MISSING_OPENAI_API_KEY") {
       response.status(500).json({ error: "Missing OPENAI_API_KEY" });
       return;
     }
 
-    if (error.message === "AI 返回格式解析失败") {
-      response.status(502).json({ error: "AI 返回格式解析失败" });
+    if (error.message === "AI returned invalid JSON" || error.message === "AI 返回格式解析失败") {
+      response.status(502).json({ error: "AI returned invalid JSON" });
       return;
     }
 
@@ -139,7 +144,7 @@ function handleEndpointError(response, error, fallbackMessage) {
     return;
   }
 
-  if (error.message === "AI 杩斿洖鏍煎紡瑙ｆ瀽澶辫触") {
+  if (error.message === "AI returned invalid JSON" || error.message === "AI 返回格式解析失败") {
     response.status(502).json({ error: "AI returned invalid JSON" });
     return;
   }

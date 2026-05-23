@@ -42,7 +42,7 @@ export async function requestJsonFromAI({ system, user, temperature = 0.4, maxCo
     const content = completion.choices?.[0]?.message?.content || "";
     return parseJsonSafely(content);
   } catch (error) {
-    if (error.message === "AI 返回格式解析失败") throw error;
+    if (error.message === "AI returned invalid JSON" || error.message === "AI 返回格式解析失败") throw error;
     if (error.code === "MISSING_OPENAI_API_KEY") throw error;
     const wrapped = new Error("AI request failed");
     wrapped.code = "AI_REQUEST_FAILED";
