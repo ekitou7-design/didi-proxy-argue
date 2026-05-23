@@ -1,0 +1,13 @@
+{
+  "name": "didi-argue-mobile-prototype",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node dev-server.mjs",
+    "build": "node dev-server.mjs --check",
+    "preview": "node dev-server.mjs"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

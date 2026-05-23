@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+
+<html class="light" lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>滴滴代吵 DIDI ARGUING</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-low": "#fff1ed",
+                        "error-container": "#ffdad6",
+                        "primary-container": "#d83900",
+                        "on-error": "#ffffff",
+                        "tertiary": "#005daa",
+                        "surface-container": "#ffe9e4",
+                        "outline-variant": "#926f66",
+                        "on-secondary": "#ffffff",
+                        "inverse-surface": "#402c26",
+                        "on-background": "#291712",
+                        "on-tertiary-fixed": "#001c3a",
+                        "on-secondary-fixed-variant": "#5516be",
+                        "error": "#ba1a1a",
+                        "secondary-fixed-dim": "#d0bcff",
+                        "secondary": "#6b38d4",
+                        "background": "#fff8f6",
+                        "tertiary-container": "#0075d5",
+                        "on-secondary-fixed": "#23005c",
+                        "surface-dim": "#f4d3cb",
+                        "tertiary-fixed": "#d4e3ff",
+                        "on-error-container": "#93000a",
+                        "surface-container-highest": "#fddbd3",
+                        "primary-fixed-dim": "#ffb5a0",
+                        "on-surface-variant": "#5d4038",
+                        "outline": "#000000",
+                        "on-primary-fixed-variant": "#872000",
+                        "on-surface": "#291712",
+                        "inverse-primary": "#ffb5a0",
+                        "surface-container-high": "#ffe2db",
+                        "surface": "#fff8f6",
+                        "tertiary-fixed-dim": "#a5c8ff",
+                        "on-tertiary": "#ffffff",
+                        "secondary-fixed": "#e9ddff",
+                        "inverse-on-surface": "#ffede8",
+                        "on-primary-fixed": "#3b0900",
+                        "on-primary": "#ffffff",
+                        "primary": "#ad2c00",
+                        "surface-bright": "#fff8f6",
+                        "on-tertiary-fixed-variant": "#004785",
+                        "on-secondary-container": "#fffbff",
+                        "secondary-container": "#8455ef",
+                        "on-tertiary-container": "#fefcff",
+                        "surface-tint": "#b12d00",
+                        "primary-fixed": "#ffdbd1",
+                        "on-primary-container": "#fffbff",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-variant": "#fddbd3"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-md": "16px",
+                        "unit": "8px",
+                        "stack-sm": "8px",
+                        "container-margin": "24px",
+                        "gutter": "16px",
+                        "stack-lg": "32px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Bricolage Grotesque"],
+                        "headline-lg-mobile": ["Bricolage Grotesque"],
+                        "display-lg": ["Bricolage Grotesque"],
+                        "headline-lg": ["Bricolage Grotesque"],
+                        "body-md": ["Bricolage Grotesque"],
+                        "body-lg": ["Bricolage Grotesque"],
+                        "label-bold": ["Bricolage Grotesque"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                        "headline-lg-mobile": ["28px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                        "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                        "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "500"}],
+                        "label-bold": ["14px", {"lineHeight": "1", "fontWeight": "700"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 48;
+        }
+        .neo-brutal-shadow {
+            box-shadow: 4px 4px 0px 0px rgba(0, 0, 0, 1);
+        }
+        .neo-brutal-shadow-active {
+            box-shadow: 0px 0px 0px 0px rgba(0, 0, 0, 1);
+        }
+        .neo-brutal-border {
+            border: 3px solid #000000;
+        }
+        .neo-brutal-header-shadow {
+            box-shadow: 0px 4px 0px 0px rgba(0, 0, 0, 1);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md overflow-x-hidden">
+<!-- Top Navigation -->
+<header class="w-full sticky top-0 bg-surface border-b-4 border-black neo-brutal-header-shadow z-50">
+<div class="flex justify-between items-center px-container-margin py-4 w-full">
+<div class="text-primary font-headline-lg-mobile text-[24px] font-black italic border-[3px] border-black rotate-[-2deg] px-3 py-1 bg-surface-container-highest neo-brutal-shadow">
+            滴滴代吵 DIDI ARGUING
+        </div>
+<button class="material-symbols-outlined text-on-surface text-3xl">
+            menu
+        </button>
+</div>
+</header>
+<main class="flex flex-col gap-stack-lg pb-40">
+<!-- Hero Section -->
+<section class="px-container-margin pt-stack-lg">
+<div class="bg-secondary-fixed neo-brutal-border rounded-lg p-stack-lg flex flex-col items-center text-center neo-brutal-shadow">
+<div class="flex flex-col items-center">
+<h1 class="font-display-lg text-primary mb-stack-sm leading-tight text-[36px]">
+                    嘴笨？<br/>AI 帮你吵！
+                </h1>
+<p class="font-body-md text-on-surface-variant mb-stack-lg opacity-80">
+                    全宇宙最强逻辑，代吵从未输过。
+                </p>
+<!-- Hero Image -->
+<div class="relative w-full max-w-[240px] aspect-square mb-stack-lg bg-white neo-brutal-border p-2 flex items-center justify-center">
+<img alt="Anime girl with megaphone" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida/ADBb0ugMSfrxfgsFaTCnP73OKWpBOdLaSdfOwhMuM9wQQJqu7xSzkdfVlNYvBw_SdYrH1OVoT0cVMq-1RrUbaLL3_m9sv4hdeVtt4DlHDqGuPI2gPHnmDNjTZ6q18e906kdLvRmleS5zGfU2hQgl3iyrz-RBeQMWkv73ST8TruGxRHKU6KYVJ8h7HvLm6ozSTgP1Dm-Yb81pGIUflLmGA3DuTc6pEUCp5yI4HTBR4RHb9kG29PY-IMncImAaPF8"/>
+</div>
+<!-- Main CTA -->
+<button class="w-full max-w-[280px] bg-[#FF4500] text-white font-headline-md py-4 neo-brutal-border neo-brutal-shadow active:translate-x-[4px] active:translate-y-[4px] active:shadow-none transition-all rounded-full uppercase tracking-tight">
+                    开始代吵
+                </button>
+</div>
+</div>
+</section>
+<!-- Category Grid - Exactly Three Entry Points -->
+<section class="px-container-margin flex flex-col gap-gutter">
+<!-- Card 1: 临时代吵 -->
+<div class="bg-surface-container-lowest neo-brutal-border rounded-lg p-stack-md neo-brutal-shadow flex items-center gap-stack-md hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all">
+<div class="w-16 h-16 rounded-full bg-error-container neo-brutal-border flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-error text-[32px]">favorite</span>
+</div>
+<div>
+<h3 class="font-headline-md text-on-surface">临时代吵</h3>
+<p class="text-on-surface-variant text-[14px] leading-tight mt-1">用户填场景，选人格，出多版本话术。</p>
+</div>
+</div>
+<!-- Card 2: 专属嘴替 -->
+<div class="bg-tertiary-fixed neo-brutal-border rounded-lg p-stack-md neo-brutal-shadow flex items-center gap-stack-md hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all">
+<div class="w-16 h-16 rounded-full bg-tertiary-container neo-brutal-border flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-white text-[32px]">chat</span>
+</div>
+<div>
+<h3 class="font-headline-md text-on-surface">专属嘴替</h3>
+<p class="text-on-surface-variant text-[14px] leading-tight mt-1">粘贴聊天记录，AI 提取风格并生成回复。</p>
+</div>
+</div>
+<!-- Card 3: 吵架训练场 -->
+<div class="bg-secondary-fixed neo-brutal-border rounded-lg p-stack-md neo-brutal-shadow flex items-center gap-stack-md hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all">
+<div class="w-16 h-16 rounded-full bg-secondary-container neo-brutal-border flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-white text-[32px]">sports_kabaddi</span>
+</div>
+<div>
+<h3 class="font-headline-md text-on-surface">吵架训练场</h3>
+<p class="text-on-surface-variant text-[14px] leading-tight mt-1">回合制对线小游戏，评委现场判分。</p>
+</div>
+</div>
+</section>
+<!-- Fun Stats Section -->
+<section class="px-container-margin">
+<div class="bg-surface neo-brutal-border rounded-lg p-stack-md flex flex-col items-center">
+<p class="font-label-bold text-on-surface-variant uppercase tracking-widest mb-2 text-[12px]">Service Status</p>
+<div class="flex items-center gap-3">
+<div class="w-4 h-4 bg-green-500 rounded-full animate-pulse neo-brutal-border border-2"></div>
+<span class="font-headline-md text-[20px]">9,999+ 已代吵成功</span>
+</div>
+</div>
+</section>
+</main>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-8 pt-4 bg-surface-container border-t-4 border-black rounded-t-xl neo-brutal-header-shadow">
+<a class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container neo-brutal-border rounded-lg px-6 py-2 neo-brutal-shadow" href="#">
+<span class="material-symbols-outlined text-[24px]">home</span>
+<span class="font-label-bold text-[12px] uppercase mt-1">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant opacity-70" href="#">
+<span class="material-symbols-outlined text-[24px]">swords</span>
+<span class="font-label-bold text-[12px] uppercase mt-1">Battle</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant opacity-70" href="#">
+<span class="material-symbols-outlined text-[24px]">smart_toy</span>
+<span class="font-label-bold text-[12px] uppercase mt-1">AI</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant opacity-70" href="#">
+<span class="material-symbols-outlined text-[24px]">person</span>
+<span class="font-label-bold text-[12px] uppercase mt-1">Profile</span>
+</a>
+</nav>
+<script>
+    // Interaction feedback
+    document.querySelectorAll('button, a').forEach(elem => {
+        elem.addEventListener('mousedown', () => {
+            elem.classList.add('scale-95');
+        });
+        elem.addEventListener('mouseup', () => {
+            elem.classList.remove('scale-95');
+        });
+        elem.addEventListener('mouseleave', () => {
+            elem.classList.remove('scale-95');
+        });
+    });
+</script>
+</body></html>
