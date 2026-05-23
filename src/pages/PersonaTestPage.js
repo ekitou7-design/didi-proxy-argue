@@ -1,23 +1,25 @@
-import { personaTestQuestions } from "../data/njutiQuizData.js";
+import { dedicatedPersonaQuizQuestions } from "../data/njutiQuizData.js";
 
 export default function PersonaTestPage(state) {
   const answered = Object.values(state.testAnswers || {}).filter(Boolean).length;
   return `
     <div class="page persona-test-page">
-      <section class="temp-intro persona-intro">
-        <strong>专属嘴替人格测试</strong>
-        <p>22 道题测出你的回怼人格。提交后会自动设为当前嘴替，用来生成你的专属回怼话术。</p>
+      <section class="flow-hero persona-intro">
+        <div>
+          <strong>嘴替人格测试</strong>
+          <p>不用上传聊天记录，答完 8 道题，也能先生成一个能用的专属嘴替。</p>
+        </div>
+        <button class="tiny-button" data-page="persona">返回</button>
       </section>
 
-      <section class="input-panel setup-panel">
+      <section class="input-panel setup-panel quiz-flow-panel">
         <div class="card-title-row">
-          <h2>做个测试题</h2>
-          <span class="stamp">${answered}/${personaTestQuestions.length}</span>
+          <h2>选最像你的反应</h2>
+          <span class="stamp">${answered}/${dedicatedPersonaQuizQuestions.length}</span>
         </div>
-        ${personaTestQuestions.map((question) => Question(question, state.testAnswers[question.id])).join("")}
+        ${dedicatedPersonaQuizQuestions.map((question) => Question(question, state.testAnswers[question.id])).join("")}
         <div class="button-row">
-          <button class="secondary-button warm" data-page="persona">返回</button>
-          <button class="primary-button" data-action="submit-persona-test">提交并生成嘴替人格</button>
+          <button class="primary-button" data-action="submit-persona-test">生成嘴替人格</button>
         </div>
       </section>
     </div>

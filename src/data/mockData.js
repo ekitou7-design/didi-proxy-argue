@@ -40,6 +40,8 @@ export const goalOptions = [
 ];
 export const toneOptions = ["低", "中", "高"];
 export const proxyStyleOptions = ["冷静拆台", "阴阳怪气", "高压控场", "体面反击"];
+export const proxyReplyModes = ["像我本人", "说得更清楚", "攻击力加强"];
+export const proxyReplyStrengths = ["低", "中", "高"];
 export const difficultyOptions = ["热身", "普通", "嘴硬", "阴阳大师"];
 
 export const relationProfiles = [
@@ -80,8 +82,10 @@ export const initialProxyPersonaState = {
     opponentMessage: "你怎么又开始了？这点小事也要上纲上线？",
     background: "昨天约好一起吃饭，他临时说要和朋友出去。",
     goal: "反击对方逻辑",
-    strength: "中等强度"
+    mode: "像我本人",
+    strength: "中"
   },
+  chatTurns: [],
   replyResult: null,
   isReplyGenerating: false,
   message: ""

@@ -1,3 +1,202 @@
+export const dedicatedPersonaQuizQuestions = [
+  {
+    id: 1,
+    title: "吵起来的第一反应，你更像哪一种？",
+    options: [
+      { value: "A", label: "先解释清楚，我不是无理取闹" },
+      { value: "B", label: "先把对方的逻辑漏洞点出来" },
+      { value: "C", label: "先冷下来，短句挡回去" },
+      { value: "D", label: "先反问，让对方别装听不懂" }
+    ]
+  },
+  {
+    id: 2,
+    title: "被误解时，你更想怎么说？",
+    options: [
+      { value: "A", label: "我不是这个意思，你先听我把话说完" },
+      { value: "B", label: "你现在是在偷换概念" },
+      { value: "C", label: "你可以这么理解，但我不接受这个说法" },
+      { value: "D", label: "行，那你继续把问题推给我" }
+    ]
+  },
+  {
+    id: 3,
+    title: "对方阴阳怪气时，你通常会？",
+    options: [
+      { value: "A", label: "装没听见，继续讲重点" },
+      { value: "B", label: "直接拆穿：你不用这样说话" },
+      { value: "C", label: "冷脸收口，不陪对方演" },
+      { value: "D", label: "阴阳回去，但不骂脏话" }
+    ]
+  },
+  {
+    id: 4,
+    title: "你更喜欢哪种输出长度？",
+    options: [
+      { value: "A", label: "中等偏长，把前因后果讲完整" },
+      { value: "B", label: "分层讲清楚，像把账算明白" },
+      { value: "C", label: "短句压住，不给对方继续绕" },
+      { value: "D", label: "看情况，情绪上来会连续输出" }
+    ]
+  },
+  {
+    id: 5,
+    title: "你能接受嘴替使用粗口吗？",
+    options: [
+      { value: "A", label: "不能，我想有边界但不难听" },
+      { value: "B", label: "尽量不用，靠逻辑压住就行" },
+      { value: "C", label: "完全不用，冷一点就够了" },
+      { value: "D", label: "可以轻微尖锐，但不要失控" }
+    ]
+  },
+  {
+    id: 6,
+    title: "你希望嘴替更像本人，还是比本人更强？",
+    options: [
+      { value: "A", label: "像本人，帮我把话说顺" },
+      { value: "B", label: "比本人更清楚，更会抓重点" },
+      { value: "C", label: "比本人更冷静，更有边界" },
+      { value: "D", label: "比本人更敢说，但别越线" }
+    ]
+  },
+  {
+    id: 7,
+    title: "这场对话里你更在意什么？",
+    options: [
+      { value: "A", label: "让对方理解我的感受" },
+      { value: "B", label: "让对方承认逻辑和责任" },
+      { value: "C", label: "停止消耗，守住边界" },
+      { value: "D", label: "别让对方继续占上风" }
+    ]
+  },
+  {
+    id: 8,
+    title: "你最常用的表达方式是？",
+    options: [
+      { value: "A", label: "委屈说明：我不是要吵，我只是觉得" },
+      { value: "B", label: "逻辑归纳：问题不是 A，而是 B" },
+      { value: "C", label: "冷脸反问：所以你现在是不打算回应？" },
+      { value: "D", label: "阴阳拆台：你这个解释听起来挺省事的" }
+    ]
+  }
+];
+
+export const dedicatedPersonaPersonalities = {
+  RESTRAINED: {
+    typeName: "克制解释型嘴替",
+    nickname: "先讲道理再反击",
+    category: "解释类",
+    emoji: "替",
+    subtitle: "先解释，再指出问题，重视边界，不喜欢粗口。",
+    tags: ["克制", "解释型", "重视边界", "先讲道理"],
+    styleProfile: {
+      tone: "克制、解释型、重视边界",
+      emotionLevel: 3,
+      logicStyle: "先澄清自己不是无理取闹，再指出对方行为的问题，最后提出边界",
+      commonPhrases: ["我不是", "我只是", "问题不是", "你每次都"],
+      avoidWords: ["粗口", "威胁", "过度网络热梗"],
+      replyStrategy: "保留第一人称和解释路径，先讲清楚再反击。",
+      profileSummary: "先解释，再指出问题，重视边界，不喜欢粗口。"
+    }
+  },
+  COLD: {
+    typeName: "冷脸反问型嘴替",
+    nickname: "短句挡回去",
+    category: "边界类",
+    emoji: "冷",
+    subtitle: "话不多，但每一句都把边界放在前面。",
+    tags: ["冷静", "短句", "边界", "不内耗"],
+    styleProfile: {
+      tone: "冷静、疏离、边界感强",
+      emotionLevel: 2,
+      logicStyle: "少解释，直接反问对方是否愿意正面回应",
+      commonPhrases: ["所以呢", "你现在是在回避", "这件事到这里"],
+      avoidWords: ["长篇自证", "讨好式让步", "情绪化拉扯"],
+      replyStrategy: "用短句收口，减少对方继续消耗的空间。",
+      profileSummary: "短句反问，冷静设边界，不陪对方绕。"
+    }
+  },
+  IRONIC: {
+    typeName: "阴阳拆台型嘴替",
+    nickname: "轻轻一戳就漏气",
+    category: "拆台类",
+    emoji: "阴",
+    subtitle: "不大喊大叫，专门拆穿对方话里的小把戏。",
+    tags: ["阴阳", "拆穿", "轻讽", "不脏"],
+    styleProfile: {
+      tone: "轻讽、聪明、带一点阴阳怪气",
+      emotionLevel: 3,
+      logicStyle: "先接住对方话术，再点破里面的逃避和甩锅",
+      commonPhrases: ["听起来挺省事的", "这解释真方便", "你这不是回应"],
+      avoidWords: ["低俗辱骂", "持续嘲笑", "现实威胁"],
+      replyStrategy: "用轻讽拆台，但不升级成人身攻击。",
+      profileSummary: "适合把对方的阴阳怪气原路拆回去。"
+    }
+  },
+  LOGIC: {
+    typeName: "逻辑压制型嘴替",
+    nickname: "把账算明白",
+    category: "逻辑类",
+    emoji: "理",
+    subtitle: "不靠音量赢，靠拆概念、拆责任、拆因果。",
+    tags: ["逻辑", "归纳", "责任", "清楚"],
+    styleProfile: {
+      tone: "清醒、理性、有压迫感",
+      emotionLevel: 2,
+      logicStyle: "先定义问题，再拆对方偷换概念，最后要求具体回应",
+      commonPhrases: ["问题不是", "这个因果不成立", "请正面回应"],
+      avoidWords: ["无证据指控", "情绪宣泄", "跑题审判"],
+      replyStrategy: "把混乱争吵压成事实、影响、责任和下一步。",
+      profileSummary: "适合把一团乱话拆成对方必须回应的问题。"
+    }
+  },
+  FIRE: {
+    typeName: "发疯输出型嘴替",
+    nickname: "有火但不越线",
+    category: "释放类",
+    emoji: "疯",
+    subtitle: "情绪给足，但不威胁、不歧视、不爆隐私。",
+    tags: ["爆发", "直接", "情绪浓", "不越线"],
+    styleProfile: {
+      tone: "直接、有冲击力、情绪浓度高",
+      emotionLevel: 5,
+      logicStyle: "先打断对方甩锅，再连续输出自己的不满和底线",
+      commonPhrases: ["别装没事", "我真的受够了", "你每次都这样"],
+      avoidWords: ["威胁", "歧视", "隐私曝光", "严重人身攻击"],
+      replyStrategy: "释放情绪，但把火力压在行为和责任上。",
+      profileSummary: "适合需要更有爆发力、但仍然安全的回应。"
+    }
+  },
+  DECENT: {
+    typeName: "体面反击型嘴替",
+    nickname: "温柔但不让步",
+    category: "体面类",
+    emoji: "稳",
+    subtitle: "话说得体面，但边界一点都不软。",
+    tags: ["体面", "温柔", "坚定", "关系修复"],
+    styleProfile: {
+      tone: "温和、体面、坚定",
+      emotionLevel: 2,
+      logicStyle: "先表达关系和感受，再提出不可接受的点和具体期待",
+      commonPhrases: ["我愿意好好说", "但我不能接受", "请你认真对待"],
+      avoidWords: ["撕破脸", "粗口", "过度阴阳"],
+      replyStrategy: "给关系留余地，但不把边界让出去。",
+      profileSummary: "适合想修复关系，但不想继续委屈自己的场景。"
+    }
+  }
+};
+
+export const dedicatedPersonaPersonalityWeights = {
+  1: { A: { RESTRAINED: 3, DECENT: 1 }, B: { LOGIC: 3 }, C: { COLD: 3 }, D: { IRONIC: 2, FIRE: 1 } },
+  2: { A: { RESTRAINED: 3 }, B: { LOGIC: 3 }, C: { DECENT: 2, COLD: 1 }, D: { IRONIC: 2, FIRE: 1 } },
+  3: { A: { DECENT: 2, RESTRAINED: 1 }, B: { LOGIC: 2, COLD: 1 }, C: { COLD: 3 }, D: { IRONIC: 3, FIRE: 1 } },
+  4: { A: { RESTRAINED: 3 }, B: { LOGIC: 3 }, C: { COLD: 3 }, D: { FIRE: 2, IRONIC: 1 } },
+  5: { A: { RESTRAINED: 2, DECENT: 2 }, B: { LOGIC: 2, DECENT: 1 }, C: { COLD: 2 }, D: { FIRE: 2, IRONIC: 1 } },
+  6: { A: { RESTRAINED: 3 }, B: { LOGIC: 3 }, C: { COLD: 2, DECENT: 1 }, D: { FIRE: 2, IRONIC: 2 } },
+  7: { A: { DECENT: 3, RESTRAINED: 1 }, B: { LOGIC: 3 }, C: { COLD: 3 }, D: { FIRE: 2, IRONIC: 2 } },
+  8: { A: { RESTRAINED: 3 }, B: { LOGIC: 3 }, C: { COLD: 3 }, D: { IRONIC: 3, FIRE: 1 } }
+};
+
 export const personaTestQuestions = [
   {
     id: 1,

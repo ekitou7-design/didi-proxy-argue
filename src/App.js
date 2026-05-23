@@ -7,7 +7,11 @@ import PersonaTestPage from "./pages/PersonaTestPage.js";
 import TrainingPage from "./pages/TrainingPage.js";
 import ProfilePage from "./pages/ProfilePage.js";
 import RecordsPage from "./pages/RecordsPage.js";
-import { personaPersonalities, personaPersonalityWeights, personaTestQuestions } from "./data/njutiQuizData.js";
+import {
+  dedicatedPersonaPersonalities,
+  dedicatedPersonaPersonalityWeights,
+  dedicatedPersonaQuizQuestions
+} from "./data/njutiQuizData.js";
 import {
   buildPersonaChatTurn,
   buildTempChatTurn,
@@ -23,6 +27,7 @@ import {
 const DISTILL_RESULTS_KEY = "persona_distill_results";
 const TEST_RESULTS_KEY = "persona_test_results";
 const CURRENT_PROFILE_KEY = "current_persona_profile";
+const PERSONA_CHAT_KEY = "persona_chat_turns";
 
 const pageTitles = {
   home: "临时吵",
@@ -97,6 +102,9 @@ export default class App {
 
     const pageTarget = event.target.closest("[data-page]");
     if (pageTarget) {
+      if (["personaDistill", "personaTest"].includes(pageTarget.dataset.page)) {
+        this.state.proxyPersona = { ...this.state.proxyPersona, createSheetOpen: false };
+      }
       this.navigate(pageTarget.dataset.page);
       return;
     }
@@ -158,6 +166,14 @@ export default class App {
     }
     if (action === "reset-distill-result") {
       this.updateProxyPersona({ distillResult: null, distillStatus: "idle", message: "" });
+      return;
+    }
+    if (action === "open-persona-create") {
+      this.updateProxyPersona({ createSheetOpen: true });
+      return;
+    }
+    if (action === "close-persona-create") {
+      this.updateProxyPersona({ createSheetOpen: false });
       return;
     }
     if (action === "submit-persona-test") {
@@ -360,6 +376,7 @@ export default class App {
         personas: mergePersonas(distillResults, this.state.proxyPersona.testResults),
         selectedPersonaId: result.id,
         currentProfile: result,
+        createSheetOpen: false,
         distillResult: null,
         distillStatus: "idle",
         message: "已保存蒸馏嘴替档案，并设为当前嘴替。"
@@ -370,9 +387,9 @@ export default class App {
 
   createPersonaFromTest() {
     const answered = Object.values(this.state.proxyPersona.testAnswers).filter(Boolean).length;
-    const unanswered = personaTestQuestions.length - answered;
-    if (unanswered > 3) {
-      window.alert?.(`还有 ${unanswered} 道题未作答，最多只能空 3 道题。`);
+    const unanswered = dedicatedPersonaQuizQuestions.length - answered;
+    if (unanswered > 1) {
+      window.alert?.(`还有 ${unanswered} 道题未作答，最多只能空 1 道题。`);
       return;
     }
 
@@ -388,6 +405,7 @@ export default class App {
         personas: mergePersonas(this.state.proxyPersona.distillResults, testResults),
         selectedPersonaId: result.id,
         currentProfile: result,
+        createSheetOpen: false,
         message: `已生成专属嘴替人格：${result.typeName}，并设为当前嘴替。`
       }
     });
@@ -401,6 +419,7 @@ export default class App {
     this.updateProxyPersona({
       currentProfile: profile,
       selectedPersonaId: profile.id,
+      createSheetOpen: false,
       message: `当前嘴替已设为：${getProfileName(profile)}`
     });
   }
@@ -443,6 +462,14 @@ export default class App {
       message: "正在生成回应..."
     });
 
+    const userText = [
+      state.replyForm.background,
+      state.replyForm.opponentMessage,
+      state.replyForm.goal ? `我想表达：${state.replyForm.goal}` : ""
+    ]
+      .filter(Boolean)
+      .join("\n");
+
     try {
       const result = await postJson("/api/persona/reply", {
         chatHistory: state.upload.chatText,
@@ -452,20 +479,42 @@ export default class App {
         realThought: "",
         goal: state.replyForm.goal,
         strength: state.replyForm.strength,
-        mode: "like_me"
+        mode: mapReplyMode(state.replyForm.mode)
       });
+      const reply = result.reply || result.myStyleReply || result.data?.reply;
+      const chatTurns = [
+        ...state.chatTurns,
+        { id: `user-${Date.now()}`, role: "user", text: userText || state.replyForm.opponentMessage },
+        { id: `assistant-${Date.now()}`, role: "assistant", text: reply }
+      ];
+      writeJson(PERSONA_CHAT_KEY, chatTurns);
       this.updateProxyPersona({
+        chatTurns,
         replyResult: {
-          reply: result.reply || result.myStyleReply,
+          reply,
           strategy: result.styleAnalysis,
           tone: getProfileTone(styleProfile)
         },
         isReplyGenerating: false,
-        message: "回应已生成。"
+        replyForm: {
+          ...state.replyForm,
+          opponentMessage: "",
+          background: "",
+          goal: ""
+        },
+        message: "嘴替已经接上了。"
       });
     } catch (error) {
+      const fallback = makeLocalReply(state.replyForm, styleProfile);
+      const chatTurns = [
+        ...state.chatTurns,
+        { id: `user-${Date.now()}`, role: "user", text: userText || state.replyForm.opponentMessage },
+        { id: `assistant-${Date.now()}`, role: "assistant", text: fallback.reply }
+      ];
+      writeJson(PERSONA_CHAT_KEY, chatTurns);
       this.updateProxyPersona({
-        replyResult: makeLocalReply(state.replyForm, styleProfile),
+        chatTurns,
+        replyResult: fallback,
         isReplyGenerating: false,
         message: `${error.message}。先用本地示例回应预览。`
       });
@@ -650,6 +699,7 @@ async function postJson(url, body) {
     try {
       const data = await response.json();
       if (data.error === "Missing OPENAI_API_KEY") message = "还没有配置 OPENAI_API_KEY";
+      else if (data.error?.message) message = data.error.message;
       else if (data.error) message = data.error;
     } catch {
       // Keep the status-based message.
@@ -676,20 +726,23 @@ function createProxyPersonaState() {
       background: "他最近经常不回消息，临时改约后说我太敏感。",
       chatText: "我不是想吵架，我只是希望你尊重之前说好的约定。你先别把问题说成我太敏感。"
     },
-    testAnswers: Object.fromEntries(personaTestQuestions.map((question) => [question.id, ""])),
+    testAnswers: Object.fromEntries(dedicatedPersonaQuizQuestions.map((question) => [question.id, ""])),
     distillResults,
     testResults,
     personas,
     selectedPersonaId: currentProfile?.id || personas[0]?.id || "",
     currentProfile,
+    createSheetOpen: false,
     distillStatus: "idle",
     distillResult: null,
     replyForm: {
       opponentMessage: "你怎么又开始了？这点小事也要上纲上线？",
       background: "昨天约好一起吃饭，他临时说要和朋友出去。",
       goal: "反击对方逻辑",
-      strength: "中等强度"
+      mode: "像我本人",
+      strength: "中"
     },
+    chatTurns: readJson(PERSONA_CHAT_KEY, []),
     replyResult: null,
     message: ""
   };
@@ -738,22 +791,22 @@ function makeMockDistillProfile() {
 }
 
 function makeTestResult(testAnswers) {
-  const scores = Object.fromEntries(Object.keys(personaPersonalities).map((key) => [key, 0]));
+  const scores = Object.fromEntries(Object.keys(dedicatedPersonaPersonalities).map((key) => [key, 0]));
 
   Object.entries(testAnswers).forEach(([questionId, answer]) => {
-    const weights = personaPersonalityWeights[questionId]?.[answer];
+    const weights = dedicatedPersonaPersonalityWeights[questionId]?.[answer];
     if (!weights) return;
     Object.entries(weights).forEach(([key, value]) => {
       scores[key] = (scores[key] || 0) + value;
     });
   });
 
-  let resultKey = "VEGE";
+  let resultKey = "RESTRAINED";
   Object.entries(scores).forEach(([key, value]) => {
     if (value > scores[resultKey]) resultKey = key;
   });
 
-  const base = personaPersonalities[resultKey] || personaPersonalities.VEGE;
+  const base = dedicatedPersonaPersonalities[resultKey] || dedicatedPersonaPersonalities.RESTRAINED;
   return normalizeTestResult({
     id: `test-${Date.now()}`,
     createdAt: new Date().toISOString(),
@@ -788,7 +841,7 @@ function normalizeDistillResult(result) {
 }
 
 function normalizeTestResult(result) {
-  const fallback = personaPersonalities.VEGE;
+  const fallback = dedicatedPersonaPersonalities.RESTRAINED;
   const typeName = result.typeName || result.name || fallback.typeName;
   const nickname = result.nickname || fallback.nickname;
   const subtitle = result.subtitle || fallback.subtitle;
@@ -844,6 +897,12 @@ function makeLocalReply(replyForm, styleProfile) {
     strategy: `本地预览：按「${getProfileName(styleProfile)}」人格生成。${strategy}`,
     tone: getProfileTone(styleProfile) || "温柔但有边界"
   };
+}
+
+function mapReplyMode(mode) {
+  if (mode === "说得更清楚") return "clearer";
+  if (mode === "攻击力加强") return "stronger";
+  return "close_to_user";
 }
 
 function uniqueReplyOptions(replies) {
