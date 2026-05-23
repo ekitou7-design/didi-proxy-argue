@@ -18,10 +18,6 @@ export default function TrainingPage(session) {
         <p>把吵架变成反应力训练。</p>
       </section>
 
-      <section class="training-card-list">
-        ${trainingCards.map(TrainingCard).join("")}
-      </section>
-
       <section class="game-setup">
         <label class="long-field">
           <span>随机场景挑战</span>
@@ -34,6 +30,10 @@ export default function TrainingPage(session) {
         </div>
 
         <button class="primary-button" data-action="start-training-chat">开始挑战</button>
+      </section>
+
+      <section class="training-card-list">
+        ${trainingCards.map(TrainingCard).join("")}
       </section>
     </div>
   `;
