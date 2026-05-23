@@ -24,19 +24,19 @@ export const personaTestQuestions = [
     title: "校园逃亡游戏开局，你的坐骑更可能是？",
     options: [
       { value: "A", label: "准点但很有距离感的校园车" },
-      { value: "B", label: "后山冲出来的野生狠角色" },
+      { value: "B", label: "后山冲出来的野生野猪" },
       { value: "C", label: "看起来温顺但很有灵气的小鹿" },
-      { value: "D", label: "教育超市旁边的神秘机器" }
+      { value: "D", label: "教育超市旁边的神秘售货机" }
     ]
   },
   {
     id: 4,
     title: "别人故意问“南大是哪所大学”时，你会？",
     options: [
-      { value: "A", label: "随便报一个相近名字，看他怎么接" },
-      { value: "B", label: "假装认真纠错，但懒得展开" },
-      { value: "C", label: "直接把问题丢回去：你到底想说什么" },
-      { value: "D", label: "端出完整介绍，让对方自己闭嘴" }
+      { value: "A", label: "东南大学" },
+      { value: "B", label: "南昌大学" },
+      { value: "C", label: "南方的大学" },
+      { value: "D", label: "南京大学" }
     ]
   },
   {
@@ -223,7 +223,7 @@ export const personaTestQuestions = [
 
 export const personaPersonalities = {
   VEGE: {
-    typeName: "菜根稳线派",
+    typeName: "菜根",
     nickname: "慢火反击锅",
     category: "接纳类",
     emoji: "🥬",

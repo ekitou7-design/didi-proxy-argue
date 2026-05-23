@@ -106,13 +106,49 @@ Field rules:
 
 export async function generatePersonaReply(body) {
   const input = preparePersonaReplyInput(body);
-  const result = await requestJsonFromAI({
-    ...buildPersonaSkillReplyPrompt(input),
-    temperature: 0.45,
-    maxCompletionTokens: 1300
-  });
 
-  return normalizePersonaReplyResult(result);
+  try {
+    const result = await requestJsonFromAI({
+      ...buildPersonaSkillReplyPrompt(input),
+      temperature: 0.45,
+      maxCompletionTokens: 1300
+    });
+
+    return normalizePersonaReplyResult(result);
+  } catch (error) {
+    if (shouldUseMockReply(error)) {
+      return buildMockPersonaReply();
+    }
+    throw error;
+  }
+}
+
+export function buildMockPersonaReply() {
+  const data = {
+    isMock: true,
+    reply:
+      "我不是非要跟你吵，我只是觉得你每次都用忙来解释，然后就好像我的感受都变成了我太敏感。问题不是这一条消息，而是你一直让我觉得自己没有被认真对待。",
+    alternatives: [
+      "我真的不是想把事情闹大，我只是觉得你每次都这样，我会很累。",
+      "你可以忙，但你不能每次都让我自己消化，然后还觉得是我想太多。"
+    ],
+    styleMatchNotes: [
+      "保留了先自我澄清再指出问题的结构",
+      "使用了“我不是……我只是……”句式",
+      "没有加入粗口或过度网络腔"
+    ],
+    riskLevel: "safe"
+  };
+
+  return {
+    success: true,
+    data,
+    isMock: data.isMock,
+    reply: data.reply,
+    alternatives: data.alternatives,
+    styleMatchNotes: data.styleMatchNotes,
+    riskLevel: data.riskLevel
+  };
 }
 
 export function normalizePersonaReplyResult(result) {
@@ -160,4 +196,14 @@ function normalizeStrength(value) {
 
 function textOf(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function shouldUseMockReply(error) {
+  return (
+    error?.code === "MISSING_OPENAI_API_KEY" ||
+    error?.code === "AI_REQUEST_FAILED" ||
+    error?.message === "AI 返回格式解析失败" ||
+    error?.message === "AI returned invalid persona reply JSON" ||
+    error?.message === "AI persona reply JSON missing reply"
+  );
 }

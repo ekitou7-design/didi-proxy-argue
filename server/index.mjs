@@ -77,7 +77,16 @@ async function handlePersonaExtraction(request, response) {
     const result = await extractPersonaProfile(request.body);
     response.json(result);
   } catch (error) {
-    handleEndpointError(response, error, "Persona extraction failed");
+    console.error("[persona/extract] failed:", error);
+    console.error("[persona/extract] stack:", error?.stack);
+    response.status(error.status || 502).json({
+      success: false,
+      error: {
+        code: "PERSONA_EXTRACTION_FAILED",
+        message: "Persona extraction failed",
+        detail: error.message
+      }
+    });
   }
 }
 

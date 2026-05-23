@@ -152,13 +152,98 @@ Field rules:
 export async function extractPersonaProfile(body) {
   const input = preparePersonaExtractionInput(body);
   const prompt = buildPersonaExtractionPrompt(input);
-  const result = await requestJsonFromAI({
-    ...prompt,
-    temperature: 0.2,
-    maxCompletionTokens: 1800
-  });
 
-  return normalizePersonaExtractionResult(result, input);
+  try {
+    const result = await requestJsonFromAI({
+      ...prompt,
+      temperature: 0.2,
+      maxCompletionTokens: 1800
+    });
+
+    return normalizePersonaExtractionResult(result, input);
+  } catch (error) {
+    if (shouldUseMockPersona(error)) {
+      return buildMockPersonaProfile(input);
+    }
+    throw error;
+  }
+}
+
+export function buildMockPersonaProfile(input) {
+  return {
+    profileId: `mock-${Date.now()}`,
+    profileName: "克制解释型嘴替",
+    targetSpeaker: input.targetSpeaker,
+    sourceType: input.sourceType,
+    isMock: true,
+    oneLineSummary: "根据上传文本初步生成的嘴替人格档案。",
+    personalityTags: ["克制", "解释型", "重视边界", "先讲道理再表达不满"],
+    languageFingerprint: {
+      sentenceLength: "中等偏长",
+      messageShape: "常用几句话组成一段完整表达",
+      openingHabits: ["我不是", "其实", "我真的觉得"],
+      transitionWords: ["但是", "问题是", "所以"],
+      modalParticles: ["真的", "吧", "啊"],
+      punctuationStyle: "问号较多，感叹号较少",
+      internetSlangLevel: "低"
+    },
+    sentencePatterns: [
+      "我不是……我只是……",
+      "问题不是……而是……",
+      "你每次都……然后还觉得是我……"
+    ],
+    emotionalPattern: {
+      angerStyle: "先解释自己，再指出对方长期问题",
+      defenseStyle: "倾向于先澄清自己不是无理取闹",
+      conflictEscalation: "克制说明 → 指出问题 → 表达失望 → 提出边界"
+    },
+    conflictStrategies: {
+      mainStrategy: "先自我澄清，再指出对方行为中的问题",
+      typicalMoves: ["自我澄清", "指出长期模式", "表达感受", "设立边界"]
+    },
+    replyStructure: [
+      "先自我澄清",
+      "再指出对方行为",
+      "再说明自己的感受",
+      "最后提出边界"
+    ],
+    generationRules: {
+      mustKeep: ["第一人称", "先解释再反击", "不要突然变成爽文腔"],
+      mustAvoid: ["粗口", "威胁", "歧视", "隐私曝光", "过度网络热梗"]
+    },
+    safetyRules: {
+      avoidThreats: true,
+      avoidDiscrimination: true,
+      avoidPrivacyExposure: true,
+      avoidHarassment: true,
+      avoidSeverePersonalAttack: true
+    },
+    systemPromptFragment: "生成回复时请使用第一人称，保留用户先解释、再指出问题、最后表达边界的表达习惯。",
+    sourceSummary: "根据上传文本初步生成的嘴替人格档案。",
+    languageFeatures: {
+      tone: "克制、解释型、重视边界",
+      sentencePattern: "先澄清自己的意图，再指出对方行为造成的问题。",
+      vocabulary: ["我不是", "其实", "问题是", "所以"],
+      sampleLines: [
+        "我不是非要跟你吵，我只是觉得这件事不能每次都这样过去。",
+        "问题不是你忙，而是你每次都让我自己消化。",
+        "你可以有你的安排，但也要尊重我已经说过的感受。"
+      ]
+    },
+    argumentStyle: {
+      logicPattern: "先自我澄清，再指出对方行为中的问题",
+      boundaryStyle: "克制说明后提出清晰边界"
+    },
+    imitationGuide: {
+      replyFormula: "先自我澄清 → 再指出对方行为 → 再说明自己的感受 → 最后提出边界"
+    },
+    safetyBoundary: {
+      doNotImitate: ["粗口", "威胁", "歧视", "隐私曝光", "过度网络热梗"],
+      privacyNotes: [],
+      unsafeContentPolicy: "保持安全表达，避免威胁、歧视、隐私曝光和严重人身攻击。"
+    },
+    analyzedPartOnly: input.analyzedPartOnly
+  };
 }
 
 export function normalizePersonaExtractionResult(result, input) {
@@ -206,4 +291,14 @@ export function normalizePersonaExtractionResult(result, input) {
     systemPromptFragment: result.systemPromptFragment,
     analyzedPartOnly: input.analyzedPartOnly
   };
+}
+
+function shouldUseMockPersona(error) {
+  return (
+    error?.code === "MISSING_OPENAI_API_KEY" ||
+    error?.code === "AI_REQUEST_FAILED" ||
+    error?.message === "AI 返回格式解析失败" ||
+    error?.message === "AI returned invalid persona extraction JSON" ||
+    error?.message?.startsWith("AI persona extraction JSON missing fields:")
+  );
 }
