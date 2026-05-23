@@ -8,30 +8,20 @@ export default function PersonaPage(state) {
         <div class="brand-lockup">
           <p class="hero-kana">PROXY PERSONA</p>
           <h2>专属嘴替</h2>
-          <p>训练一个像你的吵架分身，替你稳定输出。</p>
+          <p>做一套人格测试，生成你的嘴替战斗皮肤。</p>
         </div>
       </section>
 
       ${CurrentProfile(state.currentProfile)}
 
       <section class="feature-list two-entry">
-        <button class="feature-card pink" data-page="personaDistill">
-          <span class="feature-tone">蒸馏</span>
-          <div><h3>蒸馏自己</h3><p>跳到独立蒸馏页，粘贴聊天记录生成表达风格。</p></div>
-          <span class="feature-arrow">›</span>
-        </button>
-        ${DistillHistory(state.distillResults)}
-
         <button class="feature-card blue" data-page="personaTest">
           <span class="feature-tone">测试</span>
-          <div><h3>做个测试题</h3><p>跳到独立测试页，5 道题生成嘴替人格。</p></div>
+          <div><h3>做个测试题</h3><p>跳到独立测试页，22 道题生成嘴替人格。</p></div>
           <span class="feature-arrow">›</span>
         </button>
         ${TestHistory(state.testResults)}
       </section>
-
-      ${PersonaList(state)}
-      ${ReplyGenerator(state)}
     </div>
   `;
 }
@@ -99,6 +89,7 @@ function TestHistory(results) {
 }
 
 function TestCard(result) {
+  const dimensions = result.dimensions || result.tags || [];
   return `
     <article class="persona-summary">
       <div class="card-title-row">
@@ -107,7 +98,7 @@ function TestCard(result) {
       </div>
       <p>${escapeHtml(result.subtitle)}</p>
       <div class="tag-row">
-        ${(result.tags || []).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+        ${dimensions.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
       </div>
       <p><strong>测试时间：</strong>${formatTime(result.createdAt)}</p>
       <div class="button-row result-actions-stack">

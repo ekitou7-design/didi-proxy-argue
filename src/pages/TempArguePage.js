@@ -71,6 +71,7 @@ function SetupForm(key, session) {
 
 function ChatPage(session) {
   const summary = makeContextSummary(session);
+  const visibleRounds = [...session.rounds].reverse();
   return `
     <div class="page chat-page">
       <section class="chat-status">
@@ -84,7 +85,7 @@ function ChatPage(session) {
       </section>
 
       <section class="chat-log">
-        ${session.rounds.length ? session.rounds.map(ChatRound).join("") : EmptyChat("对方说一句，你告诉我一句，App 帮你实时接话。")}
+        ${visibleRounds.length ? visibleRounds.map(ChatRound).join("") : EmptyChat("对方说一句，你告诉我一句，App 帮你实时接话。")}
       </section>
 
       <section class="chat-composer">

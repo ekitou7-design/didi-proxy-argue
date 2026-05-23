@@ -28,6 +28,7 @@ export default function TrainingPage(session) {
 }
 
 function ChatPage(session) {
+  const visibleFeedbacks = [...session.feedbacks].reverse();
   return `
     <div class="page chat-page">
       <section class="chat-status training-status">
@@ -41,7 +42,7 @@ function ChatPage(session) {
 
       <section class="chat-log">
         <div class="bubble-card opponent"><span>系统扮演对方</span><p>${escapeHtml(session.opponent)}</p></div>
-        ${session.feedbacks.map(FeedbackRound).join("")}
+        ${visibleFeedbacks.map(FeedbackRound).join("")}
       </section>
 
       <section class="chat-composer">

@@ -7,6 +7,7 @@ import PersonaTestPage from "./pages/PersonaTestPage.js";
 import TrainingPage from "./pages/TrainingPage.js";
 import ProfilePage from "./pages/ProfilePage.js";
 import RecordsPage from "./pages/RecordsPage.js";
+import { njutiPersonalities, njutiPersonalityWeights } from "./data/njutiQuizData.js";
 import {
   buildPersonaChatTurn,
   buildTempChatTurn,
@@ -110,15 +111,18 @@ export default class App {
 
     const testTarget = event.target.closest("[data-test-answer]");
     if (testTarget) {
-      this.setState({
-        proxyPersona: {
-          ...this.state.proxyPersona,
-          testAnswers: {
-            ...this.state.proxyPersona.testAnswers,
-            [testTarget.dataset.questionId]: testTarget.dataset.testAnswer
-          }
+      const questionId = testTarget.dataset.questionId;
+      this.state.proxyPersona = {
+        ...this.state.proxyPersona,
+        testAnswers: {
+          ...this.state.proxyPersona.testAnswers,
+          [questionId]: testTarget.dataset.testAnswer
         }
-      });
+      };
+      testTarget
+        .closest("[data-test-question]")
+        ?.querySelectorAll("[data-test-answer]")
+        .forEach((button) => button.classList.toggle("active", button === testTarget));
       return;
     }
 
@@ -545,7 +549,7 @@ function createProxyPersonaState() {
       background: "他最近经常不回消息，临时改约后说我太敏感。",
       chatText: "我不是想吵架，我只是希望你尊重之前说好的约定。你先别把问题说成我太敏感。"
     },
-    testAnswers: { 1: "A", 2: "B", 3: "A", 4: "C", 5: "B" },
+    testAnswers: {},
     distillResults,
     testResults,
     personas,
@@ -601,18 +605,30 @@ function makeMockDistillProfile() {
 }
 
 function makeTestResult(testAnswers) {
-  const pool = [
-    { typeName: "冷面判官", nickname: "逻辑处刑台", subtitle: "你不是在吵架，你是在宣判对方逻辑死刑。", tags: ["冷静", "逻辑", "压迫", "证据"] },
-    { typeName: "阴阳补刀王", nickname: "笑面小刀", subtitle: "你不一定骂人，但你每句话都像带了小倒刺。", tags: ["阴阳", "反讽", "补刀", "轻刺"] },
-    { typeName: "边界封门员", nickname: "人际门禁系统", subtitle: "你不是不好惹，你只是所有越界行为都会被系统拦截。", tags: ["边界", "拒绝", "稳定", "不内耗"] },
-    { typeName: "反问审讯官", nickname: "证据席管理员", subtitle: "你不会急着解释，你会先让对方上证据席。", tags: ["反问", "证据", "审讯", "拆招"] },
-    { typeName: "主线追杀者", nickname: "跑题终结机", subtitle: "对方每转移一次话题，你就把他拖回案发现场一次。", tags: ["主线", "控场", "追问", "回拉"] },
-    { typeName: "双标反杀机", nickname: "规则回旋镖", subtitle: "对方定规则，你负责把规则原样砸回去。", tags: ["双标", "反杀", "规则", "回旋镖"] },
-    { typeName: "发疯炮台", nickname: "精神状态领先版", subtitle: "你的精神状态很稳定，稳定地准备开炮。", tags: ["高能", "爆发", "压制", "戏剧感"] },
-    { typeName: "体面绝杀师", nickname: "优雅封口器", subtitle: "你不脏嘴，但你一句话能把这段对话钉进棺材里。", tags: ["体面", "收口", "绝杀", "克制"] }
-  ];
-  const score = Object.values(testAnswers).reduce((sum, answer) => sum + answer.charCodeAt(0), 0);
-  const base = pool[score % pool.length];
+  const scores = Object.fromEntries(Object.keys(njutiPersonalities).map((key) => [key, 0]));
+
+  Object.entries(testAnswers).forEach(([questionId, answer]) => {
+    const index = Number(questionId) - 1;
+    const weights = njutiPersonalityWeights[index]?.[answer];
+    if (!weights) return;
+    Object.entries(weights).forEach(([key, value]) => {
+      scores[key] = (scores[key] || 0) + value;
+    });
+  });
+
+  let resultKey = "VEGE";
+  Object.entries(scores).forEach(([key, value]) => {
+    if (value > scores[resultKey]) resultKey = key;
+  });
+
+  const baseProfile = njutiPersonalities[resultKey] || njutiPersonalities.VEGE;
+  const base = {
+    typeName: baseProfile.name,
+    nickname: baseProfile.category,
+    subtitle: baseProfile.description,
+    dimensions: [baseProfile.category, baseProfile.emoji],
+    scores
+  };
   return normalizeTestResult({
     id: `test-${Date.now()}`,
     createdAt: new Date().toISOString(),
@@ -656,12 +672,13 @@ function normalizeTestResult(result) {
     typeName: fallback.typeName,
     nickname: fallback.nickname,
     subtitle: fallback.subtitle,
-    tags: fallback.tags,
+    dimensions: result.dimensions || result.tags || fallback.tags,
+    scores: result.scores || {},
     styleProfile: {
       tone: fallback.typeName,
       emotionLevel: 3,
       logicStyle: fallback.nickname,
-      commonPhrases: fallback.tags,
+      commonPhrases: result.dimensions || result.tags || fallback.tags,
       avoidWords: ["脏话", "人身攻击"],
       replyStrategy: fallback.subtitle,
       profileSummary: fallback.subtitle
