@@ -6,13 +6,13 @@ import { readFile } from "node:fs/promises";
 import {
   buildAnalyzeChatPrompt,
   buildTempArguePrompt,
-  buildTestResultPrompt,
-  buildTrainingScorePrompt
+  buildTestResultPrompt
 } from "./prompts.mjs";
 import { requestJsonFromAI } from "./openaiClient.mjs";
 import { extractPersonaProfile } from "./personaExtractorSkill.mjs";
 import { generatePersonaReply } from "./personaReplySkill.mjs";
 import { generateRandomTrainingScenario } from "./services/trainingScenarioService.mjs";
+import { scoreTrainingReply } from "./services/trainingScoreService.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
@@ -62,7 +62,14 @@ app.post("/api/persona/reply", async (request, response) => {
 });
 
 app.post("/api/training/score", async (request, response) => {
-  await handleAIEndpoint(response, buildTrainingScorePrompt(request.body));
+  console.log("POST /api/training/score", request.body);
+  try {
+    const result = await scoreTrainingReply(request.body);
+    response.json(result);
+  } catch (error) {
+    console.error("[training/score] failed:", error);
+    handleEndpointError(response, error, "Training score failed");
+  }
 });
 
 app.post("/api/training/scenario/random", async (request, response) => {

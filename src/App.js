@@ -15,7 +15,6 @@ import {
 import {
   buildPersonaChatTurn,
   buildTempChatTurn,
-  buildTrainingChatTurn,
   initialPersonaSession,
   initialProxyPersonaState,
   initialTempSession,
@@ -642,55 +641,80 @@ export default class App {
     const training = this.state.training;
     if (training.isSubmitting) return;
 
-    const reply = training.input.trim();
-    if (!reply) return;
-
-    this.setState({
-      training: {
-        ...training,
-        input: "",
-        isSubmitting: true
+    {
+      const reply = training.input.trim();
+      if (!reply) {
+        this.setState({
+          training: {
+            ...training,
+            scenarioMessage: "请先输入你的回复。"
+          }
+        });
+        return;
       }
-    });
 
-    let feedback;
-    let fallbackFeedback;
-    const generatedScenario = training.generatedScenario;
-    try {
-      const result = await postJson("/api/training/score", {
+      const generatedScenario = training.generatedScenario;
+      const payload = {
         scenario: generatedScenario?.title || generatedScenario?.background || training.scene,
-        difficulty: training.difficulty,
+        difficulty: generatedScenario?.difficulty || training.difficulty,
         opponentType: generatedScenario?.opponentProfile?.type || "嘴硬型",
-        opponentMessage: training.opponent,
+        opponentMessage: training.opponent || generatedScenario?.openingMessage || makeOpeningOpponent(training.scene),
         userReply: reply,
         round: training.round,
         mainline: generatedScenario?.mainline,
         traps: generatedScenario?.traps,
         trainingFocus: generatedScenario?.trainingFocus
-      });
-      fallbackFeedback = buildTrainingChatTurn(training, reply);
-      feedback = {
-        id: Date.now(),
-        userReply: reply,
-        score: result.scores?.winRate || 0,
-        strengths: result.analysis || fallbackFeedback.strengths,
-        problems: result.suggestion || fallbackFeedback.problems,
-        optimized: result.betterReply || fallbackFeedback.optimized,
-        nextOpponent: result.nextOpponentMessage || fallbackFeedback.nextOpponent
       };
-    } catch {
-      feedback = buildTrainingChatTurn(training, reply);
-    }
-    this.setState({
-      training: {
-        ...this.state.training,
-        input: "",
-        isSubmitting: false,
-        round: training.round + 1,
-        opponent: feedback.nextOpponent,
-        feedbacks: [...training.feedbacks, feedback]
+      console.log("training score payload", payload);
+
+      this.setState({
+        training: {
+          ...training,
+          isSubmitting: true,
+          scenarioMessage: "正在分析你的回复..."
+        }
+      });
+
+      try {
+        const result = await postJson("/api/training/score", payload);
+        console.log("training score response", result);
+        const feedback = {
+          id: Date.now(),
+          userReply: reply,
+          scores: result.scores || {},
+          overallScore: result.overallScore ?? result.scores?.winRate ?? 0,
+          advantages: result.advantages || result.analysis || "",
+          weaknesses: result.weaknesses || result.suggestion || "",
+          suggestion: result.suggestion || "",
+          betterReply: result.betterReply || "",
+          nextOpponent: result.nextOpponentMessage || "",
+          isOffTopic: Boolean(result.isOffTopic)
+        };
+        this.setState({
+          training: {
+            ...this.state.training,
+            step: "chat",
+            input: "",
+            isSubmitting: false,
+            scenarioMessage: "",
+            round: training.round + 1,
+            opponent: feedback.nextOpponent || payload.opponentMessage,
+            feedbacks: [...training.feedbacks, feedback]
+          }
+        });
+      } catch (error) {
+        console.error("training score failed", error);
+        this.setState({
+          training: {
+            ...this.state.training,
+            input: reply,
+            isSubmitting: false,
+            scenarioMessage: "评分失败，请稍后重试。"
+          }
+        });
       }
-    });
+      return;
+    }
   }
 
   render() {

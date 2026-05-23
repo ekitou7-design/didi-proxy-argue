@@ -45,23 +45,24 @@ function TrainingSettings(session) {
 }
 
 function TrainingChatPanel(session) {
-  const visibleFeedbacks = [...session.feedbacks];
   const opponent = session.opponent || session.generatedScenario?.openingMessage || "选好场景后，系统会扮演对方开第一句。";
   return `
     <section class="realtime-chat-panel training-dialog-panel" aria-label="吵架训练对话">
-      <div class="persona-chat-scroll realtime-chat-scroll">
+      <div class="persona-chat-scroll realtime-chat-scroll training-chat-scroll">
         <article class="persona-bubble from-user">
           <span>系统扮演对方</span>
           <p>${escapeHtml(opponent)}</p>
         </article>
-        ${visibleFeedbacks.map(FeedbackRound).join("")}
+        ${session.feedbacks.map(FeedbackRound).join("")}
       </div>
     </section>
   `;
 }
 
 function TrainingInputBar(session) {
-  if (session.step !== "chat") {
+  const canSubmit = session.step === "chat" || session.generatedScenario || session.opponent;
+
+  if (!canSubmit) {
     return `
       <section class="realtime-input-bar training-start-bar">
         <p>${escapeHtml(session.generatedScenario?.suggestedFirstReplyHint || "准备好后开始这一局，对方会先出招。")}</p>
@@ -71,38 +72,52 @@ function TrainingInputBar(session) {
   }
 
   return `
-    <section class="realtime-input-bar">
+    <section class="realtime-input-bar training-input-boundary">
       <textarea data-session-input="training" placeholder="输入你的本轮回复">${escapeHtml(session.input)}</textarea>
       <button class="primary-button" data-action="training-submit" ${session.isSubmitting ? "disabled" : ""}>
-        ${session.isSubmitting ? "正在评分..." : "提交回复"}
+        ${session.isSubmitting ? "正在分析..." : "提交我的回复"}
       </button>
     </section>
   `;
 }
 
 function FeedbackRound(item) {
+  const scores = item.scores || {};
   return `
     <article class="realtime-round">
       <div class="persona-bubble from-proxy">
         <span>你</span>
         <p>${escapeHtml(item.userReply)}</p>
       </div>
-      <details class="round-more">
-        <summary>看评分和优化</summary>
-        <div class="score-row">
-          <span>胜率</span>
-          <div class="score-track"><i style="width:${Number(item.score || 0)}%"></i></div>
-          <b>${Number(item.score || 0)}</b>
-        </div>
-        ${Block("做得好的地方", item.strengths)}
-        ${Block("容易被带偏的点", item.problems)}
-        ${Block("更稳的说法", item.optimized)}
+      <details class="round-more" open>
+        <summary>本轮评分</summary>
+        ${ScoreRow("综合", item.overallScore)}
+        ${ScoreRow("逻辑值", scores.logic)}
+        ${ScoreRow("气势值", scores.power)}
+        ${ScoreRow("边界感", scores.boundary)}
+        ${ScoreRow("主线守护值", scores.mainline)}
+        ${ScoreRow("失控风险", scores.risk, "danger-score")}
+        ${ScoreRow("胜率", scores.winRate)}
+        ${Block("你回复的优点", item.advantages)}
+        ${Block("还能更狠一点的地方", item.weaknesses || item.suggestion)}
+        ${Block("优化版回复", item.betterReply)}
       </details>
       <div class="persona-bubble from-user">
         <span>系统扮演对方</span>
         <p>${escapeHtml(item.nextOpponent)}</p>
       </div>
     </article>
+  `;
+}
+
+function ScoreRow(label, value, className = "") {
+  const score = clampScore(value);
+  return `
+    <div class="score-row ${className}">
+      <span>${escapeHtml(label)}</span>
+      <div class="score-track"><i style="width:${score}%"></i></div>
+      <b>${score}</b>
+    </div>
   `;
 }
 
@@ -133,6 +148,12 @@ function SmallField(label, path, value, placeholder, className = "") {
       <textarea data-setup-input="${path}" placeholder="${escapeAttr(placeholder)}">${escapeHtml(value)}</textarea>
     </label>
   `;
+}
+
+function clampScore(value) {
+  const number = Number(value || 0);
+  if (!Number.isFinite(number)) return 0;
+  return Math.max(0, Math.min(100, Math.round(number)));
 }
 
 function escapeHtml(value) {
