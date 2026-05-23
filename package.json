@@ -4,10 +4,14 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "node dev-server.mjs",
-    "build": "node dev-server.mjs --check",
-    "preview": "node dev-server.mjs"
+    "dev": "node server/index.mjs",
+    "build": "node server/index.mjs --check",
+    "preview": "node server/index.mjs"
   },
-  "dependencies": {},
-  "devDependencies": {}
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "openai": "^6.39.0"
+  }
 }

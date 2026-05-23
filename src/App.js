@@ -166,7 +166,29 @@ export default class App {
     if (action === "temp-reply") {
       const text = this.state.temp.input.trim();
       if (!text) return;
-      const turn = buildTempChatTurn(this.state.temp, text);
+      let turn;
+      try {
+        const result = await postJson("/api/temp-argue", {
+          scene: this.state.temp.context,
+          opponent: text,
+          goal: this.state.temp.goal,
+          persona: this.state.temp.tone,
+          intensity: this.state.temp.tone
+        });
+        turn = {
+          id: Date.now(),
+          opponent: text,
+          analysis: result.opponentTactic,
+          mainline: `${result.strategy} ${result.offTopicWarning || ""}`,
+          replies: [
+            { label: "稳妥版", text: result.recommendedReply },
+            { label: "强硬版", text: result.strongerReply },
+            { label: "嘴替版/阴阳版", text: result.sarcasticReply || result.politeFinalReply }
+          ]
+        };
+      } catch {
+        turn = buildTempChatTurn(this.state.temp, text);
+      }
       this.setState({
         temp: { ...this.state.temp, latest: text, input: "", rounds: [...this.state.temp.rounds, turn] }
       });
@@ -212,7 +234,28 @@ export default class App {
     if (action === "training-submit") {
       const reply = this.state.training.input.trim();
       if (!reply) return;
-      const feedback = buildTrainingChatTurn(this.state.training, reply);
+      let feedback;
+      try {
+        const result = await postJson("/api/training/score", {
+          scenario: this.state.training.scene,
+          difficulty: this.state.training.difficulty,
+          opponentType: "嘴硬型",
+          opponentMessage: this.state.training.opponent,
+          userReply: reply,
+          round: this.state.training.round
+        });
+        feedback = {
+          id: Date.now(),
+          userReply: reply,
+          score: result.scores?.winRate || 0,
+          strengths: result.analysis,
+          problems: result.suggestion,
+          optimized: result.betterReply,
+          nextOpponent: result.nextOpponentMessage
+        };
+      } catch {
+        feedback = buildTrainingChatTurn(this.state.training, reply);
+      }
       this.setState({
         training: {
           ...this.state.training,
@@ -257,8 +300,16 @@ export default class App {
 
   async createPersonaFromChat() {
     const { userId, upload } = this.state.proxyPersona;
-    const result = await postJson("/api/proxy-persona/upload-chat", { userId, ...upload });
-    this.addGeneratedPersona(result.persona, "已生成聊天蒸馏嘴替档案");
+    const result = await postJson("/api/persona/analyze-chat", {
+      chatHistory: upload.chatText,
+      relationship: upload.relationship,
+      background: upload.background,
+      userGoal: upload.userGoal || ""
+    });
+    this.addGeneratedPersona(
+      { ...result.personaProfile, id: Date.now(), sourceType: "chat_upload" },
+      "已生成聊天蒸馏嘴替档案"
+    );
   }
 
   async createPersonaFromTest() {
@@ -267,8 +318,11 @@ export default class App {
       questionId: Number(questionId),
       answer
     }));
-    const result = await postJson("/api/proxy-persona/test-result", { userId, answers });
-    this.addGeneratedPersona(result.persona, "已生成测试嘴替档案");
+    const result = await postJson("/api/persona/test-result", { userId, answers });
+    this.addGeneratedPersona(
+      { ...result.personaProfile, id: Date.now(), sourceType: "test" },
+      "已生成测试嘴替档案"
+    );
   }
 
   addGeneratedPersona(persona, message) {
@@ -289,15 +343,23 @@ export default class App {
       this.setState({ proxyPersona: { ...state, message: "请先生成或选择一个嘴替档案" } });
       return;
     }
-    const result = await postJson("/api/proxy-reply/generate", {
-      userId: state.userId,
-      personaId: Number(state.selectedPersonaId),
-      ...state.replyForm
+    const styleProfile = state.personas.find((persona) => String(persona.id) === String(state.selectedPersonaId));
+    const result = await postJson("/api/persona-reply", {
+      chatHistory: state.upload.chatText,
+      latestOpponentMessage: state.replyForm.opponentMessage,
+      currentState: state.replyForm.background,
+      realThought: "",
+      goal: state.replyForm.goal,
+      styleProfile
     });
     this.setState({
       proxyPersona: {
         ...this.state.proxyPersona,
-        replyResult: result,
+        replyResult: {
+          reply: result.myStyleReply,
+          strategy: result.styleAnalysis,
+          tone: styleProfile?.tone || ""
+        },
         message: "回应已生成"
       }
     });
