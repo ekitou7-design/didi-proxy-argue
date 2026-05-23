@@ -500,10 +500,15 @@ export default class App {
         mode: mapReplyMode(state.replyForm.mode)
       });
       const reply = result.reply || result.myStyleReply || result.data?.reply;
+      const assistantTurns = splitReplyMessages(reply).map((text, index) => ({
+        id: `assistant-${Date.now()}-${index}`,
+        role: "assistant",
+        text
+      }));
       const chatTurns = [
         ...state.chatTurns,
         { id: `user-${Date.now()}`, role: "user", text: userText || state.replyForm.opponentMessage },
-        { id: `assistant-${Date.now()}`, role: "assistant", text: reply }
+        ...assistantTurns
       ];
       writeJson(PERSONA_CHAT_KEY, chatTurns);
       this.updateProxyPersona({
@@ -524,10 +529,15 @@ export default class App {
       });
     } catch (error) {
       const fallback = makeLocalReply(state.replyForm, styleProfile);
+      const assistantTurns = splitReplyMessages(fallback.reply).map((text, index) => ({
+        id: `assistant-${Date.now()}-${index}`,
+        role: "assistant",
+        text
+      }));
       const chatTurns = [
         ...state.chatTurns,
         { id: `user-${Date.now()}`, role: "user", text: userText || state.replyForm.opponentMessage },
-        { id: `assistant-${Date.now()}`, role: "assistant", text: fallback.reply }
+        ...assistantTurns
       ];
       writeJson(PERSONA_CHAT_KEY, chatTurns);
       this.updateProxyPersona({
@@ -703,6 +713,16 @@ export default class App {
         </div>
       </div>
     `;
+    this.scrollChatAreasToBottom();
+  }
+
+  scrollChatAreasToBottom() {
+    if (!["temp", "persona", "training"].includes(this.state.page)) return;
+    window.requestAnimationFrame?.(() => {
+      this.root.querySelectorAll(".persona-chat-scroll, .realtime-chat-scroll").forEach((element) => {
+        element.scrollTop = element.scrollHeight;
+      });
+    });
   }
 }
 
@@ -915,6 +935,13 @@ function makeLocalReply(replyForm, styleProfile) {
     strategy: `本地预览：按「${getProfileName(styleProfile)}」人格生成。${strategy}`,
     tone: getProfileTone(styleProfile) || "温柔但有边界"
   };
+}
+
+function splitReplyMessages(text) {
+  const value = String(text || "").trim();
+  if (!value) return [];
+  const pieces = value.match(/[^。！？!?]+[。！？!?]?/g) || [value];
+  return pieces.map((piece) => piece.trim()).filter(Boolean);
 }
 
 function mapReplyMode(mode) {

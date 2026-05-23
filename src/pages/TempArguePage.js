@@ -87,11 +87,7 @@ function ChatRound(round) {
         <span>对方</span>
         <p>${escapeHtml(round.opponent)}</p>
       </div>
-      <div class="persona-bubble from-proxy">
-        <span>代吵助手</span>
-        <p>${escapeHtml(bestReply)}</p>
-        ${bestReply ? `<button class="mini-copy inline-copy" data-copy-reply="${escapeAttr(bestReply)}">复制</button>` : ""}
-      </div>
+      ${ReplyBubbles(bestReply)}
       <details class="round-more">
         <summary>看分析和备选</summary>
         <div class="temp-result-block">
@@ -108,6 +104,20 @@ function ChatRound(round) {
       </details>
     </article>
   `;
+}
+
+function ReplyBubbles(text) {
+  return splitReplyMessages(text)
+    .map(
+      (piece) => `
+        <div class="persona-bubble from-proxy">
+          <span>代吵助手</span>
+          <p>${escapeHtml(piece)}</p>
+          <button class="mini-copy inline-copy" data-copy-reply="${escapeAttr(piece)}">复制</button>
+        </div>
+      `
+    )
+    .join("");
 }
 
 function TempInputBar(session) {
@@ -163,4 +173,11 @@ function escapeHtml(value) {
 
 function escapeAttr(value) {
   return escapeHtml(value).replaceAll("'", "&#39;");
+}
+
+function splitReplyMessages(text) {
+  const value = String(text || "").trim();
+  if (!value) return [];
+  const pieces = value.match(/[^。！？!?]+[。！？!?]?/g) || [value];
+  return pieces.map((piece) => piece.trim()).filter(Boolean);
 }
