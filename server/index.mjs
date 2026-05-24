@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { dirname, join } from "node:path";
@@ -11,6 +12,7 @@ import {
 import { requestJsonFromAI } from "./openaiClient.mjs";
 import { extractPersonaProfile } from "./personaExtractorSkill.mjs";
 import { generatePersonaReply } from "./personaReplySkill.mjs";
+import { handleFeishuEvent } from "./feishuBot.mjs";
 import { generateRandomTrainingScenario } from "./services/trainingScenarioService.mjs";
 import { scoreTrainingReply } from "./services/trainingScoreService.mjs";
 
@@ -33,6 +35,10 @@ const app = express();
 
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
+
+if (!process.env.FEISHU_APP_ID || !process.env.FEISHU_APP_SECRET) {
+  console.warn("[feishu] FEISHU_APP_ID or FEISHU_APP_SECRET is missing; Feishu replies will be skipped.");
+}
 
 app.get("/api/health", (request, response) => {
   response.json({
@@ -59,6 +65,10 @@ app.post("/api/persona-reply", async (request, response) => {
 
 app.post("/api/persona/reply", async (request, response) => {
   await handlePersonaReply(request, response);
+});
+
+app.post("/api/feishu/events", async (request, response) => {
+  await handleFeishuEvent(request, response);
 });
 
 app.post("/api/training/score", async (request, response) => {
