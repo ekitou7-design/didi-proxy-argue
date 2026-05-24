@@ -176,6 +176,14 @@ export default class App {
       this.updateProxyPersona({ createSheetOpen: false });
       return;
     }
+    if (action === "open-reply-settings") {
+      this.updateProxyPersona({ replySettingsOpen: true });
+      return;
+    }
+    if (action === "close-reply-settings") {
+      this.updateProxyPersona({ replySettingsOpen: false });
+      return;
+    }
     if (action === "submit-persona-test") {
       this.createPersonaFromTest();
       return;
@@ -804,6 +812,7 @@ function createProxyPersonaState() {
       mode: "像我本人",
       strength: "中"
     },
+    replySettingsOpen: false,
     chatTurns: readJson(PERSONA_CHAT_KEY, []),
     replyResult: null,
     message: ""

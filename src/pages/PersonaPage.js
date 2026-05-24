@@ -10,6 +10,7 @@ export default function PersonaPage(state) {
       ${hasProfile ? PersonaChatPanel(state, activeProfile) : EmptyPersonaState()}
       ${hasProfile ? PersonaInputBar(state) : EmptyCreateActions()}
       ${state.createSheetOpen ? PersonaCreateSheet(state, activeProfile) : ""}
+      ${state.replySettingsOpen ? ReplySettingsSheet(state) : ""}
     </div>
   `;
 }
@@ -90,33 +91,59 @@ function PersonaInputBar(state) {
         data-setup-input="proxyPersona.replyForm.opponentMessage"
         placeholder="把前情提要、对方刚说的话，或者你想表达的意思发给嘴替……"
       >${escapeHtml(form.opponentMessage)}</textarea>
-      <div class="persona-input-options">
-        <div class="mini-chip-row">
-          ${proxyReplyModes
-            .map(
-              (item) => `
-                <button class="chip tiny-chip ${form.mode === item ? "active" : ""}" data-chip-session="proxyPersona.replyForm" data-chip-field="mode" data-chip-value="${escapeAttr(item)}">
-                  ${escapeHtml(item)}
-                </button>
-              `
-            )
-            .join("")}
+      <div class="persona-send-row">
+        <button class="settings-icon-button" data-action="open-reply-settings" aria-label="打开回复设置">
+          <span aria-hidden="true">⚙</span>
+          <b>${escapeHtml(form.mode)} · ${escapeHtml(form.strength)}</b>
+        </button>
+        <button class="primary-button" data-action="generate-proxy-reply" ${state.isReplyGenerating ? "disabled" : ""}>
+          ${state.isReplyGenerating ? "嘴替正在憋大招..." : "生成回怼"}
+        </button>
+      </div>
+    </section>
+  `;
+}
+
+function ReplySettingsSheet(state) {
+  const form = state.replyForm;
+  return `
+    <section class="persona-sheet-backdrop reply-settings-backdrop">
+      <div class="reply-settings-sheet" role="dialog" aria-label="回复设置">
+        <div class="card-title-row">
+          <h2>回复设置</h2>
+          <button class="tiny-button" data-action="close-reply-settings">完成</button>
         </div>
-        <div class="mini-chip-row strength-row">
-          ${proxyReplyStrengths
-            .map(
-              (item) => `
-                <button class="chip tiny-chip intensity ${form.strength === item ? "active" : ""}" data-chip-session="proxyPersona.replyForm" data-chip-field="strength" data-chip-value="${escapeAttr(item)}">
-                  ${escapeHtml(item)}
-                </button>
-              `
-            )
-            .join("")}
+
+        <div class="reply-setting-group">
+          <strong>表达方式</strong>
+          <div class="settings-chip-grid">
+            ${proxyReplyModes
+              .map(
+                (item) => `
+                  <button class="chip tiny-chip ${form.mode === item ? "active" : ""}" data-chip-session="proxyPersona.replyForm" data-chip-field="mode" data-chip-value="${escapeAttr(item)}">
+                    ${escapeHtml(item)}
+                  </button>
+                `
+              )
+              .join("")}
+          </div>
+        </div>
+
+        <div class="reply-setting-group">
+          <strong>强度</strong>
+          <div class="settings-chip-grid strength-row">
+            ${proxyReplyStrengths
+              .map(
+                (item) => `
+                  <button class="chip tiny-chip intensity ${form.strength === item ? "active" : ""}" data-chip-session="proxyPersona.replyForm" data-chip-field="strength" data-chip-value="${escapeAttr(item)}">
+                    ${escapeHtml(item)}
+                  </button>
+                `
+              )
+              .join("")}
+          </div>
         </div>
       </div>
-      <button class="primary-button" data-action="generate-proxy-reply" ${state.isReplyGenerating ? "disabled" : ""}>
-        ${state.isReplyGenerating ? "嘴替正在憋大招..." : "生成回怼"}
-      </button>
     </section>
   `;
 }
