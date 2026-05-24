@@ -12,7 +12,7 @@ import {
 import { requestJsonFromAI } from "./openaiClient.mjs";
 import { extractPersonaProfile } from "./personaExtractorSkill.mjs";
 import { generatePersonaReply } from "./personaReplySkill.mjs";
-import { handleFeishuEvent } from "./feishuBot.mjs";
+import { handleFeishuEvent, handleFeishuWebhookSend } from "./feishuBot.mjs";
 import { generateRandomTrainingScenario } from "./services/trainingScenarioService.mjs";
 import { scoreTrainingReply } from "./services/trainingScoreService.mjs";
 
@@ -69,6 +69,10 @@ app.post("/api/persona/reply", async (request, response) => {
 
 app.post("/api/feishu/events", async (request, response) => {
   await handleFeishuEvent(request, response);
+});
+
+app.post("/api/feishu/send", async (request, response) => {
+  await handleFeishuWebhookSend(request, response);
 });
 
 app.post("/api/training/score", async (request, response) => {

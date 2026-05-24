@@ -538,6 +538,18 @@ textarea {
   outline: none;
 }
 
+input {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: var(--paper);
+  border: var(--line);
+  border-radius: 14px;
+  outline: none;
+  font-weight: 900;
+}
+
 .select-field {
   width: 100%;
   min-height: 50px;
@@ -1739,6 +1751,16 @@ textarea:focus {
   border-radius: 15px;
 }
 
+.persona-header-actions {
+  display: grid;
+  gap: 8px;
+  justify-items: stretch;
+}
+
+.persona-header-actions .tiny-button {
+  min-height: 32px;
+}
+
 .compact-tags {
   margin-top: 8px;
 }
@@ -1792,6 +1814,28 @@ textarea:focus {
 
 .persona-bubble p {
   margin: 0;
+}
+
+.feishu-send-button {
+  display: block;
+  margin: 9px 0 0 auto;
+  min-height: 30px;
+  padding: 5px 9px;
+  background: var(--white);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  box-shadow: 2px 2px 0 var(--ink);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 1000;
+}
+
+.feishu-send-button.is-sent {
+  background: var(--green);
+}
+
+.feishu-send-button.is-error {
+  background: var(--pink);
 }
 
 .persona-bubble.from-user {
@@ -1972,6 +2016,91 @@ textarea:focus {
   min-height: 42px;
 }
 
+.integration-strip {
+  display: grid;
+  gap: 4px;
+}
+
+.integration-strip strong,
+.integration-strip span {
+  display: block;
+}
+
+.integration-strip span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.feishu-settings-backdrop {
+  z-index: 9;
+}
+
+.feishu-settings-sheet {
+  width: 100%;
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  background: var(--white);
+  border: var(--line);
+  border-radius: 18px;
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+.feishu-settings-sheet .card-title-row {
+  margin-bottom: 0;
+}
+
+.settings-copy,
+.feishu-settings-block p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+  font-weight: 900;
+}
+
+.feishu-settings-block {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 16px;
+}
+
+.feishu-settings-block h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.compact-button-row {
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.compact-button-row .compact-action {
+  width: 100%;
+}
+
+.feishu-check-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  font-weight: 900;
+}
+
+.feishu-settings-block code {
+  display: block;
+  padding: 8px 10px;
+  background: var(--white);
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  font-weight: 1000;
+  overflow-wrap: anywhere;
+}
+
 .create-choice-grid {
   display: grid;
   gap: 12px;
@@ -2060,6 +2189,10 @@ textarea:focus {
 @media (max-width: 380px) {
   .persona-header-card {
     grid-template-columns: 1fr;
+  }
+
+  .persona-header-actions {
+    grid-template-columns: 1fr 1fr;
   }
 
   .compact-action {

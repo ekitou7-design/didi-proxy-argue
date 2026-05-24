@@ -157,6 +157,58 @@ export async function sendFeishuTextMessage(receiveIdType, receiveId, text) {
   return sendData;
 }
 
+export async function handleFeishuWebhookSend(request, response) {
+  const { webhookUrl, text } = request.body || {};
+
+  if (!webhookUrl) {
+    response.status(400).json({ error: "webhookUrl is required" });
+    return;
+  }
+  if (!text) {
+    response.status(400).json({ error: "text is required" });
+    return;
+  }
+
+  try {
+    const result = await sendFeishuWebhookMessage(webhookUrl, text);
+    response.json({ ok: true, result });
+  } catch (error) {
+    console.error("[feishu/send] failed:", error);
+    response.status(502).json({ error: "Feishu webhook send failed", detail: error.message });
+  }
+}
+
+async function sendFeishuWebhookMessage(webhookUrl, text) {
+  const sendResponse = await fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json; charset=utf-8" },
+    body: JSON.stringify({
+      msg_type: "text",
+      content: {
+        text
+      }
+    })
+  });
+
+  const responseText = await sendResponse.text();
+  let data = {};
+  try {
+    data = responseText ? JSON.parse(responseText) : {};
+  } catch {
+    data = { raw: responseText };
+  }
+
+  const failed =
+    !sendResponse.ok ||
+    (typeof data.code === "number" && data.code !== 0) ||
+    (typeof data.StatusCode === "number" && data.StatusCode !== 0);
+  if (failed) {
+    throw new Error(data.msg || data.StatusMessage || data.message || responseText || `HTTP ${sendResponse.status}`);
+  }
+
+  return data;
+}
+
 function isValidVerificationToken(body) {
   const expectedToken = process.env.FEISHU_VERIFICATION_TOKEN;
   if (!expectedToken) return true;

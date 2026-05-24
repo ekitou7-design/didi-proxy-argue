@@ -28,6 +28,7 @@ const DISTILL_RESULTS_KEY = "persona_distill_results";
 const TEST_RESULTS_KEY = "persona_test_results";
 const CURRENT_PROFILE_KEY = "current_persona_profile";
 const PERSONA_CHAT_KEY = "persona_chat_turns";
+const FEISHU_WEBHOOK_KEY = "didi_feishu_webhook_url";
 
 const pageTitles = {
   home: "临时吵",
@@ -54,6 +55,7 @@ export default class App {
         length: "中等",
         mainlineLock: "开启"
       },
+      feishu: createFeishuState(),
       temp: structuredClone(initialTempSession),
       persona: structuredClone(initialPersonaSession),
       training: structuredClone(initialTrainingSession)
@@ -75,7 +77,7 @@ export default class App {
 
   getPage() {
     if (this.state.page === "temp") return TempArguePage(this.state.temp);
-    if (this.state.page === "persona") return PersonaPage(this.state.proxyPersona);
+    if (this.state.page === "persona") return PersonaPage({ ...this.state.proxyPersona, feishu: this.state.feishu });
     if (this.state.page === "personaDistill") return PersonaDistillPage(this.state.proxyPersona);
     if (this.state.page === "personaTest") return PersonaTestPage(this.state.proxyPersona);
     if (this.state.page === "training") return TrainingPage(this.state.training);
@@ -87,7 +89,7 @@ export default class App {
       });
     }
     if (this.state.page === "profile") {
-      return ProfilePage({ preferences: this.state.profilePreferences });
+      return ProfilePage({ preferences: this.state.profilePreferences, feishu: this.state.feishu });
     }
     return HomePage();
   }
@@ -184,6 +186,22 @@ export default class App {
       this.updateProxyPersona({ replySettingsOpen: false });
       return;
     }
+    if (action === "open-feishu-settings") {
+      this.openFeishuSettings();
+      return;
+    }
+    if (action === "close-feishu-settings") {
+      this.updateFeishu({ settingsOpen: false });
+      return;
+    }
+    if (action === "save-feishu-settings") {
+      this.saveFeishuSettings();
+      return;
+    }
+    if (action === "test-feishu-webhook") {
+      await this.testFeishuWebhook();
+      return;
+    }
     if (action === "submit-persona-test") {
       this.createPersonaFromTest();
       return;
@@ -198,6 +216,10 @@ export default class App {
     }
     if (action === "generate-proxy-reply") {
       await this.generateProxyReply();
+      return;
+    }
+    if (action === "send-reply-to-feishu") {
+      await this.sendReplyToFeishu(actionTarget.dataset.turnId);
       return;
     }
     if (action === "generate-random-training-scenario") {
@@ -268,6 +290,16 @@ export default class App {
   }
 
   handleInput(event) {
+    const feishuInput = event.target.dataset.feishuInput;
+    if (feishuInput) {
+      this.state.feishu = {
+        ...this.state.feishu,
+        [feishuInput]: event.target.value,
+        status: ""
+      };
+      return;
+    }
+
     const setup = event.target.dataset.setupInput;
     if (setup) {
       const parts = setup.split(".");
@@ -334,6 +366,98 @@ export default class App {
       proxyPersona: {
         ...this.state.proxyPersona,
         ...partial
+      }
+    });
+  }
+
+  updateFeishu(partial) {
+    this.setState({
+      feishu: {
+        ...this.state.feishu,
+        ...partial
+      }
+    });
+  }
+
+  openFeishuSettings(status = "") {
+    const hash = hashFromPage("profile");
+    if (hash && window.location.hash !== hash) window.location.hash = hash;
+    this.setState({
+      page: "profile",
+      feishu: {
+        ...this.state.feishu,
+        settingsOpen: true,
+        status
+      }
+    });
+  }
+
+  saveFeishuSettings() {
+    const webhookUrl = this.state.feishu.webhookUrl.trim();
+    localStorage.setItem(FEISHU_WEBHOOK_KEY, webhookUrl);
+    this.updateFeishu({
+      webhookUrl,
+      savedWebhookUrl: webhookUrl,
+      status: webhookUrl ? "已保存飞书 Webhook。" : "已清空飞书 Webhook。"
+    });
+  }
+
+  async testFeishuWebhook() {
+    const webhookUrl = this.state.feishu.webhookUrl.trim();
+    if (!webhookUrl) {
+      this.updateFeishu({ status: "请先填写飞书群 Webhook URL。" });
+      return;
+    }
+
+    this.updateFeishu({ testStatus: "sending", status: "正在测试发送..." });
+    try {
+      await sendToFeishu({ webhookUrl, text: "飞书接入测试：App 已经可以把 AI 回怼推送到群里。" });
+      localStorage.setItem(FEISHU_WEBHOOK_KEY, webhookUrl);
+      this.updateFeishu({
+        savedWebhookUrl: webhookUrl,
+        testStatus: "sent",
+        status: "测试发送成功。"
+      });
+    } catch (error) {
+      this.updateFeishu({
+        testStatus: "error",
+        status: `测试发送失败：${error.message}`
+      });
+    }
+  }
+
+  async sendReplyToFeishu(turnId) {
+    const turn = this.state.proxyPersona.chatTurns.find((item) => String(item.id) === String(turnId));
+    if (!turn?.text) return;
+
+    const webhookUrl = this.state.feishu.webhookUrl.trim() || localStorage.getItem(FEISHU_WEBHOOK_KEY) || "";
+    if (!webhookUrl) {
+      this.updateProxyPersona({ message: "请先配置飞书 Webhook" });
+      this.openFeishuSettings("请先配置飞书 Webhook");
+      return;
+    }
+
+    this.updateFeishuStatusForTurn(turnId, "sending");
+    try {
+      await sendToFeishu({ webhookUrl, text: turn.text });
+      this.updateFeishuStatusForTurn(turnId, "sent", "已发送到飞书。");
+    } catch (error) {
+      this.updateFeishuStatusForTurn(turnId, "error", `发送失败：${error.message}`);
+    }
+  }
+
+  updateFeishuStatusForTurn(turnId, status, message = "") {
+    this.setState({
+      feishu: {
+        ...this.state.feishu,
+        sendingByTurnId: {
+          ...this.state.feishu.sendingByTurnId,
+          [turnId]: status
+        }
+      },
+      proxyPersona: {
+        ...this.state.proxyPersona,
+        message: message || this.state.proxyPersona.message
       }
     });
   }
@@ -770,13 +894,17 @@ async function postJson(url, body) {
       const data = await response.json();
       if (data.error === "Missing OPENAI_API_KEY") message = "还没有配置 OPENAI_API_KEY";
       else if (data.error?.message) message = data.error.message;
-      else if (data.error) message = data.error;
+      else if (data.error) message = data.detail ? `${data.error}：${data.detail}` : data.error;
     } catch {
       // Keep the status-based message.
     }
     throw new Error(message);
   }
   return response.json();
+}
+
+async function sendToFeishu({ webhookUrl, text }) {
+  return postJson("/api/feishu/send", { webhookUrl, text });
 }
 
 function createProxyPersonaState() {
@@ -816,6 +944,18 @@ function createProxyPersonaState() {
     chatTurns: readJson(PERSONA_CHAT_KEY, []),
     replyResult: null,
     message: ""
+  };
+}
+
+function createFeishuState() {
+  const webhookUrl = localStorage.getItem(FEISHU_WEBHOOK_KEY) || "";
+  return {
+    webhookUrl,
+    savedWebhookUrl: webhookUrl,
+    settingsOpen: false,
+    testStatus: "idle",
+    sendingByTurnId: {},
+    status: ""
   };
 }
 
@@ -1014,6 +1154,8 @@ function pageFromHash() {
     "persona-test": "personaTest",
     temp: "temp",
     training: "training",
+    profile: "profile",
+    records: "records",
     home: "temp"
   };
   return map[value] || "";

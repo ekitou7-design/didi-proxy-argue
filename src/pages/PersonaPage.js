@@ -24,7 +24,10 @@ function PersonaHeader(profile) {
           <h2>你还没有专属嘴替</h2>
           <p>先创建一个嘴替人格，再让它帮你说话。</p>
         </div>
-        <button class="secondary-button compact-action" data-action="open-persona-create">创建嘴替</button>
+        <div class="persona-header-actions">
+          <button class="secondary-button compact-action" data-action="open-persona-create">创建嘴替</button>
+          <button class="tiny-button" data-action="open-feishu-settings">飞书设置</button>
+        </div>
       </section>
     `;
   }
@@ -41,7 +44,10 @@ function PersonaHeader(profile) {
           ${tags.slice(0, 4).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
         </div>
       </div>
-      <button class="secondary-button compact-action" data-action="open-persona-create">创建 / 切换</button>
+      <div class="persona-header-actions">
+        <button class="secondary-button compact-action" data-action="open-persona-create">创建 / 切换</button>
+        <button class="tiny-button" data-action="open-feishu-settings">飞书设置</button>
+      </div>
     </section>
   `;
 }
@@ -66,20 +72,43 @@ function PersonaChatPanel(state, profile) {
   return `
     <section class="persona-chat-panel" aria-label="专属嘴替聊天记录">
       <div class="persona-chat-scroll">
-        ${turns.map((turn) => ChatBubble(turn, profile)).join("")}
+        ${turns.map((turn) => ChatBubble(turn, profile, state)).join("")}
       </div>
       ${state.message ? `<p class="persona-chat-note">${escapeHtml(state.message)}</p>` : ""}
     </section>
   `;
 }
 
-function ChatBubble(turn, profile) {
+function ChatBubble(turn, profile, state) {
   const isUser = turn.role === "user";
+  const feishuStatus = state.feishu?.sendingByTurnId?.[turn.id] || "";
   return `
     <article class="persona-bubble ${isUser ? "from-user" : "from-proxy"}">
       <span>${isUser ? "你" : escapeHtml(getProfileName(profile))}</span>
       <p>${escapeHtml(turn.text)}</p>
+      ${isUser ? "" : FeishuSendButton(turn, feishuStatus)}
     </article>
+  `;
+}
+
+function FeishuSendButton(turn, status) {
+  const label =
+    status === "sending"
+      ? "发送中"
+      : status === "sent"
+        ? "已发送"
+        : status === "error"
+          ? "发送失败"
+          : "发送到飞书";
+  return `
+    <button
+      class="feishu-send-button ${status ? `is-${status}` : ""}"
+      data-action="send-reply-to-feishu"
+      data-turn-id="${escapeAttr(turn.id)}"
+      ${status === "sending" || status === "sent" ? "disabled" : ""}
+    >
+      ${label}
+    </button>
   `;
 }
 
