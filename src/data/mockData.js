@@ -134,6 +134,9 @@ export const initialTempSession = {
   goal: "压回去",
   tone: "中",
   boundary: "不要骂脏话，不要人身攻击，只要求对方给明确处理方案。",
+  generatedScenario: null,
+  scenarioStatus: "idle",
+  scenarioMessage: "",
   input: "",
   isSubmitting: false,
   rounds: []

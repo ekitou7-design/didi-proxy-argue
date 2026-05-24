@@ -1468,6 +1468,12 @@ textarea:focus {
   background: var(--blue);
 }
 
+.temp-scenario-summary {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .settings-title-row {
   display: grid;
   gap: 6px;
@@ -1672,6 +1678,19 @@ textarea:focus {
 .realtime-input-bar .primary-button {
   min-height: 54px;
   font-size: 15px;
+}
+
+.temp-input-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.temp-input-actions .primary-button,
+.temp-input-actions .secondary-button {
+  min-height: 38px;
+  padding: 7px 8px;
+  font-size: 13px;
 }
 
 .random-scenario-button {

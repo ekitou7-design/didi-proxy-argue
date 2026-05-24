@@ -11,15 +11,21 @@ export default function TempArguePage(session) {
 }
 
 function TempSettings(session) {
+  const scenario = session.generatedScenario;
   return `
     <section class="realtime-settings-card temp-settings-card">
       <div class="settings-title-row">
         <div>
-          <span class="persona-kicker">当前对手</span>
-          <h2>${escapeHtml(session.who || "临时对手")}</h2>
-          <p>${escapeHtml(session.context || "先补一下前情，嘴替才好接话。")}</p>
+          <span class="persona-kicker">当前临时场景</span>
+          <h2>${escapeHtml(scenario?.title || session.who || "临时对手")}</h2>
+          <p>${escapeHtml(scenario?.background || session.context || "先补一下前情，嘴替才好接话。")}</p>
         </div>
+        <button class="primary-button random-scenario-button" data-action="generate-temp-scenario" ${session.scenarioStatus === "loading" ? "disabled" : ""}>
+          ${session.scenarioStatus === "loading" ? "生成中..." : "生成临时吵架场景"}
+        </button>
       </div>
+      ${session.scenarioMessage ? `<p class="section-note compact-status-note">${escapeHtml(session.scenarioMessage)}</p>` : ""}
+      ${scenario ? TempScenarioSummary(scenario) : ""}
 
       <details class="top-settings-detail" open>
         <summary>创建 / 切换对面场景和人设</summary>
@@ -36,7 +42,7 @@ function TempSettings(session) {
         </div>
         <div class="settings-grid">
           ${SmallField("目前对方是谁？", "temp.who", session.who, "比如：客服、同学、对象、室友")}
-          ${SmallField("对方说了什么？", "temp.latest", session.latest, "把对方刚刚说的话放这里")}
+          ${SmallField("对方第一句话 / 最新一句", "temp.latest", session.latest, "把对方刚刚说的话放这里")}
           ${SmallField("前情提要", "temp.context", session.context, "简单说一下为什么吵起来", "wide")}
         </div>
         <div class="settings-inline-groups">
@@ -54,6 +60,22 @@ function TempSettings(session) {
   `;
 }
 
+function TempScenarioSummary(scenario) {
+  const mainline = scenario.mainline || {};
+  return `
+    <div class="temp-scenario-summary">
+      <div class="temp-result-block">
+        <h3>对方人设</h3>
+        <p>${escapeHtml(scenario.opponentPersona)}</p>
+      </div>
+      <div class="temp-result-block">
+        <h3>推荐主线</h3>
+        <p>${escapeHtml([mainline.fact, mainline.impact, mainline.request, mainline.boundary].filter(Boolean).join(" "))}</p>
+      </div>
+    </div>
+  `;
+}
+
 function TempChatPanel(session) {
   const visibleRounds = [...session.rounds];
   return `
@@ -65,7 +87,7 @@ function TempChatPanel(session) {
             : `
               <article class="persona-bubble from-user">
                 <span>对方</span>
-                <p>${escapeHtml(session.latest || "对方说一句，你告诉我一句。")}</p>
+                <p>${escapeHtml(session.generatedScenario?.openingMessage || session.latest || "先生成场景，或把对方刚说的话发给我。")}</p>
               </article>
               <article class="persona-bubble from-proxy">
                 <span>代吵助手</span>
@@ -123,10 +145,15 @@ function ReplyBubbles(text) {
 function TempInputBar(session) {
   return `
     <section class="realtime-input-bar">
-      <textarea data-session-input="temp" placeholder="对方又说了什么？继续发给我……">${escapeHtml(session.input)}</textarea>
-      <button class="primary-button" data-action="temp-reply" ${session.isSubmitting ? "disabled" : ""}>
-        ${session.isSubmitting ? "正在接话..." : "帮我接一句"}
-      </button>
+      <textarea data-session-input="temp" placeholder="可输入对方新一句，也可以输入你想表达的意思；留空则按对方上一句帮你回。">${escapeHtml(session.input)}</textarea>
+      <div class="temp-input-actions">
+        <button class="secondary-button warm" data-action="temp-reply-intent" ${session.isSubmitting ? "disabled" : ""}>
+          按我的意思回
+        </button>
+        <button class="primary-button" data-action="temp-reply" ${session.isSubmitting ? "disabled" : ""}>
+          ${session.isSubmitting ? "正在接话..." : "帮我回"}
+        </button>
+      </div>
     </section>
   `;
 }

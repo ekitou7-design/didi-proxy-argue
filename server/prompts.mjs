@@ -88,6 +88,91 @@ ${formatTechniques(techniques)}
   };
 }
 
+export function buildTempScenarioPrompt(input) {
+  return {
+    system: baseStyleRules,
+    user: `
+任务：根据用户填写的信息，生成一个临时代吵冲突场景。
+输入：
+${JSON.stringify(input, null, 2)}
+
+要求：
+- 场景必须贴合“和谁吵 / 发生了什么 / 目标 / 语气强度”。
+- openingMessage 要像真实对方会说的一句话，不要像总结。
+- mainline 使用 FIRB：fact、impact、request、boundary。
+- 不要生成辱骂、威胁、现实报复或违法内容。
+
+必须返回这个 JSON 结构：
+{
+  "scenario": {
+    "title": "",
+    "background": "",
+    "opponentPersona": "",
+    "openingMessage": "",
+    "mainline": {
+      "fact": "",
+      "impact": "",
+      "request": "",
+      "boundary": ""
+    },
+    "userGoal": "",
+    "tone": ""
+  }
+}
+`
+  };
+}
+
+export function buildTempChatPrompt(input) {
+  const techniques = selectTechniques({
+    scene: input.scenario?.background || input.scene,
+    opponent: input.latestOpponentMessage || input.opponent,
+    userReply: input.userIntent
+  });
+  return {
+    system: baseStyleRules,
+    user: `
+任务：在“临时代吵”连续对话中，根据当前场景、历史和最新输入，生成下一句可直接发送的代吵回复。
+输入：
+${JSON.stringify(input, null, 2)}
+
+最新输入可能是：
+- 对方刚说的话 latestOpponentMessage；
+- 或用户想表达的意思 userIntent。
+如果 userIntent 有内容，要把它转成更有攻击力但安全的表达。
+如果 latestOpponentMessage 有内容，要先识别对方话术，再接话。
+
+可用技巧：
+${formatTechniques(techniques)}
+
+要求：
+- recommendedReply 必须是一句最推荐直接发送的话。
+- strongerReply 更强硬，但不能辱骂、人身攻击、威胁。
+- sarcasticReply 可以有轻微阴阳，但不要越界。
+- politeFinalReply 用于体面收束。
+- 参考历史，不要每轮都重复同一句结构。
+
+必须返回这个 JSON 结构：
+{
+  "opponentTactic": "",
+  "mainline": {
+    "fact": "",
+    "impact": "",
+    "request": "",
+    "boundary": ""
+  },
+  "usedTechniques": [],
+  "strategy": "",
+  "recommendedReply": "",
+  "strongerReply": "",
+  "sarcasticReply": "",
+  "politeFinalReply": "",
+  "offTopicWarning": ""
+}
+`
+  };
+}
+
 export function buildAnalyzeChatPrompt(input) {
   return {
     system: baseStyleRules,

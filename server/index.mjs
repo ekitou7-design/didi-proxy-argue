@@ -6,7 +6,9 @@ import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import {
   buildAnalyzeChatPrompt,
+  buildTempChatPrompt,
   buildTempArguePrompt,
+  buildTempScenarioPrompt,
   buildTestResultPrompt
 } from "./prompts.mjs";
 import { requestJsonFromAI } from "./openaiClient.mjs";
@@ -50,6 +52,14 @@ app.get("/api/health", (request, response) => {
 
 app.post("/api/temp-argue", async (request, response) => {
   await handleAIEndpoint(response, buildTempArguePrompt(request.body));
+});
+
+app.post("/api/temp-scenario", async (request, response) => {
+  await handleAIEndpoint(response, buildTempScenarioPrompt(request.body));
+});
+
+app.post("/api/temp-chat", async (request, response) => {
+  await handleAIEndpoint(response, buildTempChatPrompt(request.body));
 });
 
 app.post("/api/persona/analyze-chat", async (request, response) => {

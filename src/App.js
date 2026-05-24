@@ -246,6 +246,14 @@ export default class App {
       await this.handleTempReply();
       return;
     }
+    if (action === "temp-reply-intent") {
+      await this.handleTempReply({ inputAsIntent: true });
+      return;
+    }
+    if (action === "generate-temp-scenario") {
+      await this.generateTempScenario();
+      return;
+    }
     if (action === "use-temp-scenario") {
       this.useTempScenario(actionTarget.dataset.scenarioIndex);
       return;
@@ -521,6 +529,9 @@ export default class App {
       temp: {
         ...this.state.temp,
         ...preset,
+        generatedScenario: null,
+        scenarioStatus: "idle",
+        scenarioMessage: "",
         input: "",
         rounds: []
       }
@@ -732,12 +743,16 @@ export default class App {
     }
   }
 
-  async handleTempReply() {
+  async handleTempReply({ inputAsIntent = false } = {}) {
     const temp = this.state.temp;
     if (temp.isSubmitting) return;
 
-    const text = temp.input.trim() || temp.latest.trim();
-    if (!text) return;
+    const typedText = temp.input.trim();
+    const opponentText = inputAsIntent
+      ? temp.latest.trim() || temp.generatedScenario?.openingMessage || ""
+      : typedText || temp.latest.trim() || temp.generatedScenario?.openingMessage || "";
+    const userIntent = inputAsIntent ? typedText : "";
+    if (!opponentText && !userIntent) return;
 
     this.setState({
       temp: {
@@ -749,16 +764,25 @@ export default class App {
 
     let turn;
     try {
-      const result = await postJson("/api/temp-argue", {
+      const result = await postJson("/api/temp-chat", {
+        scenario: temp.generatedScenario,
         scene: temp.context,
-        opponent: text,
+        who: temp.who,
+        latestOpponentMessage: opponentText,
+        opponent: opponentText,
+        userIntent,
         goal: temp.goal,
-        persona: temp.tone,
-        intensity: temp.tone
+        tone: temp.tone,
+        intensity: temp.tone,
+        history: temp.rounds.map((round) => ({
+          opponent: round.opponent,
+          reply: round.replies?.[0]?.text || "",
+          analysis: round.analysis
+        }))
       });
       turn = {
         id: Date.now(),
-        opponent: text,
+        opponent: opponentText || "我想表达：" + userIntent,
         analysis: result.opponentTactic,
         mainline: `${result.strategy} ${result.offTopicWarning || ""}`,
         replies: uniqueReplyOptions([
@@ -768,18 +792,69 @@ export default class App {
         ])
       };
     } catch {
-      turn = buildTempChatTurn(temp, text);
+      turn = buildTempChatTurn(temp, opponentText || userIntent);
       turn.replies = uniqueReplyOptions(turn.replies);
     }
     this.setState({
       temp: {
         ...this.state.temp,
-        latest: text,
+        latest: opponentText || temp.latest,
         input: "",
         isSubmitting: false,
         rounds: [...temp.rounds, turn]
       }
     });
+  }
+
+  async generateTempScenario() {
+    const temp = this.state.temp;
+    if (temp.scenarioStatus === "loading") return;
+
+    this.setState({
+      temp: {
+        ...temp,
+        scenarioStatus: "loading",
+        scenarioMessage: "正在生成临时冲突现场..."
+      }
+    });
+
+    try {
+      const result = await postJson("/api/temp-scenario", {
+        who: temp.who,
+        context: temp.context,
+        goal: temp.goal,
+        tone: temp.tone,
+        latest: temp.latest
+      });
+      const scenario = normalizeTempScenario(result.scenario || result, temp);
+      this.setState({
+        temp: {
+          ...this.state.temp,
+          who: scenario.opponentPersona || this.state.temp.who,
+          context: scenario.background || this.state.temp.context,
+          latest: scenario.openingMessage || this.state.temp.latest,
+          goal: scenario.userGoal || this.state.temp.goal,
+          generatedScenario: scenario,
+          scenarioStatus: "done",
+          scenarioMessage: "临时场景已生成，对方先开口了。",
+          input: "",
+          rounds: []
+        }
+      });
+    } catch (error) {
+      const scenario = buildLocalTempScenario(temp);
+      this.setState({
+        temp: {
+          ...this.state.temp,
+          latest: scenario.openingMessage,
+          generatedScenario: scenario,
+          scenarioStatus: "done",
+          scenarioMessage: `API 生成较慢或失败，已先生成本地场景。${error.message ? `（${error.message}）` : ""}`,
+          input: "",
+          rounds: []
+        }
+      });
+    }
   }
 
   async generateRandomTrainingScenario() {
@@ -1300,6 +1375,53 @@ function makeLocalReply(replyForm, styleProfile) {
     strategy: `本地预览：按「${getProfileName(styleProfile)}」人格生成。${strategy}`,
     tone: getProfileTone(styleProfile) || "温柔但有边界"
   };
+}
+
+function normalizeTempScenario(scenario, temp) {
+  const mainline = scenario?.mainline && typeof scenario.mainline === "object" ? scenario.mainline : {};
+  const fallback = buildLocalTempScenario(temp);
+  return {
+    title: String(scenario?.title || fallback.title || "").trim(),
+    background: String(scenario?.background || fallback.background || "").trim(),
+    opponentPersona: String(scenario?.opponentPersona || fallback.opponentPersona || "").trim(),
+    openingMessage: String(scenario?.openingMessage || fallback.openingMessage || "").trim(),
+    mainline: {
+      fact: String(mainline.fact || fallback.mainline.fact || "").trim(),
+      impact: String(mainline.impact || fallback.mainline.impact || "").trim(),
+      request: String(mainline.request || fallback.mainline.request || "").trim(),
+      boundary: String(mainline.boundary || fallback.mainline.boundary || "").trim()
+    },
+    userGoal: String(scenario?.userGoal || fallback.userGoal || "").trim(),
+    tone: String(scenario?.tone || temp.tone || "").trim()
+  };
+}
+
+function buildLocalTempScenario(temp) {
+  const who = temp.who || "临时对手";
+  const context = temp.context || "发生了一次具体冲突，对方正在回避责任。";
+  const goal = temp.goal || "讲清楚";
+  return {
+    title: `${who}临时冲突`,
+    background: context,
+    opponentPersona: who,
+    openingMessage: temp.latest || makeTempOpening(who, context),
+    mainline: {
+      fact: context,
+      impact: "对方的说法正在把具体问题转成你的态度或情绪。",
+      request: `你的目标是：${goal}`,
+      boundary: "不要接受辱骂、人身攻击或继续转移重点。"
+    },
+    userGoal: goal,
+    tone: temp.tone || "中"
+  };
+}
+
+function makeTempOpening(who, context) {
+  if (/客服|商家|售后|退款/.test(`${who} ${context}`)) return "这个不是我们的问题，你自己下单前也应该看清楚规则。";
+  if (/对象|男朋友|女朋友|恋爱|约/.test(`${who} ${context}`)) return "你怎么又开始了？这点小事也要说这么严重吗？";
+  if (/室友|宿舍|卫生/.test(`${who} ${context}`)) return "你别说得好像自己多守规矩一样，宿舍又不是你一个人的。";
+  if (/同事|工作|项目/.test(`${who} ${context}`)) return "这也不能全怪我吧，你要求这么高，那你来做不是更快吗？";
+  return "你现在这样说就很没必要，本来没多大的事。";
 }
 
 function splitReplyMessages(text) {
