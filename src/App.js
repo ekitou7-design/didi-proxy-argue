@@ -226,6 +226,10 @@ export default class App {
       await this.generateRandomTrainingScenario();
       return;
     }
+    if (action === "confirm-training-scenario") {
+      await this.generateRandomTrainingScenario();
+      return;
+    }
     if (action === "go-persona-distill") {
       this.navigate("personaDistill");
       return;
@@ -266,22 +270,24 @@ export default class App {
       });
       return;
     }
-    if (action === "start-training-chat") {
-      const scenario = this.state.training.generatedScenario;
-      const opponent = scenario?.openingMessage || this.state.training.opponent || makeOpeningOpponent(this.state.training.scene);
-      this.setState({
-        training: {
-          ...this.state.training,
-          step: "chat",
-          opponent,
-          round: 1,
-          feedbacks: []
-        }
-      });
+    if (action === "start-training-game" || action === "start-training-chat") {
+      this.startTrainingGame();
+      return;
+    }
+    if (action === "finish-training-game") {
+      await this.finishTrainingGame();
+      return;
+    }
+    if (action === "restart-training-game") {
+      this.startTrainingGame();
+      return;
+    }
+    if (action === "reset-training-game") {
+      this.resetTrainingGame();
       return;
     }
     if (action === "edit-training-setup") {
-      this.setState({ training: { ...this.state.training, step: "setup" } });
+      this.resetTrainingGame();
       return;
     }
     if (action === "training-submit") {
@@ -303,6 +309,10 @@ export default class App {
     const setup = event.target.dataset.setupInput;
     if (setup) {
       const parts = setup.split(".");
+      if (parts[0] === "training") {
+        this.updateTrainingSetup(parts, event.target.value, false);
+        return;
+      }
       if (parts.length === 3) {
         this.setNestedState(parts[0], parts[1], parts[2], event.target.value, false);
         return;
@@ -322,6 +332,10 @@ export default class App {
     const setup = event.target.dataset.setupInput;
     if (setup) {
       const parts = setup.split(".");
+      if (parts[0] === "training") {
+        this.updateTrainingSetup(parts, event.target.value);
+        return;
+      }
       if (parts.length === 3) {
         this.setNestedState(parts[0], parts[1], parts[2], event.target.value);
         return;
@@ -460,6 +474,43 @@ export default class App {
         message: message || this.state.proxyPersona.message
       }
     });
+  }
+
+  updateTrainingSetup(parts, value, render = true) {
+    const training = this.state.training;
+    const nextTraining =
+      parts.length === 3
+        ? {
+            ...training,
+            [parts[1]]: {
+              ...training[parts[1]],
+              [parts[2]]: value
+            }
+          }
+        : {
+            ...training,
+            [parts[1]]: value
+          };
+
+    const updatedTraining = {
+      ...nextTraining,
+      generatedScenario: null,
+      opponent: "",
+      messages: [],
+      feedbacks: [],
+      review: null,
+      result: "",
+      persuasionScore: 0,
+      persuasionDelta: 0,
+      opponentState: "strong",
+      offTrackStreak: 0,
+      round: 1,
+      scenarioStatus: "idle",
+      scenarioMessage: "设置已修改，点击确认场景后再开始训练。"
+    };
+
+    if (render) this.setState({ training: updatedTraining });
+    else this.state.training = updatedTraining;
   }
 
   useTempScenario(index) {
@@ -743,17 +794,34 @@ export default class App {
     });
 
     try {
-      const result = await postJson("/api/training/scenario/random", training.randomScenarioForm || {});
+      const result = await postJson("/api/training/scenario/random", {
+        ...(training.randomScenarioForm || {}),
+        customScene: training.scene,
+        userGoal: training.goal || training.randomScenarioForm?.userGoal || ""
+      });
       const scenario = result.scenario;
       if (!scenario?.openingMessage) throw new Error("场景生成结果为空");
 
       this.setState({
         training: {
           ...this.state.training,
+          gameState: "idle",
+          step: "setup",
           scene: scenario.title || scenario.background,
           difficulty: scenario.difficulty || this.state.training.difficulty,
+          goal: scenario.userGoal || this.state.training.randomScenarioForm?.userGoal || this.state.training.goal,
+          maxRounds: maxRoundsForDifficulty(scenario.difficulty || this.state.training.difficulty),
           opponent: scenario.openingMessage,
           generatedScenario: scenario,
+          messages: [],
+          feedbacks: [],
+          review: null,
+          result: "",
+          round: 1,
+          persuasionScore: 0,
+          persuasionDelta: 0,
+          opponentState: "strong",
+          offTrackStreak: 0,
           scenarioStatus: "done",
           scenarioMessage: "场景已生成，可以开始这一局。"
         }
@@ -767,6 +835,73 @@ export default class App {
         }
       });
     }
+  }
+
+  startTrainingGame() {
+    const training = this.state.training;
+    if (!training.generatedScenario) {
+      this.setState({
+        training: {
+          ...training,
+          scenarioMessage: "请先点击确认场景，让设置生效。"
+        }
+      });
+      return;
+    }
+    const scenario = training.generatedScenario;
+    const opponent = scenario?.openingMessage || training.opponent || makeOpeningOpponent(training.scene);
+    this.setState({
+      training: {
+        ...training,
+        gameState: "playing",
+        step: "chat",
+        opponent,
+        input: "",
+        isSubmitting: false,
+        round: 1,
+        maxRounds: maxRoundsForDifficulty(training.generatedScenario?.difficulty || training.difficulty),
+        persuasionScore: 0,
+        persuasionDelta: 0,
+        opponentState: "strong",
+        offTrackStreak: 0,
+        review: null,
+        result: "",
+        feedbacks: [],
+        messages: [{ role: "assistant", content: opponent }],
+        scenarioMessage: ""
+      }
+    });
+  }
+
+  resetTrainingGame() {
+    this.setState({
+      training: {
+        ...this.state.training,
+        gameState: "idle",
+        step: "setup",
+        input: "",
+        isSubmitting: false,
+        round: 1,
+        persuasionScore: 0,
+        persuasionDelta: 0,
+        opponentState: "strong",
+        offTrackStreak: 0,
+        review: null,
+        result: "",
+        generatedScenario: null,
+        scenarioStatus: "idle",
+        opponent: "",
+        messages: [],
+        feedbacks: [],
+        scenarioMessage: ""
+      }
+    });
+  }
+
+  async finishTrainingGame() {
+    const training = this.state.training;
+    if (training.gameState !== "playing" || training.isSubmitting) return;
+    await this.submitTrainingGame({ forceEnd: true });
   }
 
   async handleTrainingSubmit() {
@@ -784,73 +919,95 @@ export default class App {
         });
         return;
       }
+      await this.submitTrainingGame({ userReply: reply });
+      return;
+    }
+  }
 
-      const generatedScenario = training.generatedScenario;
-      const payload = {
-        scenario: generatedScenario?.title || generatedScenario?.background || training.scene,
-        difficulty: generatedScenario?.difficulty || training.difficulty,
-        opponentType: generatedScenario?.opponentProfile?.type || "嘴硬型",
-        opponentMessage: training.opponent || generatedScenario?.openingMessage || makeOpeningOpponent(training.scene),
-        userReply: reply,
-        round: training.round,
-        mainline: generatedScenario?.mainline,
-        traps: generatedScenario?.traps,
-        trainingFocus: generatedScenario?.trainingFocus
-      };
-      console.log("training score payload", payload);
+  async submitTrainingGame({ userReply = "", forceEnd = false } = {}) {
+    const training = this.state.training;
+    const generatedScenario = training.generatedScenario;
+    const userMessage = userReply ? { role: "user", content: userReply } : null;
+    const messages = userMessage ? [...training.messages, userMessage] : training.messages;
+    const payload = {
+      scene: generatedScenario?.title || generatedScenario?.background || training.scene,
+      difficulty: generatedScenario?.difficulty || training.difficulty,
+      goal: generatedScenario?.userGoal || training.goal || training.randomScenarioForm?.userGoal,
+      round: training.round,
+      maxRounds: training.maxRounds || 5,
+      persuasionScore: training.persuasionScore || 0,
+      forceEnd,
+      offTrackStreak: training.offTrackStreak || 0,
+      mainline: generatedScenario?.mainline,
+      messages
+    };
+
+    this.setState({
+      training: {
+        ...training,
+        input: userReply ? "" : training.input,
+        isSubmitting: true,
+        scenarioMessage: forceEnd ? "正在结算本轮..." : "正在判断本轮说服度...",
+        messages
+      }
+    });
+
+    try {
+      const result = await postJson("/api/training/reply", payload);
+      const assistantMessage = result.assistantMessage || training.opponent || "";
+      const nextMessages = assistantMessage ? [...messages, { role: "assistant", content: assistantMessage }] : messages;
+      const feedback = userReply
+        ? {
+            id: Date.now(),
+            userReply,
+            nextOpponent: assistantMessage,
+            persuasionDelta: result.persuasionDelta || 0,
+            persuasionScore: result.persuasionScore || 0,
+            feedback: result.feedback || "",
+            opponentState: result.opponentState || "strong"
+          }
+        : null;
 
       this.setState({
         training: {
-          ...training,
-          isSubmitting: true,
-          scenarioMessage: "正在分析你的回复..."
+          ...this.state.training,
+          gameState: result.gameState || "playing",
+          step: result.gameState === "finished" ? "finished" : "chat",
+          input: "",
+          isSubmitting: false,
+          scenarioMessage: "",
+          round: result.round || training.round,
+          maxRounds: result.maxRounds || training.maxRounds || 5,
+          persuasionScore: result.persuasionScore ?? training.persuasionScore,
+          persuasionDelta: result.persuasionDelta || 0,
+          opponentState: result.opponentState || training.opponentState,
+          offTrackStreak: result.offTrackStreak || 0,
+          opponent: assistantMessage || training.opponent,
+          messages: nextMessages,
+          feedbacks: feedback ? [...training.feedbacks, feedback] : training.feedbacks,
+          review: result.review || null,
+          result: result.review?.result || ""
         }
       });
-
-      try {
-        const result = await postJson("/api/training/score", payload);
-        console.log("training score response", result);
-        const feedback = {
-          id: Date.now(),
-          userReply: reply,
-          scores: result.scores || {},
-          overallScore: result.overallScore ?? result.scores?.winRate ?? 0,
-          advantages: result.advantages || result.analysis || "",
-          weaknesses: result.weaknesses || result.suggestion || "",
-          suggestion: result.suggestion || "",
-          betterReply: result.betterReply || "",
-          nextOpponent: result.nextOpponentMessage || "",
-          isOffTopic: Boolean(result.isOffTopic)
-        };
-        this.setState({
-          training: {
-            ...this.state.training,
-            step: "chat",
-            input: "",
-            isSubmitting: false,
-            scenarioMessage: "",
-            round: training.round + 1,
-            opponent: feedback.nextOpponent || payload.opponentMessage,
-            feedbacks: [...training.feedbacks, feedback]
-          }
-        });
-      } catch (error) {
-        console.error("training score failed", error);
-        this.setState({
-          training: {
-            ...this.state.training,
-            input: reply,
-            isSubmitting: false,
-            scenarioMessage: "评分失败，请稍后重试。"
-          }
-        });
-      }
-      return;
+    } catch (error) {
+      console.error("training game failed", error);
+      this.setState({
+        training: {
+          ...this.state.training,
+          input: userReply || this.state.training.input,
+          isSubmitting: false,
+          scenarioMessage: "本轮判断失败，请稍后重试。"
+        }
+      });
     }
   }
 
   render() {
     const { page } = this.state;
+    const isRealtimePage =
+      page === "temp" ||
+      page === "persona" ||
+      (page === "training" && this.state.training.gameState === "playing");
     this.root.innerHTML = `
       <div class="app-shell">
         <div class="phone-frame">
@@ -864,7 +1021,7 @@ export default class App {
             </div>
             <button class="mini-sticker danger" data-page="persona">替</button>
           </header>
-          <main class="page-scroll ${["temp", "persona", "training"].includes(page) ? "realtime-scroll" : ""} ${page === "persona" ? "persona-scroll" : ""}">${this.getPage()}</main>
+          <main class="page-scroll ${isRealtimePage ? "realtime-scroll" : ""} ${page === "persona" ? "persona-scroll" : ""}">${this.getPage()}</main>
           ${BottomNav(page)}
         </div>
       </div>
@@ -1121,6 +1278,13 @@ function mapReplyMode(mode) {
   if (mode === "说得更清楚") return "clearer";
   if (mode === "攻击力加强") return "stronger";
   return "close_to_user";
+}
+
+function maxRoundsForDifficulty(difficulty) {
+  const text = String(difficulty || "");
+  if (/青铜|easy|简单|低/.test(text)) return 4;
+  if (/黄金|王者|hard|困难|高/.test(text)) return 6;
+  return 5;
 }
 
 function uniqueReplyOptions(replies) {

@@ -33,11 +33,33 @@ export function mockGenerateRandomTrainingScenario(input = {}) {
     return categoryMatched && difficultyMatched && opponentMatched;
   });
 
-  const sourcePool = filtered.length ? filtered : pool;
+  const categoryPool = pool.filter((scenario) => randomValues.has(normalizedInput.category) || scenario.category === normalizedInput.category);
+  const opponentPool = categoryPool.filter(
+    (scenario) => randomValues.has(normalizedInput.opponentType) || scenario.opponentProfile.type === normalizedInput.opponentType
+  );
+  const sourcePool = filtered.length ? filtered : opponentPool.length ? opponentPool : categoryPool.length ? categoryPool : pool;
   const scenario = structuredClone(sourcePool[Math.floor(Math.random() * sourcePool.length)]);
   if (!randomValues.has(normalizedInput.category)) scenario.category = normalizedInput.category;
   if (!randomValues.has(normalizedInput.difficulty)) scenario.difficulty = normalizedInput.difficulty;
   if (!randomValues.has(normalizedInput.opponentType)) scenario.opponentProfile.type = normalizedInput.opponentType;
+  if (normalizedInput.customScene) {
+    scenario.title = normalizedInput.customScene;
+    scenario.background = buildCustomSceneBackground(normalizedInput, scenario);
+    scenario.openingMessage = buildCustomOpeningMessage(normalizedInput);
+    scenario.relationship = "自定义训练对象";
+    scenario.realMainline = "不要被对方带去解释情绪，持续围绕具体行为、影响和下一步要求。";
+    scenario.mainline = buildCustomMainline(normalizedInput);
+    scenario.traps = buildCustomTraps(normalizedInput);
+    scenario.trainingFocus = ["先抓具体行为", "点出影响", "提出下一步要求", "拒绝被贴情绪标签"];
+    scenario.scoreFocus = {
+      logic: "是否围绕自定义场景里的具体行为说话。",
+      power: "是否短句有力，不被对方压住。",
+      boundary: "是否明确说出不接受什么。",
+      mainline: "是否持续围绕行为、影响和要求。",
+      risk: "是否避免辱骂、威胁或扩大攻击面。"
+    };
+    scenario.suggestedFirstReplyHint = "先别解释自己是不是敏感，直接把问题拉回具体行为和要求。";
+  }
   if (normalizedInput.userGoal) scenario.userGoal = normalizedInput.userGoal;
   return normalizeScenario(scenario, normalizedInput);
 }
@@ -47,6 +69,7 @@ export function normalizeScenarioInput(input = {}) {
     category: normalizeOption(input.category, categories),
     difficulty: normalizeOption(input.difficulty, difficulties),
     opponentType: normalizeOption(input.opponentType, opponentTypes),
+    customScene: textOf(input.customScene),
     userGoal: textOf(input.userGoal)
   };
 }
@@ -272,6 +295,42 @@ function normalizeOption(value, allowed) {
   const text = textOf(value);
   if (!text || text === "随机") return "随机";
   return allowed.includes(text) ? text : "随机";
+}
+
+function buildCustomSceneBackground(input, scenario) {
+  const category = randomValues.has(input.category) ? scenario.category : input.category;
+  const difficulty = randomValues.has(input.difficulty) ? scenario.difficulty : input.difficulty;
+  const opponentType = randomValues.has(input.opponentType) ? scenario.opponentProfile?.type : input.opponentType;
+  return `自定义场景：${input.customScene}。训练类型：${category}，难度：${difficulty}，对手倾向：${opponentType}。`;
+}
+
+function buildCustomOpeningMessage(input) {
+  const scene = input.customScene;
+  const type = input.opponentType;
+  if (/阴阳/.test(type)) return `行，就你最有道理，${scene}这事你非要这么理解我也没办法。`;
+  if (/偷换/.test(type)) return `你现在怪我也没用吧，${scene}这事难道你自己就一点问题没有？`;
+  if (/情绪勒索/.test(type)) return `我都已经这样了，你还要拿${scene}这事一直逼我吗？`;
+  if (/讲道理/.test(type)) return `${scene}这件事我不是不认，但你也不能只看你自己的角度。`;
+  return `${scene}这事不能全怪我吧，你现在说得好像都是我的问题。`;
+}
+
+function buildCustomMainline(input) {
+  const scene = input.customScene;
+  const goal = input.userGoal || "让对方正面回应并给出具体做法";
+  return {
+    fact: `当前冲突是：${scene}`,
+    impact: "对方正在把具体问题转成你的态度或情绪，导致事情本身没有被处理。",
+    request: goal,
+    boundary: "不要再用“你太敏感”“你想太多”来代替正面回应。"
+  };
+}
+
+function buildCustomTraps(input) {
+  const traps = ["把具体行为说成你的情绪问题", "要求你自证是不是太计较"];
+  if (/阴阳/.test(input.opponentType)) traps.push("用反讽让你失控");
+  if (/偷换/.test(input.opponentType)) traps.push("把责任偷换成你也有问题");
+  if (/情绪勒索/.test(input.opponentType)) traps.push("用委屈压你放弃要求");
+  return traps;
 }
 
 function pickRequested(value, allowed) {

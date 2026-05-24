@@ -13,6 +13,7 @@ import { requestJsonFromAI } from "./openaiClient.mjs";
 import { extractPersonaProfile } from "./personaExtractorSkill.mjs";
 import { generatePersonaReply } from "./personaReplySkill.mjs";
 import { handleFeishuEvent, handleFeishuWebhookSend } from "./feishuBot.mjs";
+import { handleTrainingGameReply } from "./services/trainingGameService.mjs";
 import { generateRandomTrainingScenario } from "./services/trainingScenarioService.mjs";
 import { scoreTrainingReply } from "./services/trainingScoreService.mjs";
 
@@ -83,6 +84,16 @@ app.post("/api/training/score", async (request, response) => {
   } catch (error) {
     console.error("[training/score] failed:", error);
     handleEndpointError(response, error, "Training score failed");
+  }
+});
+
+app.post("/api/training/reply", async (request, response) => {
+  try {
+    const result = await handleTrainingGameReply(request.body);
+    response.json(result);
+  } catch (error) {
+    console.error("[training/reply] failed:", error);
+    handleEndpointError(response, error, "Training reply failed");
   }
 });
 

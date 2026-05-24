@@ -179,6 +179,8 @@ export function buildTrainingScorePrompt(input) {
 ${JSON.stringify(input, null, 2)}
 
 评分范围 0-100。risk 越高代表越容易失控或跑题。
+nextOpponentMessage 要根据 history 延续当前对话，禁止复读 history 里已经出现过的对方发言，禁止每轮都用同一种“没多大的事/你想让我怎么做”的模板。
+下一轮对方发言要像真实对话：承接用户刚才的话，换一种防御、甩锅、追问或软化方式推进冲突。
 参考技巧：
 ${formatTechniques(techniques)}
 

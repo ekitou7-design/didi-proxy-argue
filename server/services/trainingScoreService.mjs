@@ -38,7 +38,16 @@ export function normalizeTrainingScoreInput(input = {}) {
     round: Number(input.round || 1),
     mainline: input.mainline && typeof input.mainline === "object" ? input.mainline : {},
     traps: Array.isArray(input.traps) ? input.traps : [],
-    trainingFocus: Array.isArray(input.trainingFocus) ? input.trainingFocus : []
+    trainingFocus: Array.isArray(input.trainingFocus) ? input.trainingFocus : [],
+    history: Array.isArray(input.history)
+      ? input.history
+          .map((item) => ({
+            userReply: textOf(item?.userReply),
+            opponentMessage: textOf(item?.opponentMessage)
+          }))
+          .filter((item) => item.userReply || item.opponentMessage)
+          .slice(-6)
+      : []
   };
 }
 
@@ -175,13 +184,75 @@ function buildBetterReply(input, flags = {}, context = {}) {
 }
 
 function buildNextOpponentMessage(input, flags, context = {}) {
-  if (flags.hasInsult) return "你看，你现在就开始骂人了，那还有什么好沟通的？";
-  if (flags.hasBoundary) return context.boundaryPushback;
-  if (flags.hasEvidence) return context.evidencePushback;
-  if (/客户|工作|职场|项目/.test(`${input.scenario} ${input.opponentMessage}`)) {
-    return "那你现在说这些也没用啊，事情已经这样了，别什么都算我头上。";
+  const scenarioText = `${input.scenario} ${input.opponentMessage} ${input.opponentType} ${context.sceneLabel || ""}`;
+  const used = new Set((input.history || []).map((item) => item.opponentMessage).filter(Boolean));
+  const pools = [];
+
+  if (flags.hasInsult) {
+    pools.push([
+      "你看，你现在就开始骂人了，那还有什么好沟通的？",
+      "你一急就开始攻击人，这事还能讲清楚吗？",
+      "你先把情绪收一收吧，不然说什么都没意义。"
+    ]);
   }
-  return context.defaultPushback;
+  if (flags.hasBoundary) {
+    pools.push([
+      context.boundaryPushback,
+      "你一直说边界，那你具体要我怎么补救？",
+      "我也不是不听，但你别把话说得像我故意的一样。"
+    ]);
+  }
+  if (flags.hasEvidence) {
+    pools.push([
+      context.evidencePushback,
+      "你非要我一条条列出来，这不就是在钻字眼吗？",
+      "你现在抓证据，那我的感受就不算了吗？"
+    ]);
+  }
+  if (/客户|客服|售后|退款|商家|规则/.test(scenarioText)) {
+    pools.push([
+      context.defaultPushback,
+      "规则就是这样，我也只能按流程处理，你一直说也没用。",
+      "你要是觉得不满意可以继续投诉，但现在我这边就是这个结果。",
+      "我们不是不给你处理，是你这个情况确实不符合条件。"
+    ]);
+  }
+  if (/工作|职场|项目|同事|小组|交付|延期/.test(scenarioText)) {
+    pools.push([
+      context.defaultPushback,
+      "那你现在说这些也没用啊，事情已经这样了，别什么都算我头上。",
+      "项目又不是我一个人的，你别把责任都推给我。",
+      "你要早说标准这么高，我一开始就不会这么做。"
+    ]);
+  }
+  if (/情侣|男友|女友|对象|冷战|约|敏感|亲密关系/.test(scenarioText)) {
+    pools.push([
+      context.defaultPushback,
+      "本来没多大的事，你现在这样一说反而显得我好像多过分一样。",
+      "我不是不在乎你，但你每次都这样追着说，我也会累。",
+      "我都解释了，你还要一直抓着这个点不放吗？"
+    ]);
+  }
+  if (/室友|宿舍|合租|卫生|公共/.test(scenarioText)) {
+    pools.push([
+      context.defaultPushback,
+      "宿舍又不是我一个人的，你也别说得好像全是我的问题。",
+      "我不是不做，只是今天确实没顾上，你没必要这么上纲上线。",
+      "你提醒可以，但别每次都像在审我一样。"
+    ]);
+  }
+
+  pools.push([
+    context.defaultPushback,
+    "我不是这个意思，你别老把话往最严重的方向理解。",
+    "那你说这么多，最后不还是觉得全是我的问题吗？",
+    "你现在这样逼我表态，我反而不知道该怎么接了。"
+  ]);
+
+  const options = pools.flat().map(textOf).filter(Boolean);
+  const offset = ((input.round || 1) + stableJitter(`${input.userReply} ${input.opponentMessage}`)) % options.length;
+  const ordered = [...options.slice(offset), ...options.slice(0, offset)];
+  return ordered.find((item) => !used.has(item) && item !== input.opponentMessage) || ordered[0];
 }
 
 function analyzeTrainingContext(input = {}, userReply = "") {

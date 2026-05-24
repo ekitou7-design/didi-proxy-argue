@@ -1426,6 +1426,24 @@ textarea:focus {
   grid-template-rows: minmax(112px, auto) minmax(0, 1fr) auto;
 }
 
+.training-game-page {
+  min-height: 100%;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.training-idle-page,
+.training-finished-page {
+  align-content: start;
+  padding-bottom: 140px;
+}
+
+.training-finished-page {
+  min-height: auto;
+}
+}
+
 .realtime-settings-card,
 .realtime-input-bar,
 .persona-header-card,
@@ -1680,6 +1698,138 @@ textarea:focus {
 
 .training-settings-card {
   background: var(--green);
+}
+
+.training-setup-card {
+  max-height: none;
+}
+
+.training-setup-grid {
+  margin-top: 10px;
+}
+
+.training-start-panel,
+.training-review-card,
+.training-review-detail,
+.training-review-actions {
+  padding: 12px;
+  background: var(--white);
+  border: var(--line);
+  border-radius: 18px;
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+.training-start-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.training-start-panel p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+  font-weight: 900;
+}
+
+.training-hud {
+  max-height: none;
+}
+
+.training-hud-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.training-hud h2,
+.training-review-card h2 {
+  margin: 6px 0 0;
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+.training-hud p,
+.training-review-card p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  line-height: 1.35;
+  font-weight: 900;
+}
+
+.training-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 1000;
+}
+
+.training-persuasion-track {
+  height: 14px;
+  margin-top: 7px;
+  overflow: hidden;
+  background: var(--white);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+}
+
+.training-persuasion-track i {
+  display: block;
+  height: 100%;
+  background: var(--red);
+  border-right: 2px solid var(--ink);
+}
+
+.training-round-feedback {
+  display: grid;
+  gap: 3px;
+  margin-top: 9px;
+  padding: 8px;
+  background: var(--white);
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.training-round-feedback span {
+  margin: 0;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.training-review-card.result-win {
+  background: var(--green);
+}
+
+.training-review-card.result-draw {
+  background: var(--yellow);
+}
+
+.training-review-card.result-lose {
+  background: var(--pink);
+}
+
+.training-review-detail {
+  display: grid;
+  gap: 10px;
+  background: var(--paper);
+}
+
+.training-review-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.training-back-button {
+  justify-self: start;
+  background: var(--white);
 }
 
 .training-start-bar p {

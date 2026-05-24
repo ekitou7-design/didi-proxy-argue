@@ -161,8 +161,17 @@ export const initialPersonaSession = {
 export const initialTrainingSession = {
   type: "吵架训练",
   step: "setup",
+  gameState: "idle",
   scene: "男朋友临时改约还说我太敏感",
   difficulty: "普通",
+  goal: "守住主线，不被对方带偏",
+  maxRounds: 5,
+  persuasionScore: 0,
+  persuasionDelta: 0,
+  opponentState: "strong",
+  review: null,
+  result: "",
+  offTrackStreak: 0,
   randomScenarioForm: {
     category: "随机",
     difficulty: "随机",
@@ -174,6 +183,7 @@ export const initialTrainingSession = {
   scenarioMessage: "",
   round: 1,
   opponent: "",
+  messages: [],
   input: "",
   isSubmitting: false,
   feedbacks: []
