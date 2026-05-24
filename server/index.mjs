@@ -14,7 +14,7 @@ import { extractPersonaProfile } from "./personaExtractorSkill.mjs";
 import { generatePersonaReply } from "./personaReplySkill.mjs";
 import { handleFeishuEvent, handleFeishuWebhookSend } from "./feishuBot.mjs";
 import { handleTrainingGameReply } from "./services/trainingGameService.mjs";
-import { generateRandomTrainingScenario } from "./services/trainingScenarioService.mjs";
+import { generatePresetTrainingScenario, generateRandomTrainingScenario } from "./services/trainingScenarioService.mjs";
 import { scoreTrainingReply } from "./services/trainingScoreService.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -104,6 +104,16 @@ app.post("/api/training/scenario/random", async (request, response) => {
   } catch (error) {
     console.error("[training/scenario/random] failed:", error);
     handleEndpointError(response, error, "Random training scenario generation failed");
+  }
+});
+
+app.post("/api/training/scenario/preset", async (request, response) => {
+  try {
+    const result = await generatePresetTrainingScenario(request.body);
+    response.json(result);
+  } catch (error) {
+    console.error("[training/scenario/preset] failed:", error);
+    handleEndpointError(response, error, "Preset training scenario generation failed");
   }
 });
 

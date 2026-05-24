@@ -1803,6 +1803,19 @@ textarea:focus {
   border-radius: 0;
 }
 
+.training-round-feedback strong {
+  font-size: 13px;
+}
+
+.training-feedback-line {
+  margin: 2px 0 0;
+  color: var(--ink);
+}
+
+.training-feedback-line b {
+  margin-right: 6px;
+}
+
 .training-review-card.result-win {
   background: var(--green);
 }
@@ -1819,6 +1832,20 @@ textarea:focus {
   display: grid;
   gap: 10px;
   background: var(--paper);
+}
+
+.training-finished-transcript {
+  display: grid;
+  gap: 10px;
+}
+
+.training-finished-transcript h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.training-finished-transcript .training-dialog-panel {
+  min-height: 260px;
 }
 
 .training-review-actions {

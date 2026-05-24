@@ -9,13 +9,29 @@ const opponentTypes = ["讲道理型", "嘴硬型", "阴阳怪气型", "偷换�
 export async function generateRandomTrainingScenario(input = {}) {
   const normalizedInput = normalizeScenarioInput(input);
 
-  if (!process.env.OPENAI_API_KEY) {
+  if (!process.env.DEEPSEEK_API_KEY && !process.env.OPENAI_API_KEY) {
     return { scenario: mockGenerateRandomTrainingScenario(normalizedInput) };
   }
 
   const result = await requestJsonFromAI({
     ...buildRandomTrainingScenarioPrompt(normalizedInput),
     temperature: 0.75,
+    maxCompletionTokens: 1800
+  });
+
+  return { scenario: normalizeScenario(result?.scenario || result, normalizedInput) };
+}
+
+export async function generatePresetTrainingScenario(input = {}) {
+  const normalizedInput = normalizeScenarioInput(input);
+
+  if (!process.env.DEEPSEEK_API_KEY && !process.env.OPENAI_API_KEY) {
+    return { scenario: mockGenerateRandomTrainingScenario(normalizedInput) };
+  }
+
+  const result = await requestJsonFromAI({
+    ...buildRandomTrainingScenarioPrompt(normalizedInput),
+    temperature: 0.45,
     maxCompletionTokens: 1800
   });
 
@@ -85,16 +101,21 @@ export function normalizeScenario(scenario, input = {}) {
   const opponentProfile = scenario.opponentProfile && typeof scenario.opponentProfile === "object" ? scenario.opponentProfile : {};
   const mainline = scenario.mainline && typeof scenario.mainline === "object" ? scenario.mainline : {};
   const scoreFocus = scenario.scoreFocus && typeof scenario.scoreFocus === "object" ? scenario.scoreFocus : {};
+  const category = textOf(scenario.category) || pickRequested(input.category, categories);
+  const difficulty = textOf(scenario.difficulty) || pickRequested(input.difficulty, difficulties);
+  const opponentType = textOf(opponentProfile.type) || pickRequested(input.opponentType, opponentTypes);
+  const traps = arrayOfText(scenario.traps);
+  const trainingFocus = arrayOfText(scenario.trainingFocus);
 
   return {
     id: textOf(scenario.id) || `scenario_${Date.now()}`,
     title: textOf(scenario.title) || "随机吵架训练场景",
-    category: textOf(scenario.category) || pickRequested(input.category, categories),
-    difficulty: textOf(scenario.difficulty) || pickRequested(input.difficulty, difficulties),
+    category,
+    difficulty,
     relationship: textOf(scenario.relationship) || "日常关系",
     background: textOf(scenario.background) || "一次具体冲突已经发生，对方试图把重点从事情本身转移到你的态度。",
     opponentProfile: {
-      type: textOf(opponentProfile.type) || pickRequested(input.opponentType, opponentTypes),
+      type: opponentType,
       personality: textOf(opponentProfile.personality) || "会为自己辩解，也会试图转移重点。",
       tactics: arrayOfText(opponentProfile.tactics)
     },
@@ -107,17 +128,17 @@ export function normalizeScenario(scenario, input = {}) {
       request: textOf(mainline.request),
       boundary: textOf(mainline.boundary)
     },
-    traps: arrayOfText(scenario.traps),
-    trainingFocus: arrayOfText(scenario.trainingFocus),
+    traps: traps.length ? traps : fallbackTraps(opponentType),
+    trainingFocus: trainingFocus.length ? trainingFocus : fallbackTrainingFocus(category, difficulty),
     scoreFocus: {
-      logic: textOf(scoreFocus.logic),
-      power: textOf(scoreFocus.power),
-      boundary: textOf(scoreFocus.boundary),
-      mainline: textOf(scoreFocus.mainline),
-      risk: textOf(scoreFocus.risk)
+      logic: textOf(scoreFocus.logic) || "是否围绕事实和责任说话，而不是被对方带去解释情绪。",
+      power: textOf(scoreFocus.power) || "是否短句清楚、有压迫感，但不升级成人身攻击。",
+      boundary: textOf(scoreFocus.boundary) || "是否明确说出不接受什么，以及下一步要求。",
+      mainline: textOf(scoreFocus.mainline) || "是否持续守住本局真正要解决的问题。",
+      risk: textOf(scoreFocus.risk) || "是否避免辱骂、威胁、现实报复或过度扩大冲突。"
     },
     suggestedFirstReplyHint: textOf(scenario.suggestedFirstReplyHint) || "先复述事实，再指出对方正在转移重点。",
-    createdAt: textOf(scenario.createdAt) || now
+    createdAt: now
   };
 }
 
@@ -331,6 +352,24 @@ function buildCustomTraps(input) {
   if (/偷换/.test(input.opponentType)) traps.push("把责任偷换成你也有问题");
   if (/情绪勒索/.test(input.opponentType)) traps.push("用委屈压你放弃要求");
   return traps;
+}
+
+function fallbackTraps(opponentType) {
+  const traps = ["把具体行为说成你的情绪问题", "要求你自证是不是太计较", "用一句反问把责任推回你身上"];
+  if (/阴阳/.test(opponentType)) traps.push("用反讽激你失控");
+  if (/嘴硬/.test(opponentType)) traps.push("明明有记录也继续否认");
+  if (/偷换/.test(opponentType)) traps.push("把原问题偷换成你的态度问题");
+  if (/情绪勒索/.test(opponentType)) traps.push("用委屈让你放弃要求");
+  return traps;
+}
+
+function fallbackTrainingFocus(category, difficulty) {
+  return [
+    `围绕${category || "当前场景"}里的具体事实发言`,
+    "识别对方转移重点的话术",
+    "提出清楚、可执行的下一步要求",
+    difficulty === "王者" ? "在高压话术下保持主线不散" : "不为了缓和气氛放弃边界"
+  ];
 }
 
 function pickRequested(value, allowed) {

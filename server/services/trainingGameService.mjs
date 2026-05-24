@@ -20,12 +20,12 @@ export async function handleTrainingGameReply(input = {}) {
     throw error;
   }
 
-  if (process.env.OPENAI_API_KEY) {
+  if (process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY) {
     try {
       const result = await requestJsonFromAI({
         ...buildTrainingGamePrompt(normalizedInput),
-        temperature: 0.35,
-        maxCompletionTokens: 1200
+        temperature: 0.62,
+        maxCompletionTokens: 1600
       });
       return normalizeAiTrainingGameResult(result, normalizedInput);
     } catch (error) {
@@ -62,6 +62,7 @@ export function normalizeTrainingGameInput(input = {}) {
 
 function localTrainingGameReply(input, userReply) {
   const evaluation = evaluateReply(input, userReply);
+  const roundScore = buildRoundScore(input, userReply, evaluation);
   const nextScore = clampNumber(input.persuasionScore + evaluation.delta, 0, 100);
   const offTrackStreak = evaluation.seriousOffTrack ? input.offTrackStreak + 1 : 0;
   const opponentState = getOpponentState(nextScore);
@@ -75,6 +76,7 @@ function localTrainingGameReply(input, userReply) {
       persuasionScore: nextScore,
       opponentState,
       offTrackStreak,
+      roundScore,
       forcedLose: offTrackStreak >= 2
     });
   }
@@ -87,6 +89,7 @@ function localTrainingGameReply(input, userReply) {
     persuasionScore: nextScore,
     persuasionDelta: evaluation.delta,
     feedback: evaluation.feedback,
+    roundScore,
     opponentState,
     offTrackStreak,
     review: null
@@ -121,7 +124,12 @@ function evaluateReply(input, userReply) {
   const delta = clampNumber(raw - difficultyPenalty, -20, 35);
   const seriousOffTrack = hasInsult || (!hasMainline && !responds) || (tooShort && !hasBoundary);
   const feedback = buildFeedback(delta, { hasMainline, responds, hasBoundary, clearLogic, concise, hasInsult, countersTactic });
-  return { delta, feedback, seriousOffTrack };
+  return {
+    delta,
+    feedback,
+    seriousOffTrack,
+    flags: { hasMainline, responds, hasBoundary, clearLogic, concise, hasInsult, countersTactic, tooLong, tooShort }
+  };
 }
 
 function finishGame(input, persuasionDelta, feedback, assistantMessage, override = {}) {
@@ -138,6 +146,7 @@ function finishGame(input, persuasionDelta, feedback, assistantMessage, override
     persuasionScore,
     persuasionDelta,
     feedback,
+    roundScore: override.roundScore || null,
     opponentState,
     offTrackStreak: override.offTrackStreak ?? input.offTrackStreak,
     review
@@ -181,6 +190,7 @@ function buildTrainingGamePrompt(input) {
 你要判断用户回复、更新 persuasionScore，并决定继续还是结束。
 禁止威胁、歧视、隐私曝光、严重人身攻击、违法内容。
 复盘短、准、像教练，不要鸡汤。
+对手回复要贴合场景和上一轮用户原话，允许 1-2 句，有具体反击点；不要每次都用“我不是故意的”“你别说得这么严重”这类模板句。
 `,
     user: `
 输入：
@@ -209,6 +219,21 @@ opponentState：
   "persuasionScore": 0,
   "persuasionDelta": 0,
   "feedback": "",
+  "roundScore": {
+    "scores": {
+      "logic": 0,
+      "power": 0,
+      "boundary": 0,
+      "mainline": 0,
+      "risk": 0,
+      "winRate": 0
+    },
+    "overallScore": 0,
+    "advantages": "",
+    "weaknesses": "",
+    "suggestion": "",
+    "betterReply": ""
+  },
   "opponentState": "strong | wavering | defensive | nearly_convinced | convinced",
   "offTrackStreak": 0,
   "review": null
@@ -250,6 +275,7 @@ function normalizeAiTrainingGameResult(result, input) {
       persuasionScore,
       persuasionDelta,
       feedback: textOf(result.feedback) || localFallback.feedback,
+      roundScore: normalizeRoundScore(result.roundScore, localFallback.roundScore),
       opponentState,
       offTrackStreak: clampNumber(result.offTrackStreak, 0, 10),
       review: normalizeReview(result.review, input, persuasionScore)
@@ -264,6 +290,7 @@ function normalizeAiTrainingGameResult(result, input) {
     persuasionScore,
     persuasionDelta,
     feedback: textOf(result.feedback) || localFallback.feedback,
+    roundScore: normalizeRoundScore(result.roundScore, localFallback.roundScore),
     opponentState,
     offTrackStreak: clampNumber(result.offTrackStreak, 0, 10),
     review: null
@@ -289,12 +316,115 @@ function normalizeReview(review, input, persuasionScore) {
   };
 }
 
+function normalizeRoundScore(roundScore, fallback) {
+  if (!roundScore || typeof roundScore !== "object" || Array.isArray(roundScore)) return fallback || null;
+  const scores = roundScore.scores && typeof roundScore.scores === "object" ? roundScore.scores : {};
+  const fallbackScores = fallback?.scores || {};
+  return {
+    scores: {
+      logic: clampNumber(scores.logic ?? fallbackScores.logic, 0, 100),
+      power: clampNumber(scores.power ?? fallbackScores.power, 0, 100),
+      boundary: clampNumber(scores.boundary ?? fallbackScores.boundary, 0, 100),
+      mainline: clampNumber(scores.mainline ?? fallbackScores.mainline, 0, 100),
+      risk: clampNumber(scores.risk ?? fallbackScores.risk, 0, 100),
+      winRate: clampNumber(scores.winRate ?? fallbackScores.winRate, 0, 100)
+    },
+    overallScore: clampNumber(roundScore.overallScore ?? fallback?.overallScore, 0, 100),
+    advantages: textOf(roundScore.advantages) || fallback?.advantages || "",
+    weaknesses: textOf(roundScore.weaknesses) || fallback?.weaknesses || "",
+    suggestion: textOf(roundScore.suggestion) || fallback?.suggestion || "",
+    betterReply: textOf(roundScore.betterReply) || fallback?.betterReply || ""
+  };
+}
+
+function buildRoundScore(input, userReply, evaluation) {
+  const flags = evaluation.flags || {};
+  const scores = {
+    logic: clampNumber((flags.hasMainline ? 76 : 45) + (flags.clearLogic ? 12 : 0) + (flags.tooLong ? -8 : 0), 0, 100),
+    power: clampNumber(56 + Math.max(evaluation.delta, -10) + (flags.concise ? 12 : 0) + (flags.hasInsult ? -15 : 0), 0, 100),
+    boundary: clampNumber(flags.hasBoundary ? 82 : flags.hasMainline ? 58 : 38, 0, 100),
+    mainline: clampNumber(flags.hasMainline ? 82 : flags.responds ? 55 : 32, 0, 100),
+    risk: clampNumber(flags.hasInsult ? 88 : flags.tooLong ? 46 : flags.tooShort ? 52 : 24, 0, 100),
+    winRate: 0
+  };
+  scores.winRate = clampNumber(Math.round((scores.logic + scores.power + scores.boundary + scores.mainline + (100 - scores.risk)) / 5), 0, 100);
+  return {
+    scores,
+    overallScore: scores.winRate,
+    advantages: buildRoundAdvantages(flags),
+    weaknesses: buildRoundWeaknesses(flags),
+    suggestion: buildRoundSuggestion(input, flags),
+    betterReply: buildBetterReply(input, userReply)
+  };
+}
+
+function buildRoundAdvantages(flags) {
+  if (flags.hasInsult) return "情绪强度出来了，但有效攻击点被削弱了。";
+  if (flags.hasMainline && flags.hasBoundary && flags.countersTactic) return "你抓住主线、设了边界，也点破了对方的话术。";
+  if (flags.hasMainline && flags.hasBoundary) return "你没有被对方带偏，核心问题和边界都比较清楚。";
+  if (flags.hasMainline) return "你抓到了事情本身，开始把争论从情绪拉回责任。";
+  if (flags.responds) return "你接住了对方上一句，没有完全另起炉灶。";
+  return "你有回应意愿，但还需要更明确地抓住问题。";
+}
+
+function buildRoundWeaknesses(flags) {
+  if (flags.hasInsult) return "辱骂会让对方抓住“你失控”反打，事实和诉求都会被盖住。";
+  if (flags.tooShort) return "句子太短，事实、影响、要求都没展开，对方容易继续打太极。";
+  if (flags.tooLong) return "信息太多，攻击点分散，对方可以挑一句继续绕。";
+  if (!flags.hasBoundary && !flags.hasMainline) return "主线和边界都不够明确，容易被拖进解释情绪。";
+  if (!flags.hasBoundary) return "还缺一句明确边界：你不接受什么，对方接下来要怎么做。";
+  if (!flags.countersTactic) return "可以点破对方正在转移重点，不要只顺着内容辩。";
+  return "可以再压短一点，让事实、影响、要求更集中。";
+}
+
+function buildRoundSuggestion(input, flags) {
+  const request = textOf(input.mainline?.request) || input.goal || "给出具体处理方式";
+  if (flags.hasInsult) return "先删掉骂人的部分，再用事实和要求压回去。";
+  if (!flags.hasBoundary) return `补一句边界和要求，比如“我不接受你把问题转成我的态度，请你现在${request}”。`;
+  if (!flags.countersTactic) return "加一句“你现在是在转移重点”，再回到事实。";
+  return "下一句继续短句推进，不要扩大战场。";
+}
+
 function buildOpponentMessage(input, score, state) {
+  const contextual = buildContextualOpponentMessage(input, state);
+  if (contextual) return contextual;
+
   const sceneText = `${input.scene} ${input.goal}`;
   const pools = opponentPoolsForDifficulty(input.difficulty);
   const source = pools[state] || pools.strong;
   const offset = stableIndex(`${input.round}-${score}-${sceneText}`, source.length);
   return source[offset];
+}
+
+function buildContextualOpponentMessage(input, state) {
+  const lastUser = latestUserReply(input.messages);
+  const hook = extractReplyHook(lastUser);
+  const scene = `${input.scene} ${input.goal}`;
+  const isWork = /工作|职场|同事|项目|材料|客户|任务/.test(scene);
+  const isRelationship = /男朋友|女朋友|对象|恋爱|冷战|消息|约/.test(scene);
+  const isRoommate = /室友|宿舍|卫生|垃圾|公共/.test(scene);
+  const isMoney = /朋友|借钱|还钱|转账/.test(scene);
+
+  if (!lastUser) return "";
+  if (state === "nearly_convinced" || state === "defensive") {
+    if (isWork) return `行，你说的时间线我听到了，但你也不能把流程里所有漏洞都算我一个人的吧？${hook ? `你刚才说“${hook}”，这个我可以补。` : ""}`;
+    if (isRelationship) return `我承认这次让你不舒服了，但你别把它上升成我完全不尊重你。${hook ? `你说“${hook}”，这点我会想。` : ""}`;
+    if (isRoommate) return `好，我这次可以处理，但你别搞得像我故意破坏宿舍规则一样。`;
+    if (isMoney) return `我知道钱该还，但你这样说我压力也很大。你要我给时间，我可以给。`;
+    return `行，你这个点我听到了，但我不接受你把我说成完全没责任心。`;
+  }
+
+  if (isWork) return `你说${hook ? `“${hook}”` : "这些"}听起来很有道理，但当时情况那么乱，你也不能说我就是故意甩锅吧？`;
+  if (isRelationship) return `你现在抓着${hook ? `“${hook}”` : "这个点"}不放，可我也不是故意让你难受的，你能不能别先把我定性？`;
+  if (isRoommate) return `你说规则可以，但你这个语气就像在审我。${hook ? `“${hook}”这话听着也挺冲的。` : ""}`;
+  if (isMoney) return `你一直讲还钱计划，我不是不还，只是你这样催真的让我觉得这段关系只剩钱了。`;
+  return `你说${hook ? `“${hook}”` : "这些"}，但我觉得你还是把事情说得太绝对了。`;
+}
+
+function extractReplyHook(text) {
+  const clean = textOf(text).replace(/\s+/g, "");
+  if (!clean) return "";
+  return clean.length > 16 ? `${clean.slice(0, 16)}...` : clean;
 }
 
 function opponentPoolsForDifficulty(difficulty) {

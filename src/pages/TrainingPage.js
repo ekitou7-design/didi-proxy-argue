@@ -32,10 +32,10 @@ function TrainingIdlePage(session) {
           ${SelectField("对手人设", "training.randomScenarioForm.opponentType", opponentTypes, session.randomScenarioForm?.opponentType)}
           ${SelectField("训练强度", "training.difficulty", difficultyOptions, session.difficulty)}
           ${SmallField("前情提要", "training.scene", session.scene, "也可以自己输入想练的场景。", "wide")}
-          ${SmallField("训练目标", "training.goal", scenario?.userGoal || session.goal, "例如：不被带偏、强硬拒绝、表达边界", "wide")}
+          ${SmallField("训练目标", "training.goal", session.goal || scenario?.userGoal, "例如：不被带偏、强硬拒绝、表达边界", "wide")}
         </div>
         <button class="secondary-button warm compact-full-button" data-action="confirm-training-scenario" ${session.scenarioStatus === "loading" ? "disabled" : ""}>
-          ${session.scenarioStatus === "loading" ? "确认中..." : "确认场景"}
+          ${session.scenarioStatus === "loading" ? "生成中..." : "按当前设置生成场景"}
         </button>
       </section>
       <section class="training-start-panel">
@@ -107,11 +107,41 @@ function MessageBubble(message, feedbacks, index) {
 
 function RoundFeedback(item) {
   const delta = Number(item.persuasionDelta || 0);
+  const roundScore = item.roundScore || {};
+  const scores = roundScore.scores || {};
   return `
     <div class="training-round-feedback">
       <b>本轮 ${delta >= 0 ? `+${delta}` : delta}</b>
       <span>${escapeHtml(item.feedback || "本轮已记录。")}</span>
+      ${roundScore.overallScore != null ? `<strong>综合评分：${clampScore(roundScore.overallScore)}</strong>` : ""}
+      ${ScoreRow("逻辑", scores.logic)}
+      ${ScoreRow("气势", scores.power)}
+      ${ScoreRow("边界", scores.boundary)}
+      ${ScoreRow("主线", scores.mainline)}
+      ${ScoreRow("风险", scores.risk, "danger-score")}
+      ${FeedbackText("优点", roundScore.advantages)}
+      ${FeedbackText("建议", roundScore.suggestion || roundScore.weaknesses)}
+      ${FeedbackText("优化版", roundScore.betterReply)}
     </div>
+  `;
+}
+
+function ScoreRow(label, value, className = "") {
+  if (value == null || value === "") return "";
+  const score = clampScore(value);
+  return `
+    <div class="score-row ${className}">
+      <span>${escapeHtml(label)}</span>
+      <div class="score-track"><i style="width:${score}%"></i></div>
+      <b>${score}</b>
+    </div>
+  `;
+}
+
+function FeedbackText(title, text) {
+  if (!text) return "";
+  return `
+    <p class="training-feedback-line"><b>${escapeHtml(title)}</b>${escapeHtml(text)}</p>
   `;
 }
 
@@ -149,6 +179,11 @@ function TrainingFinishedPage(session) {
         ${ReviewList("问题", review.problems)}
         ${ReviewBlock("更好的回复", review.betterReply)}
         ${ReviewBlock("下一轮建议", review.nextAdvice)}
+      </section>
+
+      <section class="training-finished-transcript">
+        <h3>本局对话</h3>
+        ${TrainingChatPanel(session)}
       </section>
 
       <section class="training-review-actions">

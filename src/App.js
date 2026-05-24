@@ -227,7 +227,7 @@ export default class App {
       return;
     }
     if (action === "confirm-training-scenario") {
-      await this.generateRandomTrainingScenario();
+      await this.generatePresetTrainingScenario();
       return;
     }
     if (action === "go-persona-distill") {
@@ -506,7 +506,8 @@ export default class App {
       offTrackStreak: 0,
       round: 1,
       scenarioStatus: "idle",
-      scenarioMessage: "设置已修改，点击确认场景后再开始训练。"
+      scenarioMessage: "设置已修改，点击确认场景后再开始训练。",
+      scenarioRequestId: ""
     };
 
     if (render) this.setState({ training: updatedTraining });
@@ -794,38 +795,11 @@ export default class App {
     });
 
     try {
-      const result = await postJson("/api/training/scenario/random", {
-        ...(training.randomScenarioForm || {}),
-        customScene: training.scene,
-        userGoal: training.goal || training.randomScenarioForm?.userGoal || ""
-      });
+      const result = await postJson("/api/training/scenario/random", {});
       const scenario = result.scenario;
       if (!scenario?.openingMessage) throw new Error("场景生成结果为空");
 
-      this.setState({
-        training: {
-          ...this.state.training,
-          gameState: "idle",
-          step: "setup",
-          scene: scenario.title || scenario.background,
-          difficulty: scenario.difficulty || this.state.training.difficulty,
-          goal: scenario.userGoal || this.state.training.randomScenarioForm?.userGoal || this.state.training.goal,
-          maxRounds: maxRoundsForDifficulty(scenario.difficulty || this.state.training.difficulty),
-          opponent: scenario.openingMessage,
-          generatedScenario: scenario,
-          messages: [],
-          feedbacks: [],
-          review: null,
-          result: "",
-          round: 1,
-          persuasionScore: 0,
-          persuasionDelta: 0,
-          opponentState: "strong",
-          offTrackStreak: 0,
-          scenarioStatus: "done",
-          scenarioMessage: "场景已生成，可以开始这一局。"
-        }
-      });
+      this.applyGeneratedTrainingScenario(scenario, "随机场景已生成，可以开始这一局。");
     } catch (error) {
       this.setState({
         training: {
@@ -835,6 +809,65 @@ export default class App {
         }
       });
     }
+  }
+
+  async generatePresetTrainingScenario() {
+    const training = this.state.training;
+    if (training.scenarioStatus === "loading") return;
+    const request = {
+      ...(training.randomScenarioForm || {}),
+      customScene: training.scene,
+      userGoal: training.goal || training.randomScenarioForm?.userGoal || ""
+    };
+    const requestId = `preset_${Date.now()}`;
+    const draftScenario = buildPresetScenarioDraft(request);
+
+    this.applyGeneratedTrainingScenario(draftScenario, "已先按当前设置生成场景，正在用 API 精修...", "loading", requestId);
+
+    try {
+      const result = await postJson("/api/training/scenario/preset", request);
+      const scenario = result.scenario;
+      if (!scenario?.openingMessage) throw new Error("场景生成结果为空");
+      if (this.state.training.scenarioRequestId !== requestId || this.state.training.gameState !== "idle") return;
+
+      this.applyGeneratedTrainingScenario(scenario, "已按当前设置生成场景，可以开始这一局。");
+    } catch (error) {
+      if (this.state.training.scenarioRequestId !== requestId || this.state.training.gameState !== "idle") return;
+      this.setState({
+        training: {
+          ...this.state.training,
+          scenarioStatus: "done",
+          scenarioMessage: `API 精修较慢或失败，已保留当前设置生成的场景。${error.message ? `（${error.message}）` : ""}`
+        }
+      });
+    }
+  }
+
+  applyGeneratedTrainingScenario(scenario, scenarioMessage, scenarioStatus = "done", scenarioRequestId = "") {
+    this.setState({
+      training: {
+        ...this.state.training,
+        gameState: "idle",
+        step: "setup",
+        difficulty: scenario.difficulty || this.state.training.difficulty,
+        goal: scenario.userGoal || this.state.training.randomScenarioForm?.userGoal || this.state.training.goal,
+        maxRounds: maxRoundsForDifficulty(scenario.difficulty || this.state.training.difficulty),
+        opponent: scenario.openingMessage,
+        generatedScenario: scenario,
+        messages: [],
+        feedbacks: [],
+        review: null,
+        result: "",
+        round: 1,
+        persuasionScore: 0,
+        persuasionDelta: 0,
+        opponentState: "strong",
+        offTrackStreak: 0,
+        scenarioStatus,
+        scenarioMessage,
+        scenarioRequestId: scenarioRequestId || this.state.training.scenarioRequestId || ""
+      }
+    });
   }
 
   startTrainingGame() {
@@ -893,7 +926,8 @@ export default class App {
         opponent: "",
         messages: [],
         feedbacks: [],
-        scenarioMessage: ""
+        scenarioMessage: "",
+        scenarioRequestId: ""
       }
     });
   }
@@ -964,6 +998,7 @@ export default class App {
             persuasionDelta: result.persuasionDelta || 0,
             persuasionScore: result.persuasionScore || 0,
             feedback: result.feedback || "",
+            roundScore: result.roundScore || null,
             opponentState: result.opponentState || "strong"
           }
         : null;
@@ -1285,6 +1320,110 @@ function maxRoundsForDifficulty(difficulty) {
   if (/青铜|easy|简单|低/.test(text)) return 4;
   if (/黄金|王者|hard|困难|高/.test(text)) return 6;
   return 5;
+}
+
+function buildPresetScenarioDraft(input = {}) {
+  const category = pickSetupValue(input.category, "自定义场景");
+  const difficulty = pickSetupValue(input.difficulty, "普通");
+  const opponentType = pickSetupValue(input.opponentType, "嘴硬型");
+  const customScene = String(input.customScene || "").trim();
+  const userGoal = String(input.userGoal || "").trim() || "守住主线，让对方正面回应并给出具体做法。";
+  const title = customScene || `${category}里的${opponentType}训练`;
+  const mainline = buildPresetMainline({ category, customScene, userGoal });
+
+  return {
+    id: `preset_draft_${Date.now()}`,
+    title,
+    category,
+    difficulty,
+    relationship: relationshipForCategory(category),
+    background: buildPresetBackground({ category, difficulty, opponentType, customScene, userGoal }),
+    opponentProfile: {
+      type: opponentType,
+      personality: personalityForOpponentType(opponentType),
+      tactics: tacticsForOpponentType(opponentType)
+    },
+    openingMessage: openingForOpponentType({ opponentType, customScene, category }),
+    userGoal,
+    realMainline: `这局要守住的是：${mainline.fact}。不要被对方带去解释态度、情绪或人品。`,
+    mainline,
+    traps: trapsForOpponentType(opponentType),
+    trainingFocus: [
+      "先说事实，不急着解释自己",
+      "点出对方正在转移重点",
+      "提出明确、可执行的下一步要求",
+      difficulty === "王者" ? "在对方高压反问下继续守住主线" : "不为了缓和气氛放弃边界"
+    ],
+    scoreFocus: {
+      logic: "是否围绕事实和责任说话。",
+      power: "是否短句清楚、有压迫感。",
+      boundary: "是否说清不接受什么。",
+      mainline: "是否持续守住本局核心问题。",
+      risk: "是否避免辱骂、人身攻击或现实威胁。"
+    },
+    suggestedFirstReplyHint: "先别解释你是不是太计较，直接把话拉回具体事实和要求。",
+    createdAt: new Date().toISOString()
+  };
+}
+
+function pickSetupValue(value, fallback) {
+  const text = String(value || "").trim();
+  return !text || text === "随机" ? fallback : text;
+}
+
+function buildPresetMainline({ category, customScene, userGoal }) {
+  const scene = customScene || category || "这件事";
+  return {
+    fact: `当前冲突是：${scene}`,
+    impact: "对方正在把具体问题转成你的态度或情绪，导致事情本身没有被处理。",
+    request: userGoal || "让对方正面回应，并给出具体处理方式。",
+    boundary: "不要再用“你太敏感”“你想太多”或反问来代替正面回应。"
+  };
+}
+
+function buildPresetBackground({ category, difficulty, opponentType, customScene, userGoal }) {
+  const scene = customScene || `一场${category}冲突`;
+  return `${scene}。本局难度：${difficulty}；对手人设：${opponentType}。你的训练目标是：${userGoal}。对方会尝试把问题从事实和责任转成你的态度、情绪或沟通方式。`;
+}
+
+function relationshipForCategory(category) {
+  if (/职场|工作|同事/.test(category)) return "同事";
+  if (/情侣|冷战|恋爱/.test(category)) return "亲密关系对象";
+  if (/宿舍|室友/.test(category)) return "室友";
+  if (/朋友|借钱/.test(category)) return "朋友";
+  if (/商家|客服/.test(category)) return "商家或客服";
+  if (/家庭|催婚/.test(category)) return "家人";
+  if (/网友/.test(category)) return "网友";
+  return "日常关系";
+}
+
+function personalityForOpponentType(opponentType) {
+  if (/阴阳/.test(opponentType)) return "喜欢用反讽和轻飘飘的评价让你失控。";
+  if (/偷换/.test(opponentType)) return "会把原本的问题偷换成你的态度、能力或情绪问题。";
+  if (/情绪勒索/.test(opponentType)) return "会用委屈和关系压力让你放弃合理要求。";
+  if (/讲道理/.test(opponentType)) return "表面讲逻辑，但会选择性忽略自己的责任。";
+  return "嘴硬、不愿承认问题，会不断找借口推开责任。";
+}
+
+function tacticsForOpponentType(opponentType) {
+  if (/阴阳/.test(opponentType)) return ["暗讽你太较真", "嘲笑你的表达方式", "引你情绪化"];
+  if (/偷换/.test(opponentType)) return ["把事实偷换成态度", "要求你自证没问题", "模糊责任边界"];
+  if (/情绪勒索/.test(opponentType)) return ["表现委屈", "用关系压你", "让你为合理诉求内疚"];
+  if (/讲道理/.test(opponentType)) return ["选择性讲规则", "淡化影响", "把责任平均摊开"];
+  return ["否认问题", "找借口", "反问你为什么没做更多"];
+}
+
+function trapsForOpponentType(opponentType) {
+  return tacticsForOpponentType(opponentType).map((tactic) => `对方可能会${tactic}，不要顺着解释，拉回事实和要求。`);
+}
+
+function openingForOpponentType({ opponentType, customScene, category }) {
+  const scene = customScene || category || "这件事";
+  if (/阴阳/.test(opponentType)) return `行，就你最有道理，${scene}都能被你说得这么严重。`;
+  if (/偷换/.test(opponentType)) return `你现在一直说${scene}，那你自己就一点问题都没有吗？`;
+  if (/情绪勒索/.test(opponentType)) return `我都已经这样了，你还要拿${scene}一直逼我吗？`;
+  if (/讲道理/.test(opponentType)) return `${scene}我不是不认，但你也不能只站在你自己的角度看。`;
+  return `${scene}不能全怪我吧，你现在说得好像都是我的问题。`;
 }
 
 function uniqueReplyOptions(replies) {
