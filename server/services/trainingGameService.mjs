@@ -38,10 +38,25 @@ export async function handleTrainingGameReply(input = {}) {
 
 export function normalizeTrainingGameInput(input = {}) {
   const maxRounds = clampNumber(input.maxRounds || 5, 1, 8);
+  const config = input.gameConfig && typeof input.gameConfig === "object" ? input.gameConfig : {};
+  const gameConfig = normalizeGameConfig(config, input);
+  const playerRole = roleFromConfig(gameConfig, gameConfig.playerRoleKey);
+  const aiRole = roleFromConfig(gameConfig, gameConfig.aiRoleKey);
   return {
-    scene: textOf(input.scene),
-    difficulty: normalizeDifficulty(input.difficulty),
-    goal: textOf(input.goal) || "守住主线，清楚表达诉求和边界。",
+    scene: gameConfig.scene,
+    gameConfig,
+    roleA: gameConfig.roleA,
+    roleB: gameConfig.roleB,
+    playerRoleKey: gameConfig.playerRoleKey,
+    aiRoleKey: gameConfig.aiRoleKey,
+    playerRole,
+    aiRole,
+    playerIdentity: playerRole.name,
+    aiIdentity: aiRole.name,
+    aiDifficulty: textOf(input.aiDifficulty) || textOf(config.difficulty) || textOf(input.difficulty),
+    difficulty: normalizeDifficulty(config.difficulty || input.difficulty),
+    trainingGoals: gameConfig.trainingGoals,
+    goal: gameConfig.trainingGoals.length ? gameConfig.trainingGoals.join("、") : textOf(input.goal) || "守住主线，清楚表达诉求和边界。",
     round: clampNumber(input.round || 1, 1, maxRounds),
     maxRounds,
     persuasionScore: clampNumber(input.persuasionScore, 0, 100),
@@ -188,6 +203,38 @@ function buildTrainingGamePrompt(input) {
     system: `
 你是“吵架训练场”的对手和裁判。只输出 JSON。
 你要判断用户回复、更新 persuasionScore，并决定继续还是结束。
+
+你正在扮演吵架训练场里的 AI 对手。
+
+本局场景：
+${input.scene}
+
+玩家扮演：
+${input.playerRole.name}
+玩家角色描述：
+${input.playerRole.description}
+玩家角色目标：
+${input.playerRole.goal}
+
+你扮演：
+${input.aiRole.name}
+你的角色描述：
+${input.aiRole.description}
+你的角色目标：
+${input.aiRole.goal}
+
+你必须始终站在你的角色角度说话。
+你不能替玩家说话。
+你不能跳出场景。
+你不能把对话变成辩论赛。
+你要像真实生活中的吵架对象一样，根据难度进行反驳、推脱、追问、阴阳怪气或施压。
+但不要使用辱骂、歧视、威胁、人身攻击等违规内容。
+
+玩家的训练目标是：
+${input.trainingGoals.join("、") || input.goal}
+
+assistantMessage 只能是“${input.aiRole.name}”说出的话，不能输出玩家回复、不能替玩家总结观点、不能突然替玩家发言。
+描述玩家时使用“玩家”或“${input.playerRole.name}”，不要用“我”来代指玩家。
 禁止威胁、歧视、隐私曝光、严重人身攻击、违法内容。
 复盘短、准、像教练，不要鸡汤。
 对手回复要贴合场景和上一轮用户原话，允许 1-2 句，有具体反击点；不要每次都用“我不是故意的”“你别说得这么严重”这类模板句。
@@ -592,4 +639,61 @@ function arrayOfText(value) {
 
 function textOf(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeGameConfig(config = {}, input = {}) {
+  const playerRoleKey = normalizeRoleKey(config.playerRoleKey || input.playerRoleKey || "A");
+  const aiRoleKey = oppositeRoleKey(playerRoleKey);
+  const scene =
+    textOf(config.scene) ||
+    textOf(input.scene) ||
+    textOf(config.topic) ||
+    textOf(input.debateTopic) ||
+    "一次真实生活冲突已经发生，对方正在回避具体问题。";
+  const roleA = normalizeRole(config.roleA, {
+    name: textOf(input.playerIdentity) || textOf(config.playerIdentity) || "我",
+    description: "冲突中需要表达诉求、守住边界的一方",
+    goal: textOf(input.goal) || "让对方正面回应问题，并给出具体做法"
+  });
+  const roleB = normalizeRole(config.roleB, {
+    name: textOf(input.aiIdentity) || textOf(config.aiIdentity) || "对方",
+    description: "冲突中会辩解、回避或反击的一方",
+    goal: "为自己的行为找理由，反驳玩家，并试图转移重点"
+  });
+  const trainingGoals = Array.isArray(config.trainingGoals)
+    ? config.trainingGoals.map(textOf).filter(Boolean)
+    : Array.isArray(config.goals)
+      ? config.goals.map(textOf).filter(Boolean)
+      : arrayOfText(input.trainingGoals);
+
+  return {
+    scene,
+    roleA,
+    roleB,
+    playerRoleKey,
+    aiRoleKey,
+    trainingGoals,
+    difficulty: textOf(config.difficulty) || textOf(input.difficulty) || "normal"
+  };
+}
+
+function normalizeRole(role, fallback) {
+  const source = role && typeof role === "object" && !Array.isArray(role) ? role : {};
+  return {
+    name: textOf(source.name) || fallback.name,
+    description: textOf(source.description) || fallback.description,
+    goal: textOf(source.goal) || fallback.goal
+  };
+}
+
+function normalizeRoleKey(value) {
+  return value === "B" ? "B" : "A";
+}
+
+function oppositeRoleKey(value) {
+  return normalizeRoleKey(value) === "A" ? "B" : "A";
+}
+
+function roleFromConfig(config, key) {
+  return normalizeRoleKey(key) === "A" ? config.roleA : config.roleB;
 }

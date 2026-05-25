@@ -81,12 +81,23 @@ export function mockGenerateRandomTrainingScenario(input = {}) {
 }
 
 export function normalizeScenarioInput(input = {}) {
+  const config = input.gameConfig && typeof input.gameConfig === "object" ? input.gameConfig : {};
+  const gameConfig = normalizeGameConfig(config, input);
   return {
     category: normalizeOption(input.category, categories),
-    difficulty: normalizeOption(input.difficulty, difficulties),
+    difficulty: normalizeOption(input.difficulty || config.difficulty, difficulties),
     opponentType: normalizeOption(input.opponentType, opponentTypes),
-    customScene: textOf(input.customScene),
-    userGoal: textOf(input.userGoal)
+    customScene: textOf(input.customScene) || textOf(config.scene) || textOf(config.topic),
+    userGoal: gameConfig.trainingGoals.length ? gameConfig.trainingGoals.join("、") : textOf(input.userGoal),
+    gameConfig,
+    scene: gameConfig.scene,
+    roleA: gameConfig.roleA,
+    roleB: gameConfig.roleB,
+    playerRoleKey: gameConfig.playerRoleKey,
+    aiRoleKey: gameConfig.aiRoleKey,
+    playerRole: roleFromConfig(gameConfig, gameConfig.playerRoleKey),
+    aiRole: roleFromConfig(gameConfig, gameConfig.aiRoleKey),
+    aiDifficulty: textOf(input.aiDifficulty)
   };
 }
 
@@ -106,21 +117,45 @@ export function normalizeScenario(scenario, input = {}) {
   const opponentType = textOf(opponentProfile.type) || pickRequested(input.opponentType, opponentTypes);
   const traps = arrayOfText(scenario.traps);
   const trainingFocus = arrayOfText(scenario.trainingFocus);
+  const baseConfig = normalizeGameConfig(input.gameConfig || scenario, input);
+  const roleA = normalizeRole(scenario.roleA, baseConfig.roleA);
+  const roleB = normalizeRole(scenario.roleB, baseConfig.roleB);
+  const playerRoleKey = normalizeRoleKey(scenario.playerRoleKey || input.playerRoleKey || baseConfig.playerRoleKey);
+  const aiRoleKey = oppositeRoleKey(playerRoleKey);
+  const playerRole = roleFromParts(roleA, roleB, playerRoleKey);
+  const aiRole = roleFromParts(roleA, roleB, aiRoleKey);
+  const scene = textOf(scenario.scene) || textOf(scenario.background) || input.scene || baseConfig.scene;
+  const trainingGoals = arrayOfText(scenario.trainingGoals).length
+    ? arrayOfText(scenario.trainingGoals)
+    : input.gameConfig?.trainingGoals?.length
+      ? input.gameConfig.trainingGoals
+      : trainingFocus.length
+        ? trainingFocus
+        : arrayOfText(input.trainingGoals);
 
   return {
     id: textOf(scenario.id) || `scenario_${Date.now()}`,
     title: textOf(scenario.title) || "随机吵架训练场景",
+    scene,
+    roleA,
+    roleB,
+    playerRoleKey,
+    aiRoleKey,
+    trainingGoals,
+    playerIdentity: playerRole.name,
+    aiIdentity: aiRole.name,
+    aiDifficulty: textOf(scenario.aiDifficulty) || input.aiDifficulty || difficulty,
     category,
     difficulty,
     relationship: textOf(scenario.relationship) || "日常关系",
-    background: textOf(scenario.background) || "一次具体冲突已经发生，对方试图把重点从事情本身转移到你的态度。",
+    background: scene || "一次具体冲突已经发生，对方试图把重点从事情本身转移到你的态度。",
     opponentProfile: {
       type: opponentType,
       personality: textOf(opponentProfile.personality) || "会为自己辩解，也会试图转移重点。",
       tactics: arrayOfText(opponentProfile.tactics)
     },
     openingMessage: textOf(scenario.openingMessage) || "你现在这样说就很没必要，本来不是多大的事。",
-    userGoal: textOf(scenario.userGoal) || input.userGoal || "守住主线，清楚表达诉求和边界。",
+    userGoal: textOf(scenario.userGoal) || input.userGoal || playerRole.goal || "守住主线，清楚表达诉求和边界。",
     realMainline: textOf(scenario.realMainline) || "不要证明自己有没有资格不舒服，要让对方正面回应具体问题。",
     mainline: {
       fact: textOf(mainline.fact),
@@ -316,6 +351,80 @@ function normalizeOption(value, allowed) {
   const text = textOf(value);
   if (!text || text === "随机") return "随机";
   return allowed.includes(text) ? text : "随机";
+}
+
+function normalizeGameConfig(config = {}, input = {}) {
+  const source = config && typeof config === "object" && !Array.isArray(config) ? config : {};
+  const playerRoleKey = normalizeRoleKey(source.playerRoleKey || input.playerRoleKey || "A");
+  const roleA = normalizeRole(source.roleA, {
+    name: textOf(source.playerIdentity) || textOf(input.playerIdentity) || "我",
+    description: "冲突中需要表达诉求、守住边界的一方",
+    goal: textOf(input.userGoal) || textOf(source.userGoal) || "让对方正面回应问题，并给出具体做法"
+  });
+  const roleB = normalizeRole(source.roleB, {
+    name: textOf(source.aiIdentity) || textOf(input.aiIdentity) || inferOpponentName(source, input),
+    description: "冲突中会辩解、回避或反击的一方",
+    goal: "为自己的行为找理由，反驳玩家，并试图转移重点"
+  });
+  const trainingGoals = Array.isArray(source.trainingGoals)
+    ? source.trainingGoals.map(textOf).filter(Boolean)
+    : Array.isArray(source.goals)
+      ? source.goals.map(textOf).filter(Boolean)
+      : arrayOfText(input.trainingGoals);
+
+  return {
+    scene:
+      textOf(source.scene) ||
+      textOf(source.background) ||
+      textOf(input.scene) ||
+      textOf(input.customScene) ||
+      textOf(source.topic) ||
+      "一次真实生活冲突已经发生，对方正在回避具体问题。",
+    roleA,
+    roleB,
+    playerRoleKey,
+    aiRoleKey: oppositeRoleKey(playerRoleKey),
+    trainingGoals,
+    difficulty: textOf(source.difficulty) || textOf(input.difficulty) || "normal"
+  };
+}
+
+function normalizeRole(role, fallback) {
+  const source = role && typeof role === "object" && !Array.isArray(role) ? role : {};
+  return {
+    name: textOf(source.name) || fallback.name,
+    description: textOf(source.description) || fallback.description,
+    goal: textOf(source.goal) || fallback.goal
+  };
+}
+
+function normalizeRoleKey(value) {
+  return value === "B" ? "B" : "A";
+}
+
+function oppositeRoleKey(value) {
+  return normalizeRoleKey(value) === "A" ? "B" : "A";
+}
+
+function roleFromConfig(config, key) {
+  return normalizeRoleKey(key) === "A" ? config.roleA : config.roleB;
+}
+
+function roleFromParts(roleA, roleB, key) {
+  return normalizeRoleKey(key) === "A" ? roleA : roleB;
+}
+
+function inferOpponentName(source = {}, input = {}) {
+  const text = `${textOf(source.relationship)} ${textOf(input.category)} ${textOf(source.title)} ${textOf(source.background)}`;
+  if (/室友|宿舍/.test(text)) return "室友";
+  if (/男朋友|女朋友|情侣|对象|恋爱/.test(text)) return /女朋友/.test(text) ? "女朋友" : "男朋友";
+  if (/同事|职场|客户|项目/.test(text)) return "同事";
+  if (/朋友|借钱|迟到/.test(text)) return "朋友";
+  if (/亲戚|家庭|催婚|聚餐/.test(text)) return "亲戚";
+  if (/商家|客服|退款/.test(text)) return "商家";
+  if (/网友|评论/.test(text)) return "网友";
+  if (/队友|小组作业|同学/.test(text)) return "队友";
+  return "对方";
 }
 
 function buildCustomSceneBackground(input, scenario) {

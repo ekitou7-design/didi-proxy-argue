@@ -334,12 +334,43 @@ ${JSON.stringify(input, null, 2)}
 
 如果 category/difficulty/opponentType 为空或“随机”，请自行选择一个真实生活冲突设定。
 如果 userGoal 有内容，场景要围绕这个训练目标设计。
+不要生成抽象观点题，不要写成支持/反对某观点，不要使用“正方”“反方”“立场A”“立场B”“辩论主题”。
+要生成真实生活吵架场景，例如：
+- 宿舍里室友不倒垃圾，还嘲讽玩家小题大做
+- 男朋友临时改约，还说玩家太敏感
+- 同事把工作甩给玩家，出问题后还怪玩家没提醒
+- 家庭聚餐上亲戚催婚，还拿表妹二胎来压玩家
+- 朋友总是迟到，被指出后反说玩家太计较
+
+如果 gameConfig 有内容，必须沿用里面的角色设定：
+- gameConfig.scene 是本局场景。
+- gameConfig.roleA / roleB 是两个生活场景角色，各自有 name、description、goal。
+- gameConfig.playerRoleKey 是玩家选择的角色，aiRoleKey 必须自动取另一个角色。
+- gameConfig.trainingGoals 是玩家训练目标。
+- gameConfig.difficulty 是训练难度。
+- title/background/userGoal/realMainline/mainline/traps/trainingFocus 里描述玩家时，用“玩家”或玩家角色名，不要用“我”代指玩家。
+- openingMessage 必须由 AI 角色发出，站在 AI 角色目标上说话，不得替玩家说话。
 
 必须返回这个 JSON 结构：
 {
   "scenario": {
     "id": "scenario_xxx",
     "title": "",
+    "scene": "",
+    "roleA": {
+      "name": "",
+      "description": "",
+      "goal": ""
+    },
+    "roleB": {
+      "name": "",
+      "description": "",
+      "goal": ""
+    },
+    "playerRoleKey": "A | B",
+    "aiRoleKey": "A | B",
+    "trainingGoals": [],
+    "aiDifficulty": "",
     "category": "",
     "difficulty": "",
     "relationship": "",
@@ -374,6 +405,10 @@ ${JSON.stringify(input, null, 2)}
 
 字段要求：
 - title 要具体，例如“室友连续三次不倒垃圾，还说你太计较”。
+- scene 是完整生活场景，不是观点题。
+- roleA 和 roleB 必须是场景里的具体人物，例如“我 / 室友”“女朋友 / 男朋友”“员工 / 同事”。
+- 每个 role.goal 都要像真实吵架里的角色目标，不要写成抽象观点。
+- playerRoleKey 默认可以是 "A"，aiRoleKey 必须是另一个角色。
 - background 必须有完整前情，包含触发事件和对方为什么会这样说。
 - realMainline 是本局真正要守住的争吵主线。
 - mainline 必须是 FIRB：Fact 事实、Impact 影响、Request 诉求、Boundary 边界。

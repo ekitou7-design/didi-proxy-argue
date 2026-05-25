@@ -6,6 +6,7 @@ export default function TempArguePage(session) {
       ${TempSettings(session)}
       ${TempChatPanel(session)}
       ${TempInputBar(session)}
+      ${session.settingsOpen ? TempSettingsSheet(session) : ""}
     </div>
   `;
 }
@@ -20,15 +21,25 @@ function TempSettings(session) {
           <h2>${escapeHtml(scenario?.title || session.who || "临时对手")}</h2>
           <p>${escapeHtml(scenario?.background || session.context || "先补一下前情，嘴替才好接话。")}</p>
         </div>
-        <button class="primary-button random-scenario-button" data-action="generate-temp-scenario" ${session.scenarioStatus === "loading" ? "disabled" : ""}>
-          ${session.scenarioStatus === "loading" ? "生成中..." : "生成临时吵架场景"}
-        </button>
+        <button class="primary-button random-scenario-button" data-action="open-temp-settings">场景设置</button>
       </div>
       ${session.scenarioMessage ? `<p class="section-note compact-status-note">${escapeHtml(session.scenarioMessage)}</p>` : ""}
-      ${scenario ? TempScenarioSummary(scenario) : ""}
+    </section>
+  `;
+}
 
-      <details class="top-settings-detail" open>
-        <summary>创建 / 切换对面场景和人设</summary>
+function TempSettingsSheet(session) {
+  return `
+    <section class="persona-sheet-backdrop">
+      <div class="persona-create-sheet compact-settings-sheet" role="dialog" aria-label="临时吵设置">
+        <div class="card-title-row">
+          <h2>场景设置</h2>
+          <button class="tiny-button" data-action="close-temp-settings">完成</button>
+        </div>
+        <button class="primary-button compact-full-button" data-action="generate-temp-scenario" ${session.scenarioStatus === "loading" ? "disabled" : ""}>
+          ${session.scenarioStatus === "loading" ? "生成中..." : "生成临时吵架场景"}
+        </button>
+        ${session.generatedScenario ? TempScenarioSummary(session.generatedScenario) : ""}
         <div class="preset-row">
           ${tempScenarioPresets
             .map(
@@ -55,7 +66,7 @@ function TempSettings(session) {
             ${ChipGroup("tone", toneOptions, session.tone, "intensity")}
           </div>
         </div>
-      </details>
+      </div>
     </section>
   `;
 }

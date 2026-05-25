@@ -1,7 +1,9 @@
 export const navItems = [
   { key: "temp", label: "临时吵", mark: "吵" },
   { key: "persona", label: "专属嘴替", mark: "替" },
-  { key: "training", label: "吵架训练", mark: "练" }
+  { key: "training", label: "训练场", mark: "练" },
+  { key: "records", label: "记录", mark: "记" },
+  { key: "profile", label: "我的", mark: "我" }
 ];
 
 export const features = [
@@ -77,6 +79,13 @@ export const proxyStyleOptions = ["冷静拆台", "阴阳怪气", "高压控场"
 export const proxyReplyModes = ["像我本人", "说得更清楚", "攻击力加强"];
 export const proxyReplyStrengths = ["低", "中", "高"];
 export const difficultyOptions = ["热身", "普通", "嘴硬", "阴阳大师"];
+export const trainingGoalOptions = ["不被嘲讽带偏", "抓住核心问题", "不情绪失控", "练习反击阴阳怪气", "坚持提出明确要求"];
+export const trainingDifficultyOptions = [
+  { value: "easy", label: "温和" },
+  { value: "normal", label: "正常" },
+  { value: "hard", label: "强势" },
+  { value: "hell", label: "地狱" }
+];
 
 export const relationProfiles = [
   {
@@ -137,6 +146,7 @@ export const initialTempSession = {
   generatedScenario: null,
   scenarioStatus: "idle",
   scenarioMessage: "",
+  settingsOpen: false,
   input: "",
   isSubmitting: false,
   rounds: []
@@ -165,9 +175,32 @@ export const initialTrainingSession = {
   type: "吵架训练",
   step: "setup",
   gameState: "idle",
-  scene: "男朋友临时改约还说我太敏感",
+  scene: "宿舍里，室友一直不倒垃圾。玩家提醒后，室友还嘲讽玩家小题大做。",
+  debateTopic: "宿舍里，室友一直不倒垃圾。玩家提醒后，室友还嘲讽玩家小题大做。",
+  playerIdentity: "我",
+  aiIdentity: "室友",
+  playerSide: "A",
+  aiSide: "B",
+  aiDifficulty: "正常争论",
   difficulty: "普通",
   goal: "守住主线，不被对方带偏",
+  gameConfig: {
+    scene: "宿舍里，室友一直不倒垃圾。玩家提醒后，室友还嘲讽玩家小题大做。",
+    roleA: {
+      name: "我",
+      description: "被室友不倒垃圾影响的人",
+      goal: "让室友承担责任，不要再嘲讽和转移话题"
+    },
+    roleB: {
+      name: "室友",
+      description: "不想倒垃圾，还觉得对方管太多",
+      goal: "为自己辩解，反驳对方，说对方小题大做"
+    },
+    playerRoleKey: "A",
+    aiRoleKey: "B",
+    trainingGoals: ["不被嘲讽带偏", "抓住核心问题"],
+    difficulty: "normal"
+  },
   maxRounds: 5,
   persuasionScore: 0,
   persuasionDelta: 0,
@@ -184,6 +217,7 @@ export const initialTrainingSession = {
   generatedScenario: null,
   scenarioStatus: "idle",
   scenarioMessage: "",
+  settingsOpen: false,
   round: 1,
   opponent: "",
   messages: [],

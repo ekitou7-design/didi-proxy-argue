@@ -4,7 +4,7 @@ import TempArguePage from "./pages/TempArguePage.js";
 import PersonaPage from "./pages/PersonaPage.js";
 import PersonaDistillPage from "./pages/PersonaDistillPage.js";
 import PersonaTestPage from "./pages/PersonaTestPage.js";
-import TrainingPage from "./pages/TrainingPage.js";
+import TrainingPage, { getGameConfig, TrainingPreviewContent } from "./pages/TrainingPage.js";
 import ProfilePage from "./pages/ProfilePage.js";
 import RecordsPage from "./pages/RecordsPage.js";
 import {
@@ -15,12 +15,20 @@ import {
 import {
   buildPersonaChatTurn,
   buildTempChatTurn,
+  features,
   initialPersonaSession,
   initialProxyPersonaState,
   initialTempSession,
   initialTrainingSession,
+  trainingDifficultyOptions,
+  trainingGoalOptions,
+  goalOptions,
   makeOpeningOpponent,
+  navItems,
+  proxyReplyModes,
+  proxyReplyStrengths,
   relationProfiles,
+  toneOptions,
   tempScenarioPresets
 } from "./data/mockData.js";
 
@@ -105,7 +113,7 @@ export default class App {
     const pageTarget = event.target.closest("[data-page]");
     if (pageTarget) {
       if (["personaDistill", "personaTest"].includes(pageTarget.dataset.page)) {
-        this.state.proxyPersona = { ...this.state.proxyPersona, createSheetOpen: false };
+        this.state.proxyPersona = { ...this.state.proxyPersona, createSheetOpen: false, personaInfoOpen: false };
       }
       this.navigate(pageTarget.dataset.page);
       return;
@@ -117,6 +125,10 @@ export default class App {
       const field = chipTarget.dataset.chipField;
       if (sessionKey === "proxyPersona.replyForm") {
         this.setNestedState("proxyPersona", "replyForm", field, chipTarget.dataset.chipValue);
+        return;
+      }
+      if (sessionKey === "training.gameConfig") {
+        this.updateTrainingSetup(["training", "gameConfig", field], chipTarget.dataset.chipValue);
         return;
       }
       this.setState({
@@ -178,6 +190,14 @@ export default class App {
       this.updateProxyPersona({ createSheetOpen: false });
       return;
     }
+    if (action === "open-persona-info") {
+      this.updateProxyPersona({ personaInfoOpen: true });
+      return;
+    }
+    if (action === "close-persona-info") {
+      this.updateProxyPersona({ personaInfoOpen: false });
+      return;
+    }
     if (action === "open-reply-settings") {
       this.updateProxyPersona({ replySettingsOpen: true });
       return;
@@ -226,8 +246,20 @@ export default class App {
       await this.generateRandomTrainingScenario();
       return;
     }
+    if (action === "toggle-training-goal") {
+      this.toggleTrainingGoal(actionTarget.dataset.goal);
+      return;
+    }
     if (action === "confirm-training-scenario") {
       await this.generatePresetTrainingScenario();
+      return;
+    }
+    if (action === "open-training-settings") {
+      this.setState({ training: { ...this.state.training, settingsOpen: true } });
+      return;
+    }
+    if (action === "close-training-settings") {
+      this.setState({ training: { ...this.state.training, settingsOpen: false } });
       return;
     }
     if (action === "go-persona-distill") {
@@ -248,6 +280,14 @@ export default class App {
     }
     if (action === "temp-reply-intent") {
       await this.handleTempReply({ inputAsIntent: true });
+      return;
+    }
+    if (action === "open-temp-settings") {
+      this.setState({ temp: { ...this.state.temp, settingsOpen: true } });
+      return;
+    }
+    if (action === "close-temp-settings") {
+      this.setState({ temp: { ...this.state.temp, settingsOpen: false } });
       return;
     }
     if (action === "generate-temp-scenario") {
@@ -487,7 +527,18 @@ export default class App {
   updateTrainingSetup(parts, value, render = true) {
     const training = this.state.training;
     const nextTraining =
-      parts.length === 3
+      parts.length === 4
+        ? {
+            ...training,
+            [parts[1]]: {
+              ...training[parts[1]],
+              [parts[2]]: {
+                ...training[parts[1]]?.[parts[2]],
+                [parts[3]]: value
+              }
+            }
+          }
+        : parts.length === 3
         ? {
             ...training,
             [parts[1]]: {
@@ -500,8 +551,25 @@ export default class App {
             [parts[1]]: value
           };
 
+    const rawConfig = nextTraining.gameConfig || {};
+    const playerRoleKey = rawConfig.playerRoleKey === "B" ? "B" : "A";
+    const gameConfig = normalizeTrainingGameConfig({
+      ...rawConfig,
+      playerRoleKey,
+      aiRoleKey: oppositeRoleKey(playerRoleKey)
+    });
     const updatedTraining = {
       ...nextTraining,
+      gameConfig,
+      scene: gameConfig.scene,
+      debateTopic: gameConfig.scene,
+      playerIdentity: getPlayerRoleFromConfig(gameConfig).name,
+      aiIdentity: getAiRoleFromConfig(gameConfig).name,
+      playerSide: gameConfig.playerRoleKey,
+      aiSide: gameConfig.aiRoleKey,
+      goal: formatTrainingGoals(gameConfig.trainingGoals),
+      difficulty: difficultyLabelForConfig(gameConfig.difficulty),
+      aiDifficulty: difficultyLabelForConfig(gameConfig.difficulty),
       generatedScenario: null,
       opponent: "",
       messages: [],
@@ -514,12 +582,21 @@ export default class App {
       offTrackStreak: 0,
       round: 1,
       scenarioStatus: "idle",
-      scenarioMessage: "设置已修改，点击确认场景后再开始训练。",
+      scenarioMessage: "设置已修改，将按中间区域的本局配置开始训练。",
       scenarioRequestId: ""
     };
 
     if (render) this.setState({ training: updatedTraining });
     else this.state.training = updatedTraining;
+  }
+
+  toggleTrainingGoal(goal) {
+    if (!goal) return;
+    const config = getGameConfig(this.state.training);
+    const goals = config.trainingGoals.includes(goal)
+      ? config.trainingGoals.filter((item) => item !== goal)
+      : [...config.trainingGoals, goal];
+    this.updateTrainingSetup(["training", "gameConfig", "trainingGoals"], goals.length ? goals : [goal]);
   }
 
   useTempScenario(index) {
@@ -532,6 +609,7 @@ export default class App {
         generatedScenario: null,
         scenarioStatus: "idle",
         scenarioMessage: "",
+        settingsOpen: false,
         input: "",
         rounds: []
       }
@@ -632,6 +710,7 @@ export default class App {
       currentProfile: profile,
       selectedPersonaId: profile.id,
       createSheetOpen: false,
+      personaInfoOpen: false,
       message: `当前嘴替已设为：${getProfileName(profile)}`
     });
   }
@@ -874,7 +953,7 @@ export default class App {
       const scenario = result.scenario;
       if (!scenario?.openingMessage) throw new Error("场景生成结果为空");
 
-      this.applyGeneratedTrainingScenario(scenario, "随机场景已生成，可以开始这一局。");
+      this.applyGeneratedTrainingScenario(scenario, "AI 已随机生成一局，仍可在中间区域手动修改。");
     } catch (error) {
       this.setState({
         training: {
@@ -889,15 +968,19 @@ export default class App {
   async generatePresetTrainingScenario() {
     const training = this.state.training;
     if (training.scenarioStatus === "loading") return;
+    const config = getGameConfig(training);
     const request = {
       ...(training.randomScenarioForm || {}),
-      customScene: training.scene,
-      userGoal: training.goal || training.randomScenarioForm?.userGoal || ""
+      gameConfig: config,
+      customScene: config.scene,
+      userGoal: formatTrainingGoals(config.trainingGoals),
+      debateTopic: config.scene,
+      aiDifficulty: difficultyLabelForConfig(config.difficulty)
     };
     const requestId = `preset_${Date.now()}`;
     const draftScenario = buildPresetScenarioDraft(request);
 
-    this.applyGeneratedTrainingScenario(draftScenario, "已先按当前设置生成场景，正在用 API 精修...", "loading", requestId);
+    this.applyGeneratedTrainingScenario(draftScenario, "已按本局配置生成训练草稿，正在用 API 精修...", "loading", requestId);
 
     try {
       const result = await postJson("/api/training/scenario/preset", request);
@@ -905,7 +988,7 @@ export default class App {
       if (!scenario?.openingMessage) throw new Error("场景生成结果为空");
       if (this.state.training.scenarioRequestId !== requestId || this.state.training.gameState !== "idle") return;
 
-      this.applyGeneratedTrainingScenario(scenario, "已按当前设置生成场景，可以开始这一局。");
+      this.applyGeneratedTrainingScenario(scenario, "已按本局配置生成训练草稿，可以继续修改或开始训练。");
     } catch (error) {
       if (this.state.training.scenarioRequestId !== requestId || this.state.training.gameState !== "idle") return;
       this.setState({
@@ -919,14 +1002,23 @@ export default class App {
   }
 
   applyGeneratedTrainingScenario(scenario, scenarioMessage, scenarioStatus = "done", scenarioRequestId = "") {
+    const gameConfig = scenarioToGameConfig(scenario, this.state.training.gameConfig);
     this.setState({
       training: {
         ...this.state.training,
         gameState: "idle",
         step: "setup",
-        difficulty: scenario.difficulty || this.state.training.difficulty,
-        goal: scenario.userGoal || this.state.training.randomScenarioForm?.userGoal || this.state.training.goal,
-        maxRounds: maxRoundsForDifficulty(scenario.difficulty || this.state.training.difficulty),
+        gameConfig,
+        scene: gameConfig.scene,
+        debateTopic: gameConfig.scene,
+        playerIdentity: getPlayerRoleFromConfig(gameConfig).name,
+        aiIdentity: getAiRoleFromConfig(gameConfig).name,
+        playerSide: gameConfig.playerRoleKey,
+        aiSide: gameConfig.aiRoleKey,
+        aiDifficulty: difficultyLabelForConfig(gameConfig.difficulty),
+        difficulty: difficultyLabelForConfig(gameConfig.difficulty),
+        goal: formatTrainingGoals(gameConfig.trainingGoals),
+        maxRounds: maxRoundsForDifficulty(gameConfig.difficulty),
         opponent: scenario.openingMessage,
         generatedScenario: scenario,
         messages: [],
@@ -947,27 +1039,50 @@ export default class App {
 
   startTrainingGame() {
     const training = this.state.training;
-    if (!training.generatedScenario) {
+    const config = getGameConfig(training);
+    const playerRole = getPlayerRoleFromConfig(config);
+    const aiRole = getAiRoleFromConfig(config);
+    if (!config.scene.trim()) {
       this.setState({
         training: {
           ...training,
-          scenarioMessage: "请先点击确认场景，让设置生效。"
+          scenarioMessage: "请先填写本局场景。"
         }
       });
       return;
     }
-    const scenario = training.generatedScenario;
-    const opponent = scenario?.openingMessage || training.opponent || makeOpeningOpponent(training.scene);
+    if (!playerRole.name.trim() || !aiRole.name.trim()) {
+      this.setState({
+        training: {
+          ...training,
+          scenarioMessage: "请先填写两个角色名称。"
+        }
+      });
+      return;
+    }
+    const scenario = training.generatedScenario || buildScenarioFromGameConfig(config);
+    const opponent = scenario?.openingMessage || training.opponent || makeOpeningOpponent(config.scene);
     this.setState({
       training: {
         ...training,
         gameState: "playing",
         step: "chat",
+        gameConfig: config,
+        scene: config.scene,
+        playerSide: config.playerRoleKey,
+        aiSide: config.aiRoleKey,
+        debateTopic: config.scene,
+        playerIdentity: playerRole.name,
+        aiIdentity: aiRole.name,
+        aiDifficulty: difficultyLabelForConfig(config.difficulty),
+        difficulty: difficultyLabelForConfig(config.difficulty),
+        goal: formatTrainingGoals(config.trainingGoals),
+        generatedScenario: scenario,
         opponent,
         input: "",
         isSubmitting: false,
         round: 1,
-        maxRounds: maxRoundsForDifficulty(training.generatedScenario?.difficulty || training.difficulty),
+        maxRounds: maxRoundsForDifficulty(config.difficulty),
         persuasionScore: 0,
         persuasionDelta: 0,
         opponentState: "strong",
@@ -1023,7 +1138,7 @@ export default class App {
         this.setState({
           training: {
             ...training,
-            scenarioMessage: "请先输入你的回复。"
+            scenarioMessage: "请先输入玩家回复。"
           }
         });
         return;
@@ -1036,12 +1151,15 @@ export default class App {
   async submitTrainingGame({ userReply = "", forceEnd = false } = {}) {
     const training = this.state.training;
     const generatedScenario = training.generatedScenario;
+    const config = getGameConfig(training);
     const userMessage = userReply ? { role: "user", content: userReply } : null;
     const messages = userMessage ? [...training.messages, userMessage] : training.messages;
     const payload = {
-      scene: generatedScenario?.title || generatedScenario?.background || training.scene,
-      difficulty: generatedScenario?.difficulty || training.difficulty,
-      goal: generatedScenario?.userGoal || training.goal || training.randomScenarioForm?.userGoal,
+      gameConfig: config,
+      scene: config.scene,
+      aiDifficulty: difficultyLabelForConfig(config.difficulty),
+      difficulty: config.difficulty,
+      goal: formatTrainingGoals(config.trainingGoals),
       round: training.round,
       maxRounds: training.maxRounds || 5,
       persuasionScore: training.persuasionScore || 0,
@@ -1120,7 +1238,8 @@ export default class App {
       (page === "training" && this.state.training.gameState === "playing");
     this.root.innerHTML = `
       <div class="app-shell">
-        <div class="phone-frame">
+        <div class="phone-frame web-app-frame">
+          ${TopNav(page)}
           <header class="top-bar">
             <button class="mini-sticker logo-sticker" data-page="home" aria-label="回到首页">
               <img src="/public/app-logo.svg" alt="" />
@@ -1131,7 +1250,11 @@ export default class App {
             </div>
             <button class="mini-sticker danger" data-page="persona">替</button>
           </header>
-          <main class="page-scroll ${isRealtimePage ? "realtime-scroll" : ""} ${page === "persona" ? "persona-scroll" : ""}">${this.getPage()}</main>
+          <div class="desktop-workspace">
+            <aside class="desktop-sidebar">${DesktopSidebar(this.state)}</aside>
+            <main class="page-scroll ${isRealtimePage ? "realtime-scroll" : ""} ${page === "persona" ? "persona-scroll" : ""}">${this.getPage()}</main>
+            <aside class="desktop-context">${DesktopContextPanel(this.state)}</aside>
+          </div>
           ${BottomNav(page)}
         </div>
       </div>
@@ -1147,6 +1270,170 @@ export default class App {
       });
     });
   }
+}
+
+function TopNav(activePage) {
+  return `
+    <nav class="web-top-nav" aria-label="顶部导航">
+      <button class="web-brand" data-page="temp">
+        <img src="/public/app-logo.svg" alt="" />
+        <span>滴滴代吵</span>
+      </button>
+      <div class="web-nav-links">
+        ${navItems
+          .map(
+            (item) => `
+              <button class="web-nav-link ${activePage === item.key ? "active" : ""}" data-page="${item.key}">
+                ${item.label}
+              </button>
+            `
+          )
+          .join("")}
+      </div>
+    </nav>
+  `;
+}
+
+function DesktopSidebar(state) {
+  const activePage = state.page;
+  const profile = getCurrentProxyProfile(state.proxyPersona);
+  return `
+    <section class="desktop-panel">
+      <h2>功能入口</h2>
+      <div class="desktop-mode-list">
+        ${features
+          .map(
+            (feature) => `
+              <button class="desktop-mode-card ${activePage === feature.key ? "active" : ""}" data-page="${feature.key}">
+                <b>${feature.mark}</b>
+                <span>${feature.title}</span>
+              </button>
+            `
+          )
+          .join("")}
+      </div>
+    </section>
+    <section class="desktop-panel">
+      <h2>最近状态</h2>
+      <p>临时吵：${state.temp.rounds.length} 轮</p>
+      <p>专属嘴替：${state.proxyPersona.chatTurns.length} 条消息</p>
+      <p>训练场：第 ${state.training.round || 1} 轮</p>
+    </section>
+    <section class="desktop-panel">
+      <h2>当前人格</h2>
+      <p>${profile ? escapeHtml(getProfileName(profile)) : "还没创建嘴替人格"}</p>
+      <div class="desktop-tag-row">
+        ${getProfileTagsForLayout(profile).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function DesktopContextPanel(state) {
+  if (state.page === "persona") return PersonaDesktopContext(state.proxyPersona);
+  if (state.page === "training") return TrainingDesktopContext(state.training);
+  if (state.page === "records") return SimpleDesktopContext("记录", "这里会沉淀你的临时吵、专属嘴替和训练结果。");
+  if (state.page === "profile") return SimpleDesktopContext("我的", "管理偏好、飞书同步和后续账号设置。");
+  return TempDesktopContext(state.temp);
+}
+
+function TempDesktopContext(temp) {
+  return `
+    <section class="desktop-panel context-panel">
+      <h2>主线锁定</h2>
+      ${DesktopField("和谁吵", "temp.who", temp.who, "客服、室友、对象、同事")}
+      ${DesktopField("对方说了什么", "temp.latest", temp.latest, "对方刚刚那句话")}
+      ${DesktopField("前情提要", "temp.context", temp.context, "为什么吵起来")}
+      <h3>我的诉求</h3>
+      ${DesktopChipGroup("temp", "goal", goalOptions, temp.goal)}
+      <h3>语气强度</h3>
+      ${DesktopChipGroup("temp", "tone", toneOptions, temp.tone)}
+      <div class="desktop-preset-list">
+        ${tempScenarioPresets
+          .map((item, index) => `<button class="tiny-button" data-action="use-temp-scenario" data-scenario-index="${index}">${escapeHtml(item.label)}</button>`)
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function PersonaDesktopContext(proxyPersona) {
+  const profile = getCurrentProxyProfile(proxyPersona);
+  return `
+    <section class="desktop-panel context-panel">
+      <h2>嘴替人格</h2>
+      <p>${profile ? escapeHtml(getProfileName(profile)) : "还没有专属嘴替"}</p>
+      <div class="desktop-tag-row">
+        ${getProfileTagsForLayout(profile).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
+      </div>
+      <button class="secondary-button warm compact-full-button" data-action="open-persona-create">创建 / 切换人格</button>
+      <button class="secondary-button compact-full-button" data-page="personaDistill">上传 txt 蒸馏</button>
+      <button class="secondary-button compact-full-button" data-page="personaTest">做人格测试</button>
+      <h3>生成策略</h3>
+      ${DesktopChipGroup("proxyPersona.replyForm", "mode", proxyReplyModes, proxyPersona.replyForm.mode)}
+      ${DesktopChipGroup("proxyPersona.replyForm", "strength", proxyReplyStrengths, proxyPersona.replyForm.strength)}
+      ${DesktopField("前情提要", "proxyPersona.replyForm.background", proxyPersona.replyForm.background, "这次冲突的背景")}
+      ${DesktopField("我想表达", "proxyPersona.replyForm.goal", proxyPersona.replyForm.goal, "想守住的主线")}
+    </section>
+  `;
+}
+
+function TrainingDesktopContext(training) {
+  const config = getGameConfig(training);
+  return `
+    <section class="desktop-panel context-panel">
+      ${TrainingPreviewContent(training, config)}
+    </section>
+  `;
+}
+
+function SimpleDesktopContext(title, text) {
+  return `<section class="desktop-panel context-panel"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(text)}</p></section>`;
+}
+
+function DesktopField(label, path, value, placeholder) {
+  return `
+    <label class="desktop-field">
+      <span>${escapeHtml(label)}</span>
+      <textarea data-setup-input="${path}" placeholder="${escapeAttr(placeholder)}">${escapeHtml(value)}</textarea>
+    </label>
+  `;
+}
+
+function DesktopChipGroup(sessionKey, field, options, active, labelFormatter = (item) => item) {
+  return `
+    <div class="desktop-chip-group">
+      ${options
+        .map(
+          (item) => `<button class="chip tiny-chip ${active === item ? "active" : ""}" data-chip-session="${sessionKey}" data-chip-field="${field}" data-chip-value="${escapeAttr(item)}">${escapeHtml(labelFormatter(item))}</button>`
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function getCurrentProxyProfile(proxyPersona) {
+  return (
+    proxyPersona.personas.find((persona) => String(persona.id) === String(proxyPersona.selectedPersonaId)) ||
+    proxyPersona.currentProfile
+  );
+}
+
+function getProfileTagsForLayout(profile) {
+  if (!profile) return ["先创建", "再开吵"];
+  return (profile.personaProfile?.personalityTags || profile.tags || profile.styleProfile?.commonPhrases || ["专属", "边界"]).slice(0, 4);
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value).replaceAll("'", "&#39;");
 }
 
 async function postJson(url, body) {
@@ -1198,6 +1485,7 @@ function createProxyPersonaState() {
     selectedPersonaId: currentProfile?.id || personas[0]?.id || "",
     currentProfile,
     createSheetOpen: false,
+    personaInfoOpen: false,
     distillStatus: "idle",
     distillResult: null,
     replyForm: {
@@ -1439,12 +1727,180 @@ function mapReplyMode(mode) {
 
 function maxRoundsForDifficulty(difficulty) {
   const text = String(difficulty || "");
-  if (/青铜|easy|简单|低/.test(text)) return 4;
-  if (/黄金|王者|hard|困难|高/.test(text)) return 6;
+  if (/青铜|easy|温和|简单|低/.test(text)) return 4;
+  if (/黄金|王者|hard|hell|强势|地狱|困难|高/.test(text)) return 6;
   return 5;
 }
 
+function normalizeTrainingGameConfig(config = {}) {
+  const playerRoleKey = config.playerRoleKey === "B" ? "B" : "A";
+  const trainingGoals = Array.isArray(config.trainingGoals)
+    ? config.trainingGoals.filter(Boolean)
+    : String(config.trainingGoals || config.goals || "")
+        .split(/[、,，/]/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+  return {
+    scene: String(config.scene || "").trim(),
+    roleA: normalizeRoleConfig(config.roleA, {
+      name: "我",
+      description: "场景中的主动表达者",
+      goal: "说清问题，守住主线"
+    }),
+    roleB: normalizeRoleConfig(config.roleB, {
+      name: "对方",
+      description: "场景中的冲突对象",
+      goal: "反驳玩家，制造压力"
+    }),
+    playerRoleKey,
+    aiRoleKey: oppositeRoleKey(playerRoleKey),
+    trainingGoals: trainingGoals.length ? trainingGoals : ["抓住核心问题"],
+    difficulty: normalizeConfigDifficulty(config.difficulty)
+  };
+}
+
+function normalizeRoleConfig(role, fallback) {
+  return {
+    name: String(role?.name || fallback.name || "").trim(),
+    description: String(role?.description || fallback.description || "").trim(),
+    goal: String(role?.goal || fallback.goal || "").trim()
+  };
+}
+
+function oppositeRoleKey(roleKey) {
+  return roleKey === "B" ? "A" : "B";
+}
+
+function getRoleFromConfig(config, roleKey) {
+  return roleKey === "B" ? config.roleB : config.roleA;
+}
+
+function getPlayerRoleFromConfig(config) {
+  return getRoleFromConfig(config, config.playerRoleKey);
+}
+
+function getAiRoleFromConfig(config) {
+  return getRoleFromConfig(config, config.aiRoleKey);
+}
+
+function normalizeConfigDifficulty(value) {
+  if (["easy", "normal", "hard", "hell"].includes(value)) return value;
+  if (/温和|热身|青铜|easy/i.test(String(value || ""))) return "easy";
+  if (/强势|嘴硬|黄金|hard/i.test(String(value || ""))) return "hard";
+  if (/地狱|阴阳|王者|hell/i.test(String(value || ""))) return "hell";
+  return "normal";
+}
+
+function difficultyLabelForConfig(value) {
+  return trainingDifficultyOptions.find((item) => item.value === normalizeConfigDifficulty(value))?.label || "正常";
+}
+
+function formatTrainingGoals(goals = []) {
+  return goals.length ? goals.join("、") : "抓住核心问题";
+}
+
+function scenarioToGameConfig(scenario = {}, previousConfig = {}) {
+  const inferred = inferScenarioRoles(scenario, previousConfig);
+  const difficulty = normalizeConfigDifficulty(scenario.aiDifficulty || scenario.difficulty || previousConfig.difficulty);
+  const goals = scenario.userGoal
+    ? matchTrainingGoals(scenario.userGoal)
+    : previousConfig.trainingGoals;
+  return normalizeTrainingGameConfig({
+    scene: scenario.scene || scenario.background || scenario.title || previousConfig.scene || "",
+    roleA: scenario.roleA || inferred.roleA,
+    roleB: scenario.roleB || inferred.roleB,
+    playerRoleKey: scenario.playerRoleKey === "B" ? "B" : previousConfig.playerRoleKey || "A",
+    trainingGoals: goals?.length ? goals : ["抓住核心问题"],
+    difficulty
+  });
+}
+
+function matchTrainingGoals(text) {
+  const value = String(text || "");
+  const matched = trainingGoalOptions.filter((goal) => value.includes(goal));
+  if (matched.length) return matched;
+  if (/嘲讽|阴阳/.test(value)) matched.push("练习反击阴阳怪气");
+  if (/核心|主线|责任/.test(value)) matched.push("抓住核心问题");
+  if (/冷静|稳定|失控/.test(value)) matched.push("不情绪失控");
+  if (/明确|要求|诉求/.test(value)) matched.push("坚持提出明确要求");
+  if (/带偏|转移/.test(value)) matched.push("不被嘲讽带偏");
+  return matched.length ? [...new Set(matched)] : ["抓住核心问题"];
+}
+
+function inferScenarioRoles(scenario = {}, previousConfig = {}) {
+  const text = `${scenario.title || ""} ${scenario.background || ""} ${scenario.relationship || ""} ${scenario.category || ""}`;
+  if (/男朋友|女朋友|情侣|恋爱|冷战|对象/.test(text)) {
+    return {
+      roleA: { name: "我", description: "被临时改约影响的人", goal: "说清感受和要求，不被太敏感带偏" },
+      roleB: { name: "男朋友", description: "临时改约后觉得对方反应太大", goal: "为临时改约找理由，反驳对方太敏感" }
+    };
+  }
+  if (/室友|宿舍|合租|垃圾/.test(text)) {
+    return {
+      roleA: { name: "我", description: "被室友不倒垃圾影响的人", goal: "让室友承担责任，不要再嘲讽和转移话题" },
+      roleB: { name: "室友", description: "不想倒垃圾，还觉得对方管太多", goal: "为自己辩解，反驳对方，说对方小题大做" }
+    };
+  }
+  if (/同事|职场|工作|项目|客户/.test(text)) {
+    return {
+      roleA: { name: "我", description: "被同事甩锅影响的人", goal: "澄清责任，要求对方正面处理问题" },
+      roleB: { name: "同事", description: "把工作压力和责任推给别人", goal: "为自己推脱，强调对方也有责任" }
+    };
+  }
+  return {
+    roleA: previousConfig.roleA || { name: "我", description: "场景中的主动表达者", goal: "说清问题，守住主线" },
+    roleB: previousConfig.roleB || { name: "对方", description: "场景中的冲突对象", goal: "反驳玩家，制造压力" }
+  };
+}
+
+function buildScenarioFromGameConfig(config) {
+  const playerRole = getPlayerRoleFromConfig(config);
+  const aiRole = getAiRoleFromConfig(config);
+  const goal = formatTrainingGoals(config.trainingGoals);
+  const mainline = {
+    fact: config.scene,
+    impact: "玩家需要在压力下稳定表达，不被对手带偏。",
+    request: `围绕“${goal}”推进对话。`,
+    boundary: "AI 对手不能替玩家说话，也不能跳出场景。"
+  };
+  return {
+    id: `config_scenario_${Date.now()}`,
+    title: config.scene,
+    background: config.scene,
+    roleA: config.roleA,
+    roleB: config.roleB,
+    playerRoleKey: config.playerRoleKey,
+    aiRoleKey: config.aiRoleKey,
+    playerIdentity: playerRole.name,
+    aiIdentity: aiRole.name,
+    aiDifficulty: difficultyLabelForConfig(config.difficulty),
+    difficulty: difficultyLabelForConfig(config.difficulty),
+    relationship: `${playerRole.name} vs ${aiRole.name}`,
+    openingMessage: buildOpeningForGameConfig(config),
+    userGoal: goal,
+    realMainline: `玩家要完成训练目标：${goal}。`,
+    mainline,
+    traps: ["转移重点", "反问施压", "要求玩家自证"],
+    trainingFocus: config.trainingGoals,
+    scoreFocus: {
+      logic: "是否围绕场景和身份关系说话。",
+      power: "是否能稳定推进，不被 AI 对手压住。",
+      boundary: "是否守住玩家角色目标和表达边界。",
+      mainline: "是否持续围绕训练目标。",
+      risk: "是否避免辱骂、威胁或人身攻击。"
+    },
+    suggestedFirstReplyHint: "先抓住场景里的核心问题，再回应 AI 对手的施压点。",
+    createdAt: new Date().toISOString()
+  };
+}
+
+function buildOpeningForGameConfig(config) {
+  const aiRole = getAiRoleFromConfig(config);
+  return `${aiRole.name}先开口：${aiRole.goal || "这事也不能只听玩家一边说法。"}。`;
+}
+
 function buildPresetScenarioDraft(input = {}) {
+  if (input.gameConfig) return buildScenarioFromGameConfig(normalizeTrainingGameConfig(input.gameConfig));
   const category = pickSetupValue(input.category, "自定义场景");
   const difficulty = pickSetupValue(input.difficulty, "普通");
   const opponentType = pickSetupValue(input.opponentType, "嘴硬型");
@@ -1452,10 +1908,16 @@ function buildPresetScenarioDraft(input = {}) {
   const userGoal = String(input.userGoal || "").trim() || "守住主线，让对方正面回应并给出具体做法。";
   const title = customScene || `${category}里的${opponentType}训练`;
   const mainline = buildPresetMainline({ category, customScene, userGoal });
+  const inferred = inferScenarioRoles({ title, category, background: customScene }, {});
 
   return {
     id: `preset_draft_${Date.now()}`,
     title,
+    roleA: inferred.roleA,
+    roleB: inferred.roleB,
+    playerRoleKey: "A",
+    aiRoleKey: "B",
+    aiDifficulty: input.aiDifficulty || difficulty,
     category,
     difficulty,
     relationship: relationshipForCategory(category),

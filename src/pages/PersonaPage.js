@@ -9,6 +9,7 @@ export default function PersonaPage(state) {
       ${PersonaHeader(activeProfile)}
       ${hasProfile ? PersonaChatPanel(state, activeProfile) : EmptyPersonaState()}
       ${hasProfile ? PersonaInputBar(state) : EmptyCreateActions()}
+      ${state.personaInfoOpen && activeProfile ? PersonaInfoSheet(activeProfile) : ""}
       ${state.createSheetOpen ? PersonaCreateSheet(state, activeProfile) : ""}
       ${state.replySettingsOpen ? ReplySettingsSheet(state) : ""}
     </div>
@@ -26,27 +27,76 @@ function PersonaHeader(profile) {
         </div>
         <div class="persona-header-actions">
           <button class="secondary-button compact-action" data-action="open-persona-create">创建嘴替</button>
+          <button class="tiny-button" data-page="personaDistill">上传蒸馏</button>
+          <button class="tiny-button" data-page="personaTest">人格测试</button>
           <button class="tiny-button" data-action="open-feishu-settings">飞书设置</button>
         </div>
       </section>
     `;
   }
 
-  const summary = getProfileSummary(profile);
-  const tags = getProfileTags(profile);
   return `
     <section class="persona-header-card">
       <div class="persona-header-main">
         <span class="persona-kicker">当前嘴替</span>
         <h2>${escapeHtml(getProfileName(profile))}</h2>
-        <p>${escapeHtml(summary)}</p>
-        <div class="tag-row compact-tags">
-          ${tags.slice(0, 4).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
-        </div>
       </div>
       <div class="persona-header-actions">
+        <button class="tiny-button" data-action="open-persona-info">查看档案</button>
         <button class="secondary-button compact-action" data-action="open-persona-create">创建 / 切换</button>
-        <button class="tiny-button" data-action="open-feishu-settings">飞书设置</button>
+      </div>
+    </section>
+  `;
+}
+
+function PersonaInfoSheet(profile) {
+  const summary = getProfileSummary(profile);
+  const tags = getProfileTags(profile);
+  const style = profile.styleProfile || profile.personaProfile || profile;
+  const source = profile.sourceType === "test" ? "人格测试生成" : "txt 蒸馏生成";
+  return `
+    <section class="persona-sheet-backdrop persona-info-backdrop">
+      <div class="persona-info-sheet" role="dialog" aria-label="当前嘴替档案">
+        <div class="card-title-row">
+          <div>
+            <span class="persona-kicker">当前嘴替档案</span>
+            <h2>${escapeHtml(getProfileName(profile))}</h2>
+          </div>
+          <button class="tiny-button" data-action="close-persona-info">关闭</button>
+        </div>
+
+        <div class="persona-info-block">
+          <strong>一句话概括</strong>
+          <p>${escapeHtml(summary)}</p>
+        </div>
+
+        <div class="persona-info-block">
+          <strong>风格标签</strong>
+          <div class="tag-row compact-tags">
+            ${tags.slice(0, 6).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+          </div>
+        </div>
+
+        <div class="persona-info-grid">
+          <div>
+            <strong>来源</strong>
+            <p>${escapeHtml(source)}</p>
+          </div>
+          <div>
+            <strong>语气</strong>
+            <p>${escapeHtml(style.tone || "按你的风格接话")}</p>
+          </div>
+          <div>
+            <strong>策略</strong>
+            <p>${escapeHtml(style.replyStrategy || style.logicStyle || "拉回主线，守住边界。")}</p>
+          </div>
+        </div>
+
+        <div class="persona-info-actions">
+          <button class="tiny-button" data-page="personaDistill">上传蒸馏</button>
+          <button class="tiny-button" data-page="personaTest">人格测试</button>
+          <button class="tiny-button" data-action="open-feishu-settings">飞书设置</button>
+        </div>
       </div>
     </section>
   `;
