@@ -19,6 +19,7 @@ import {
 } from "./services/api.js";
 import { escapeAttr, escapeHtml } from "./utils/html.js";
 import { splitReplyMessages } from "./utils/message.js";
+import { readJson, writeJson } from "./utils/storage.js";
 import {
   dedicatedPersonaPersonalities,
   dedicatedPersonaPersonalityWeights,
@@ -1986,19 +1987,6 @@ function uniqueReplyOptions(replies) {
     seen.add(text);
     return true;
   });
-}
-
-function readJson(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeJson(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
 }
 
 function pageFromHash() {
