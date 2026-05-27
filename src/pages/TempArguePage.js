@@ -1,4 +1,6 @@
 import { goalOptions, tempScenarioPresets, toneOptions } from "../data/mockData.js";
+import { escapeAttr, escapeHtml } from "../utils/html.js";
+import { splitReplyMessages } from "../utils/message.js";
 
 export default function TempArguePage(session) {
   return `
@@ -199,23 +201,4 @@ function ChipGroup(field, options, active, extraClass = "") {
         .join("")}
     </div>
   `;
-}
-
-function escapeHtml(value) {
-  return String(value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
-function escapeAttr(value) {
-  return escapeHtml(value).replaceAll("'", "&#39;");
-}
-
-function splitReplyMessages(text) {
-  const value = String(text || "").trim();
-  if (!value) return [];
-  const pieces = value.match(/[^。！？!?]+[。！？!?]?/g) || [value];
-  return pieces.map((piece) => piece.trim()).filter(Boolean);
 }

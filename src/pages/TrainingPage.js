@@ -1,4 +1,5 @@
 import { trainingDifficultyOptions, trainingGoalOptions } from "../data/mockData.js";
+import { escapeAttr, escapeHtml } from "../utils/html.js";
 
 export default function TrainingPage(session) {
   if (session.gameState === "finished") return TrainingFinishedPage(session);
@@ -433,16 +434,4 @@ function clampScore(value) {
   const number = Number(value || 0);
   if (!Number.isFinite(number)) return 0;
   return Math.max(0, Math.min(100, Math.round(number)));
-}
-
-function escapeHtml(value) {
-  return String(value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
-function escapeAttr(value) {
-  return escapeHtml(value).replaceAll("'", "&#39;");
 }

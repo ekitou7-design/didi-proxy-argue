@@ -1,4 +1,5 @@
 import { proxyReplyModes, proxyReplyStrengths } from "../data/mockData.js";
+import { escapeAttr, escapeHtml } from "../utils/html.js";
 
 export default function PersonaPage(state) {
   const activeProfile = getActiveProfile(state);
@@ -347,16 +348,4 @@ function getProfileTags(profile) {
     profile.styleProfile?.commonPhrases ||
     ["专属", "有边界", "会接话"]
   );
-}
-
-function escapeHtml(value) {
-  return String(value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
-function escapeAttr(value) {
-  return escapeHtml(value).replaceAll("'", "&#39;");
 }

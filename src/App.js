@@ -8,6 +8,18 @@ import TrainingPage, { getGameConfig, TrainingPreviewContent } from "./pages/Tra
 import ProfilePage from "./pages/ProfilePage.js";
 import RecordsPage from "./pages/RecordsPage.js";
 import {
+  extractPersona,
+  generatePersonaReply,
+  generatePresetTrainingScenario as requestPresetTrainingScenario,
+  generateRandomTrainingScenario as requestRandomTrainingScenario,
+  generateTempReply,
+  generateTempScenario as requestTempScenario,
+  sendToFeishu,
+  submitTrainingReply
+} from "./services/api.js";
+import { escapeAttr, escapeHtml } from "./utils/html.js";
+import { splitReplyMessages } from "./utils/message.js";
+import {
   dedicatedPersonaPersonalities,
   dedicatedPersonaPersonalityWeights,
   dedicatedPersonaQuizQuestions
@@ -632,7 +644,7 @@ export default class App {
     this.updateProxyPersona({ distillStatus: "loading", distillResult: null, message: "" });
 
     try {
-      const result = await postJson("/api/persona/extract", {
+      const result = await extractPersona({
         rawText: upload.chatText,
         targetSpeaker: upload.targetSpeaker || "我",
         sourceType: upload.sourceType || "chat"
@@ -762,7 +774,7 @@ export default class App {
       .join("\n");
 
     try {
-      const result = await postJson("/api/persona/reply", {
+      const result = await generatePersonaReply({
         chatHistory: state.upload.chatText,
         personaProfile: styleProfile.personaProfile || styleProfile,
         opponentMessage: state.replyForm.opponentMessage,
@@ -843,7 +855,7 @@ export default class App {
 
     let turn;
     try {
-      const result = await postJson("/api/temp-chat", {
+      const result = await generateTempReply({
         scenario: temp.generatedScenario,
         scene: temp.context,
         who: temp.who,
@@ -898,7 +910,7 @@ export default class App {
     });
 
     try {
-      const result = await postJson("/api/temp-scenario", {
+      const result = await requestTempScenario({
         who: temp.who,
         context: temp.context,
         goal: temp.goal,
@@ -949,7 +961,7 @@ export default class App {
     });
 
     try {
-      const result = await postJson("/api/training/scenario/random", {});
+      const result = await requestRandomTrainingScenario();
       const scenario = result.scenario;
       if (!scenario?.openingMessage) throw new Error("场景生成结果为空");
 
@@ -983,7 +995,7 @@ export default class App {
     this.applyGeneratedTrainingScenario(draftScenario, "已按本局配置生成训练草稿，正在用 API 精修...", "loading", requestId);
 
     try {
-      const result = await postJson("/api/training/scenario/preset", request);
+      const result = await requestPresetTrainingScenario(request);
       const scenario = result.scenario;
       if (!scenario?.openingMessage) throw new Error("场景生成结果为空");
       if (this.state.training.scenarioRequestId !== requestId || this.state.training.gameState !== "idle") return;
@@ -1180,7 +1192,7 @@ export default class App {
     });
 
     try {
-      const result = await postJson("/api/training/reply", payload);
+      const result = await submitTrainingReply(payload);
       const assistantMessage = result.assistantMessage || training.opponent || "";
       const nextMessages = assistantMessage ? [...messages, { role: "assistant", content: assistantMessage }] : messages;
       const feedback = userReply
@@ -1422,43 +1434,6 @@ function getCurrentProxyProfile(proxyPersona) {
 function getProfileTagsForLayout(profile) {
   if (!profile) return ["先创建", "再开吵"];
   return (profile.personaProfile?.personalityTags || profile.tags || profile.styleProfile?.commonPhrases || ["专属", "边界"]).slice(0, 4);
-}
-
-function escapeHtml(value) {
-  return String(value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
-function escapeAttr(value) {
-  return escapeHtml(value).replaceAll("'", "&#39;");
-}
-
-async function postJson(url, body) {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  });
-  if (!response.ok) {
-    let message = `请求失败：${response.status}`;
-    try {
-      const data = await response.json();
-      if (data.error === "Missing OPENAI_API_KEY") message = "还没有配置 OPENAI_API_KEY";
-      else if (data.error?.message) message = data.error.message;
-      else if (data.error) message = data.detail ? `${data.error}：${data.detail}` : data.error;
-    } catch {
-      // Keep the status-based message.
-    }
-    throw new Error(message);
-  }
-  return response.json();
-}
-
-async function sendToFeishu({ webhookUrl, text }) {
-  return postJson("/api/feishu/send", { webhookUrl, text });
 }
 
 function createProxyPersonaState() {
@@ -1710,13 +1685,6 @@ function makeTempOpening(who, context) {
   if (/室友|宿舍|卫生/.test(`${who} ${context}`)) return "你别说得好像自己多守规矩一样，宿舍又不是你一个人的。";
   if (/同事|工作|项目/.test(`${who} ${context}`)) return "这也不能全怪我吧，你要求这么高，那你来做不是更快吗？";
   return "你现在这样说就很没必要，本来没多大的事。";
-}
-
-function splitReplyMessages(text) {
-  const value = String(text || "").trim();
-  if (!value) return [];
-  const pieces = value.match(/[^。！？!?]+[。！？!?]?/g) || [value];
-  return pieces.map((piece) => piece.trim()).filter(Boolean);
 }
 
 function mapReplyMode(mode) {
