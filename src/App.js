@@ -15,6 +15,14 @@ import {
   updateFeishuStatusForTurn
 } from "./controllers/feishuController.js";
 import {
+  createPersonaFromTest,
+  deleteProfileResult,
+  generateDistillPersona,
+  generateProxyReply,
+  saveDistillPersona,
+  setCurrentProfile
+} from "./controllers/personaController.js";
+import {
   generateTempScenario,
   handleTempReply,
   useTempScenario
@@ -23,12 +31,6 @@ import {
   getCurrentProxyProfile,
   getProfileName,
   getProfileTagsForLayout,
-  getProfileTone,
-  makeDistillResult,
-  makeLocalReply,
-  makeMockDistillProfile,
-  makeTestResult,
-  mapReplyMode,
   mergePersonas,
   normalizeDistillResult,
   normalizeProfile,
@@ -47,15 +49,12 @@ import {
   scenarioToGameConfig
 } from "./domain/training.js";
 import {
-  extractPersona,
-  generatePersonaReply,
   generatePresetTrainingScenario as requestPresetTrainingScenario,
   generateRandomTrainingScenario as requestRandomTrainingScenario,
   submitTrainingReply
 } from "./services/api.js";
 import { escapeAttr, escapeHtml } from "./utils/html.js";
-import { splitReplyMessages } from "./utils/message.js";
-import { readJson, writeJson } from "./utils/storage.js";
+import { readJson } from "./utils/storage.js";
 import { dedicatedPersonaQuizQuestions } from "./data/njutiQuizData.js";
 import {
   buildPersonaChatTurn,
@@ -594,198 +593,27 @@ export default class App {
   }
 
   async generateDistillPersona() {
-    const { upload } = this.state.proxyPersona;
-    this.updateProxyPersona({ distillStatus: "loading", distillResult: null, message: "" });
-
-    try {
-      const result = await extractPersona({
-        rawText: upload.chatText,
-        targetSpeaker: upload.targetSpeaker || "我",
-        sourceType: upload.sourceType || "chat"
-      });
-      this.updateProxyPersona({
-        distillStatus: "done",
-        distillResult: makeDistillResult(result, upload),
-        message: "蒸馏完成，可以保存档案。"
-      });
-    } catch (error) {
-      this.updateProxyPersona({
-        distillStatus: "done",
-        distillResult: makeDistillResult(makeMockDistillProfile().personaProfile, upload),
-        message: `${error.message}。先用本地模拟结果跑通流程。`
-      });
-    }
+    return generateDistillPersona(this);
   }
 
   saveDistillPersona() {
-    const result = this.state.proxyPersona.distillResult;
-    if (!result) return;
-    const distillResults = [result, ...this.state.proxyPersona.distillResults];
-    writeJson(DISTILL_RESULTS_KEY, distillResults);
-    writeJson(CURRENT_PROFILE_KEY, result);
-    this.setState({
-      page: "persona",
-      activePersona: result.profileName,
-      proxyPersona: {
-        ...this.state.proxyPersona,
-        distillResults,
-        personas: mergePersonas(distillResults, this.state.proxyPersona.testResults),
-        selectedPersonaId: result.id,
-        currentProfile: result,
-        createSheetOpen: false,
-        distillResult: null,
-        distillStatus: "idle",
-        message: "已保存蒸馏嘴替档案，并设为当前嘴替。"
-      }
-    });
-    if (window.location.hash !== "#/persona") window.location.hash = "#/persona";
+    return saveDistillPersona(this);
   }
 
   createPersonaFromTest() {
-    const answered = Object.values(this.state.proxyPersona.testAnswers).filter(Boolean).length;
-    const unanswered = dedicatedPersonaQuizQuestions.length - answered;
-    if (unanswered > 1) {
-      window.alert?.(`还有 ${unanswered} 道题未作答，最多只能空 1 道题。`);
-      return;
-    }
-
-    const result = makeTestResult(this.state.proxyPersona.testAnswers);
-    const testResults = [result, ...this.state.proxyPersona.testResults];
-    writeJson(TEST_RESULTS_KEY, testResults);
-    writeJson(CURRENT_PROFILE_KEY, result);
-    this.setState({
-      page: "persona",
-      proxyPersona: {
-        ...this.state.proxyPersona,
-        testResults,
-        personas: mergePersonas(this.state.proxyPersona.distillResults, testResults),
-        selectedPersonaId: result.id,
-        currentProfile: result,
-        createSheetOpen: false,
-        message: `已生成专属嘴替人格：${result.typeName}，并设为当前嘴替。`
-      }
-    });
-    if (window.location.hash !== "#/persona") window.location.hash = "#/persona";
+    return createPersonaFromTest(this);
   }
 
   setCurrentProfile(profileId) {
-    const profile = this.state.proxyPersona.personas.find((item) => item.id === profileId);
-    if (!profile) return;
-    writeJson(CURRENT_PROFILE_KEY, profile);
-    this.updateProxyPersona({
-      currentProfile: profile,
-      selectedPersonaId: profile.id,
-      createSheetOpen: false,
-      personaInfoOpen: false,
-      message: `当前嘴替已设为：${getProfileName(profile)}`
-    });
+    return setCurrentProfile(this, profileId);
   }
 
   deleteProfileResult(profileId) {
-    const distillResults = this.state.proxyPersona.distillResults.filter((item) => item.id !== profileId);
-    const testResults = this.state.proxyPersona.testResults.filter((item) => item.id !== profileId);
-    writeJson(DISTILL_RESULTS_KEY, distillResults);
-    writeJson(TEST_RESULTS_KEY, testResults);
-
-    const currentProfile =
-      this.state.proxyPersona.currentProfile?.id === profileId ? null : this.state.proxyPersona.currentProfile;
-    if (!currentProfile) localStorage.removeItem(CURRENT_PROFILE_KEY);
-
-    this.updateProxyPersona({
-      distillResults,
-      testResults,
-      personas: mergePersonas(distillResults, testResults),
-      currentProfile,
-      selectedPersonaId: currentProfile?.id || "",
-      message: "已删除。"
-    });
+    return deleteProfileResult(this, profileId);
   }
 
   async generateProxyReply() {
-    const state = this.state.proxyPersona;
-    if (state.isReplyGenerating) return;
-
-    const styleProfile =
-      state.personas.find((persona) => String(persona.id) === String(state.selectedPersonaId)) ||
-      state.currentProfile;
-    if (!styleProfile) {
-      this.updateProxyPersona({ message: "请先生成或选择一个嘴替档案。" });
-      return;
-    }
-
-    this.updateProxyPersona({
-      isReplyGenerating: true,
-      replyResult: null,
-      message: "正在生成回应..."
-    });
-
-    const userText = [
-      state.replyForm.background,
-      state.replyForm.opponentMessage,
-      state.replyForm.goal ? `我想表达：${state.replyForm.goal}` : ""
-    ]
-      .filter(Boolean)
-      .join("\n");
-
-    try {
-      const result = await generatePersonaReply({
-        chatHistory: state.upload.chatText,
-        personaProfile: styleProfile.personaProfile || styleProfile,
-        opponentMessage: state.replyForm.opponentMessage,
-        background: state.replyForm.background,
-        realThought: "",
-        goal: state.replyForm.goal,
-        strength: state.replyForm.strength,
-        mode: mapReplyMode(state.replyForm.mode)
-      });
-      const reply = result.reply || result.myStyleReply || result.data?.reply;
-      const assistantTurns = splitReplyMessages(reply).map((text, index) => ({
-        id: `assistant-${Date.now()}-${index}`,
-        role: "assistant",
-        text
-      }));
-      const chatTurns = [
-        ...state.chatTurns,
-        { id: `user-${Date.now()}`, role: "user", text: userText || state.replyForm.opponentMessage },
-        ...assistantTurns
-      ];
-      writeJson(PERSONA_CHAT_KEY, chatTurns);
-      this.updateProxyPersona({
-        chatTurns,
-        replyResult: {
-          reply,
-          strategy: result.styleAnalysis,
-          tone: getProfileTone(styleProfile)
-        },
-        isReplyGenerating: false,
-        replyForm: {
-          ...state.replyForm,
-          opponentMessage: "",
-          background: "",
-          goal: ""
-        },
-        message: "嘴替已经接上了。"
-      });
-    } catch (error) {
-      const fallback = makeLocalReply(state.replyForm, styleProfile);
-      const assistantTurns = splitReplyMessages(fallback.reply).map((text, index) => ({
-        id: `assistant-${Date.now()}-${index}`,
-        role: "assistant",
-        text
-      }));
-      const chatTurns = [
-        ...state.chatTurns,
-        { id: `user-${Date.now()}`, role: "user", text: userText || state.replyForm.opponentMessage },
-        ...assistantTurns
-      ];
-      writeJson(PERSONA_CHAT_KEY, chatTurns);
-      this.updateProxyPersona({
-        chatTurns,
-        replyResult: fallback,
-        isReplyGenerating: false,
-        message: `${error.message}。先用本地示例回应预览。`
-      });
-    }
+    return generateProxyReply(this);
   }
 
   async handleTempReply({ inputAsIntent = false } = {}) {
