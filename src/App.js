@@ -15,6 +15,11 @@ import {
   updateFeishuStatusForTurn
 } from "./controllers/feishuController.js";
 import {
+  generateTempScenario,
+  handleTempReply,
+  useTempScenario
+} from "./controllers/tempController.js";
+import {
   getCurrentProxyProfile,
   getProfileName,
   getProfileTagsForLayout,
@@ -29,7 +34,6 @@ import {
   normalizeProfile,
   normalizeTestResult
 } from "./domain/persona.js";
-import { buildLocalTempScenario, normalizeTempScenario, uniqueReplyOptions } from "./domain/temp.js";
 import {
   buildPresetScenarioDraft,
   buildScenarioFromGameConfig,
@@ -47,8 +51,6 @@ import {
   generatePersonaReply,
   generatePresetTrainingScenario as requestPresetTrainingScenario,
   generateRandomTrainingScenario as requestRandomTrainingScenario,
-  generateTempReply,
-  generateTempScenario as requestTempScenario,
   submitTrainingReply
 } from "./services/api.js";
 import { escapeAttr, escapeHtml } from "./utils/html.js";
@@ -57,7 +59,6 @@ import { readJson, writeJson } from "./utils/storage.js";
 import { dedicatedPersonaQuizQuestions } from "./data/njutiQuizData.js";
 import {
   buildPersonaChatTurn,
-  buildTempChatTurn,
   features,
   initialPersonaSession,
   initialProxyPersonaState,
@@ -578,20 +579,7 @@ export default class App {
   }
 
   useTempScenario(index) {
-    const preset = tempScenarioPresets[Number(index)];
-    if (!preset) return;
-    this.setState({
-      temp: {
-        ...this.state.temp,
-        ...preset,
-        generatedScenario: null,
-        scenarioStatus: "idle",
-        scenarioMessage: "",
-        settingsOpen: false,
-        input: "",
-        rounds: []
-      }
-    });
+    return useTempScenario(this, index);
   }
 
   setNestedState(rootKey, groupKey, field, value, render = true) {
@@ -801,117 +789,11 @@ export default class App {
   }
 
   async handleTempReply({ inputAsIntent = false } = {}) {
-    const temp = this.state.temp;
-    if (temp.isSubmitting) return;
-
-    const typedText = temp.input.trim();
-    const opponentText = inputAsIntent
-      ? temp.latest.trim() || temp.generatedScenario?.openingMessage || ""
-      : typedText || temp.latest.trim() || temp.generatedScenario?.openingMessage || "";
-    const userIntent = inputAsIntent ? typedText : "";
-    if (!opponentText && !userIntent) return;
-
-    this.setState({
-      temp: {
-        ...temp,
-        input: "",
-        isSubmitting: true
-      }
-    });
-
-    let turn;
-    try {
-      const result = await generateTempReply({
-        scenario: temp.generatedScenario,
-        scene: temp.context,
-        who: temp.who,
-        latestOpponentMessage: opponentText,
-        opponent: opponentText,
-        userIntent,
-        goal: temp.goal,
-        tone: temp.tone,
-        intensity: temp.tone,
-        history: temp.rounds.map((round) => ({
-          opponent: round.opponent,
-          reply: round.replies?.[0]?.text || "",
-          analysis: round.analysis
-        }))
-      });
-      turn = {
-        id: Date.now(),
-        opponent: opponentText || "我想表达：" + userIntent,
-        analysis: result.opponentTactic,
-        mainline: `${result.strategy} ${result.offTopicWarning || ""}`,
-        replies: uniqueReplyOptions([
-          { label: "稳妥版", text: result.recommendedReply },
-          { label: "强硬版", text: result.strongerReply },
-          { label: "嘴替版/阴阳版", text: result.sarcasticReply || result.politeFinalReply }
-        ])
-      };
-    } catch {
-      turn = buildTempChatTurn(temp, opponentText || userIntent);
-      turn.replies = uniqueReplyOptions(turn.replies);
-    }
-    this.setState({
-      temp: {
-        ...this.state.temp,
-        latest: opponentText || temp.latest,
-        input: "",
-        isSubmitting: false,
-        rounds: [...temp.rounds, turn]
-      }
-    });
+    return handleTempReply(this, { inputAsIntent });
   }
 
   async generateTempScenario() {
-    const temp = this.state.temp;
-    if (temp.scenarioStatus === "loading") return;
-
-    this.setState({
-      temp: {
-        ...temp,
-        scenarioStatus: "loading",
-        scenarioMessage: "正在生成临时冲突现场..."
-      }
-    });
-
-    try {
-      const result = await requestTempScenario({
-        who: temp.who,
-        context: temp.context,
-        goal: temp.goal,
-        tone: temp.tone,
-        latest: temp.latest
-      });
-      const scenario = normalizeTempScenario(result.scenario || result, temp);
-      this.setState({
-        temp: {
-          ...this.state.temp,
-          who: scenario.opponentPersona || this.state.temp.who,
-          context: scenario.background || this.state.temp.context,
-          latest: scenario.openingMessage || this.state.temp.latest,
-          goal: scenario.userGoal || this.state.temp.goal,
-          generatedScenario: scenario,
-          scenarioStatus: "done",
-          scenarioMessage: "临时场景已生成，对方先开口了。",
-          input: "",
-          rounds: []
-        }
-      });
-    } catch (error) {
-      const scenario = buildLocalTempScenario(temp);
-      this.setState({
-        temp: {
-          ...this.state.temp,
-          latest: scenario.openingMessage,
-          generatedScenario: scenario,
-          scenarioStatus: "done",
-          scenarioMessage: `API 生成较慢或失败，已先生成本地场景。${error.message ? `（${error.message}）` : ""}`,
-          input: "",
-          rounds: []
-        }
-      });
-    }
+    return generateTempScenario(this);
   }
 
   async generateRandomTrainingScenario() {
