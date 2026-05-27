@@ -47,6 +47,13 @@ import {
   normalizeProfile,
   normalizeTestResult
 } from "./domain/persona.js";
+import {
+  CURRENT_PROFILE_KEY,
+  DISTILL_RESULTS_KEY,
+  FEISHU_WEBHOOK_KEY,
+  PERSONA_CHAT_KEY,
+  TEST_RESULTS_KEY
+} from "./constants/storageKeys.js";
 import { readJson } from "./utils/storage.js";
 import { dedicatedPersonaQuizQuestions } from "./data/njutiQuizData.js";
 import {
@@ -57,12 +64,6 @@ import {
   initialTrainingSession,
   relationProfiles
 } from "./data/mockData.js";
-
-const DISTILL_RESULTS_KEY = "persona_distill_results";
-const TEST_RESULTS_KEY = "persona_test_results";
-const CURRENT_PROFILE_KEY = "current_persona_profile";
-const PERSONA_CHAT_KEY = "persona_chat_turns";
-const FEISHU_WEBHOOK_KEY = "didi_feishu_webhook_url";
 
 const pageTitles = {
   home: "临时吵",

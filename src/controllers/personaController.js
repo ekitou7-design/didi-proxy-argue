@@ -1,5 +1,11 @@
 import { dedicatedPersonaQuizQuestions } from "../data/njutiQuizData.js";
 import {
+  CURRENT_PROFILE_KEY,
+  DISTILL_RESULTS_KEY,
+  PERSONA_CHAT_KEY,
+  TEST_RESULTS_KEY
+} from "../constants/storageKeys.js";
+import {
   getProfileName,
   getProfileTone,
   makeDistillResult,
@@ -12,11 +18,6 @@ import {
 import { extractPersona, generatePersonaReply } from "../services/api.js";
 import { splitReplyMessages } from "../utils/message.js";
 import { writeJson } from "../utils/storage.js";
-
-const DISTILL_RESULTS_KEY = "persona_distill_results";
-const TEST_RESULTS_KEY = "persona_test_results";
-const CURRENT_PROFILE_KEY = "current_persona_profile";
-const PERSONA_CHAT_KEY = "persona_chat_turns";
 
 export async function generateDistillPersona(app) {
   const { upload } = app.state.proxyPersona;

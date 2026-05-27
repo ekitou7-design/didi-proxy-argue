@@ -1,6 +1,5 @@
+import { FEISHU_WEBHOOK_KEY } from "../constants/storageKeys.js";
 import { sendToFeishu } from "../services/api.js";
-
-const FEISHU_WEBHOOK_KEY = "didi_feishu_webhook_url";
 
 export function openFeishuSettings(app, status = "") {
   const hash = "#/profile";
