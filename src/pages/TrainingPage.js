@@ -1,5 +1,6 @@
 import { trainingDifficultyOptions, trainingGoalOptions } from "../data/mockData.js";
 import { escapeAttr, escapeHtml } from "../utils/html.js";
+import { getMessageContent } from "../utils/messageModel.js";
 
 export default function TrainingPage(session) {
   if (session.gameState === "finished") return TrainingFinishedPage(session);
@@ -221,7 +222,7 @@ function MessageBubble(message, feedbacks, index, config) {
   return `
     <article class="persona-bubble ${isUser ? "from-proxy" : "from-user"}">
       <span>${escapeHtml(role.name)}</span>
-      <p>${escapeHtml(message.content)}</p>
+      <p>${escapeHtml(getMessageContent(message))}</p>
       ${feedback ? RoundFeedback(feedback) : ""}
     </article>
   `;

@@ -1,5 +1,6 @@
 import { proxyReplyModes, proxyReplyStrengths } from "../data/mockData.js";
 import { escapeAttr, escapeHtml } from "../utils/html.js";
+import { getMessageContent } from "../utils/messageModel.js";
 
 export default function PersonaPage(state) {
   const activeProfile = getActiveProfile(state);
@@ -136,7 +137,7 @@ function ChatBubble(turn, profile, state) {
   return `
     <article class="persona-bubble ${isUser ? "from-user" : "from-proxy"}">
       <span>${isUser ? "你" : escapeHtml(getProfileName(profile))}</span>
-      <p>${escapeHtml(turn.text)}</p>
+      <p>${escapeHtml(getMessageContent(turn))}</p>
       ${isUser ? "" : FeishuSendButton(turn, feishuStatus)}
     </article>
   `;
