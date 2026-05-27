@@ -8,6 +8,13 @@ import TrainingPage, { getGameConfig, TrainingPreviewContent } from "./pages/Tra
 import ProfilePage from "./pages/ProfilePage.js";
 import RecordsPage from "./pages/RecordsPage.js";
 import {
+  openFeishuSettings,
+  saveFeishuSettings,
+  sendReplyToFeishu,
+  testFeishuWebhook,
+  updateFeishuStatusForTurn
+} from "./controllers/feishuController.js";
+import {
   getCurrentProxyProfile,
   getProfileName,
   getProfileTagsForLayout,
@@ -42,7 +49,6 @@ import {
   generateRandomTrainingScenario as requestRandomTrainingScenario,
   generateTempReply,
   generateTempScenario as requestTempScenario,
-  sendToFeishu,
   submitTrainingReply
 } from "./services/api.js";
 import { escapeAttr, escapeHtml } from "./utils/html.js";
@@ -477,86 +483,23 @@ export default class App {
   }
 
   openFeishuSettings(status = "") {
-    const hash = hashFromPage("profile");
-    if (hash && window.location.hash !== hash) window.location.hash = hash;
-    this.setState({
-      page: "profile",
-      feishu: {
-        ...this.state.feishu,
-        settingsOpen: true,
-        status
-      }
-    });
+    return openFeishuSettings(this, status);
   }
 
   saveFeishuSettings() {
-    const webhookUrl = this.state.feishu.webhookUrl.trim();
-    localStorage.setItem(FEISHU_WEBHOOK_KEY, webhookUrl);
-    this.updateFeishu({
-      webhookUrl,
-      savedWebhookUrl: webhookUrl,
-      status: webhookUrl ? "已保存飞书 Webhook。" : "已清空飞书 Webhook。"
-    });
+    return saveFeishuSettings(this);
   }
 
   async testFeishuWebhook() {
-    const webhookUrl = this.state.feishu.webhookUrl.trim();
-    if (!webhookUrl) {
-      this.updateFeishu({ status: "请先填写飞书群 Webhook URL。" });
-      return;
-    }
-
-    this.updateFeishu({ testStatus: "sending", status: "正在测试发送..." });
-    try {
-      await sendToFeishu({ webhookUrl, text: "飞书接入测试：App 已经可以把 AI 回怼推送到群里。" });
-      localStorage.setItem(FEISHU_WEBHOOK_KEY, webhookUrl);
-      this.updateFeishu({
-        savedWebhookUrl: webhookUrl,
-        testStatus: "sent",
-        status: "测试发送成功。"
-      });
-    } catch (error) {
-      this.updateFeishu({
-        testStatus: "error",
-        status: `测试发送失败：${error.message}`
-      });
-    }
+    return testFeishuWebhook(this);
   }
 
   async sendReplyToFeishu(turnId) {
-    const turn = this.state.proxyPersona.chatTurns.find((item) => String(item.id) === String(turnId));
-    if (!turn?.text) return;
-
-    const webhookUrl = this.state.feishu.webhookUrl.trim() || localStorage.getItem(FEISHU_WEBHOOK_KEY) || "";
-    if (!webhookUrl) {
-      this.updateProxyPersona({ message: "请先配置飞书 Webhook" });
-      this.openFeishuSettings("请先配置飞书 Webhook");
-      return;
-    }
-
-    this.updateFeishuStatusForTurn(turnId, "sending");
-    try {
-      await sendToFeishu({ webhookUrl, text: turn.text });
-      this.updateFeishuStatusForTurn(turnId, "sent", "已发送到飞书。");
-    } catch (error) {
-      this.updateFeishuStatusForTurn(turnId, "error", `发送失败：${error.message}`);
-    }
+    return sendReplyToFeishu(this, turnId);
   }
 
   updateFeishuStatusForTurn(turnId, status, message = "") {
-    this.setState({
-      feishu: {
-        ...this.state.feishu,
-        sendingByTurnId: {
-          ...this.state.feishu.sendingByTurnId,
-          [turnId]: status
-        }
-      },
-      proxyPersona: {
-        ...this.state.proxyPersona,
-        message: message || this.state.proxyPersona.message
-      }
-    });
+    return updateFeishuStatusForTurn(this, turnId, status, message);
   }
 
   updateTrainingSetup(parts, value, render = true) {
