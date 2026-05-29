@@ -1492,6 +1492,16 @@ textarea:focus {
   background: var(--blue);
 }
 
+.temp-settings-card .settings-title-row {
+  grid-template-columns: minmax(0, 1fr) 96px;
+  align-items: start;
+}
+
+.temp-settings-actions {
+  display: grid;
+  gap: 7px;
+}
+
 .temp-scenario-summary {
   display: grid;
   gap: 8px;

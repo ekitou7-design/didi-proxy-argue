@@ -15,6 +15,7 @@ export async function handleTempReply(app, { inputAsIntent = false } = {}) {
     : typedText || temp.latest.trim() || temp.generatedScenario?.openingMessage || "";
   const userIntent = inputAsIntent ? typedText : "";
   if (!opponentText && !userIntent) return;
+  const displayText = inputAsIntent ? userIntent : opponentText;
 
   app.setState({
     temp: {
@@ -30,31 +31,39 @@ export async function handleTempReply(app, { inputAsIntent = false } = {}) {
       scenario: temp.generatedScenario,
       scene: temp.context,
       who: temp.who,
+      currentInput: typedText,
+      inputMode: inputAsIntent ? "userIntent" : "opponentMessage",
       latestOpponentMessage: opponentText,
       opponent: opponentText,
       userIntent,
       goal: temp.goal,
       tone: temp.tone,
       intensity: temp.tone,
+      boundary: temp.boundary,
       history: temp.rounds.map((round) => ({
         opponent: round.opponent,
         reply: round.replies?.[0]?.text || "",
         analysis: round.analysis
       }))
     });
+    const fallbackTurn = buildTempChatTurn(temp, displayText, { inputAsIntent });
+    const resultMainline = result.mainline && typeof result.mainline === "object"
+      ? [result.mainline.fact, result.mainline.impact, result.mainline.request, result.mainline.boundary].filter(Boolean).join(" ")
+      : "";
     turn = {
       id: Date.now(),
-      opponent: opponentText || "我想表达：" + userIntent,
-      analysis: result.opponentTactic,
-      mainline: `${result.strategy} ${result.offTopicWarning || ""}`,
+      opponent: inputAsIntent ? "我想表达：" + userIntent : opponentText,
+      analysis: result.opponentTactic || fallbackTurn.analysis,
+      mainline: [result.strategy, resultMainline, result.offTopicWarning].filter(Boolean).join(" ") || fallbackTurn.mainline,
       replies: uniqueReplyOptions([
         { label: "稳妥版", text: result.recommendedReply },
         { label: "强硬版", text: result.strongerReply },
-        { label: "嘴替版/阴阳版", text: result.sarcasticReply || result.politeFinalReply }
+        { label: "嘴替版/阴阳版", text: result.sarcasticReply || result.politeFinalReply },
+        ...fallbackTurn.replies
       ])
     };
   } catch {
-    turn = buildTempChatTurn(temp, opponentText || userIntent);
+    turn = buildTempChatTurn(temp, displayText, { inputAsIntent });
     turn.replies = uniqueReplyOptions(turn.replies);
   }
   app.setState({
@@ -71,6 +80,8 @@ export async function handleTempReply(app, { inputAsIntent = false } = {}) {
 export async function generateTempScenario(app) {
   const temp = app.state.temp;
   if (temp.scenarioStatus === "loading") return;
+  const nextRefreshCount = Number(temp.scenarioRefreshCount || 0) + 1;
+  const latestForScenario = temp.latest && temp.latest !== temp.generatedScenario?.openingMessage ? temp.latest : "";
 
   app.setState({
     temp: {
@@ -86,7 +97,8 @@ export async function generateTempScenario(app) {
       context: temp.context,
       goal: temp.goal,
       tone: temp.tone,
-      latest: temp.latest
+      latest: latestForScenario,
+      refreshCount: nextRefreshCount
     });
     const scenario = normalizeTempScenario(result.scenario || result, temp);
     app.setState({
@@ -99,12 +111,13 @@ export async function generateTempScenario(app) {
         generatedScenario: scenario,
         scenarioStatus: "done",
         scenarioMessage: "临时场景已生成，对方先开口了。",
+        scenarioRefreshCount: nextRefreshCount,
         input: "",
         rounds: []
       }
     });
   } catch (error) {
-    const scenario = buildLocalTempScenario(temp);
+    const scenario = buildLocalTempScenario({ ...temp, scenarioRefreshCount: nextRefreshCount });
     app.setState({
       temp: {
         ...app.state.temp,
@@ -112,6 +125,7 @@ export async function generateTempScenario(app) {
         generatedScenario: scenario,
         scenarioStatus: "done",
         scenarioMessage: `API 生成较慢或失败，已先生成本地场景。${error.message ? `（${error.message}）` : ""}`,
+        scenarioRefreshCount: nextRefreshCount,
         input: "",
         rounds: []
       }

@@ -24,7 +24,12 @@ function TempSettings(session) {
           <h2>${escapeHtml(scenario?.title || session.who || "临时对手")}</h2>
           <p>${escapeHtml(scenario?.background || session.context || "先补一下前情，嘴替才好接话。")}</p>
         </div>
-        <button class="primary-button random-scenario-button" data-action="open-temp-settings">场景设置</button>
+        <div class="temp-settings-actions">
+          <button class="secondary-button warm random-scenario-button" data-action="generate-temp-scenario" ${session.scenarioStatus === "loading" ? "disabled" : ""}>
+            ${session.scenarioStatus === "loading" ? "刷新中..." : "换个场景"}
+          </button>
+          <button class="primary-button random-scenario-button" data-action="open-temp-settings">场景设置</button>
+        </div>
       </div>
       ${session.scenarioMessage ? `<p class="section-note compact-status-note">${escapeHtml(session.scenarioMessage)}</p>` : ""}
     </section>
@@ -40,7 +45,7 @@ function TempSettingsSheet(session) {
           <button class="tiny-button" data-action="close-temp-settings">完成</button>
         </div>
         <button class="primary-button compact-full-button" data-action="generate-temp-scenario" ${session.scenarioStatus === "loading" ? "disabled" : ""}>
-          ${session.scenarioStatus === "loading" ? "生成中..." : "生成临时吵架场景"}
+          ${session.scenarioStatus === "loading" ? "生成中..." : session.generatedScenario ? "刷新临时吵架场景" : "生成临时吵架场景"}
         </button>
         ${session.generatedScenario ? TempScenarioSummary(session.generatedScenario) : ""}
         <div class="settings-grid">

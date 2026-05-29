@@ -98,6 +98,7 @@ ${JSON.stringify(input, null, 2)}
 
 要求：
 - 场景必须贴合“和谁吵 / 发生了什么 / 目标 / 语气强度”。
+- 如果输入里有 refreshCount，必须生成一个和上一轮明显不同的 openingMessage 或冲突角度，避免刷新后还是同一场景。
 - openingMessage 要像真实对方会说的一句话，不要像总结。
 - mainline 使用 FIRB：fact、impact、request、boundary。
 - 不要生成辱骂、威胁、现实报复或违法内容。
@@ -147,10 +148,13 @@ ${formatTechniques(techniques)}
 
 要求：
 - recommendedReply 必须是一句最推荐直接发送的话。
+- recommendedReply 必须回应 latestOpponentMessage 或 userIntent 的具体内容，不准只套“回到主线/正面回应”的万能模板。
+- 回复里至少要保留一个来自输入的具体信息：对方话术、事件、诉求、责任、规则、时间、对象或损失。
 - strongerReply 更强硬，但不能辱骂、人身攻击、威胁。
 - sarcasticReply 可以有轻微阴阳，但不要越界。
 - politeFinalReply 用于体面收束。
 - 参考历史，不要每轮都重复同一句结构。
+- 如果 userIntent 有内容，先满足用户想表达的意思；如果 latestOpponentMessage 有内容，先接住对方刚说的话。
 
 必须返回这个 JSON 结构：
 {

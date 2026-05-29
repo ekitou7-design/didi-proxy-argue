@@ -106,6 +106,7 @@ export const initialTempSession = {
   generatedScenario: null,
   scenarioStatus: "idle",
   scenarioMessage: "",
+  scenarioRefreshCount: 0,
   settingsOpen: false,
   input: "",
   isSubmitting: false,
@@ -194,8 +195,8 @@ export function makeContextSummary(session) {
   };
 }
 
-export function buildTempChatTurn(session, opponentText) {
-  return buildRealtimeTurn(session, opponentText);
+export function buildTempChatTurn(session, text, options = {}) {
+  return buildTargetedTempTurn(session, text, options);
 }
 
 export function buildPersonaChatTurn(session, opponentText) {
@@ -229,6 +230,101 @@ function buildRealtimeTurn(session, opponentText, hasPersona = false) {
       }
     ],
     toneReminder: `按“${tone}”来，但别为了显得好说话把边界让没了。`
+  };
+}
+
+function buildTargetedTempTurn(session, text, { inputAsIntent = false } = {}) {
+  const rawText = String(text || "").trim();
+  const object = session.who || session.generatedScenario?.opponentPersona || "对方";
+  const goal = session.goal || session.generatedScenario?.userGoal || "把诉求说清楚";
+  const scene = session.generatedScenario?.background || session.context || "这次冲突";
+  const tone = session.tone || "中";
+  const boundary = session.boundary || "不要骂脏话，不要人身攻击，只围绕主线表达。";
+  const analysis = inputAsIntent ? "你现在给的是想表达的意思，需要把它变成更清楚、更有压迫感但不越界的话。" : detectTactic(rawText);
+  const tacticReply = buildTempReplyCore({ text: rawText, object, goal, scene, tone, inputAsIntent });
+
+  return {
+    id: Date.now(),
+    opponent: inputAsIntent ? `我想表达：${rawText}` : rawText,
+    analysis,
+    mainline: `本轮围绕“${goal}”。场景是：${scene}。不要顺着${object}去解释情绪，先抓事实和影响，再给明确要求。边界：${boundary}`,
+    replies: [
+      {
+        label: "稳妥版",
+        text: tacticReply.balanced
+      },
+      {
+        label: "强硬版",
+        text: tacticReply.strong
+      },
+      {
+        label: "嘴替版/阴阳版",
+        text: tacticReply.sharp
+      }
+    ],
+    toneReminder: `按“${tone}”来，但别为了显得好说话把边界让没了。`
+  };
+}
+
+function buildTempReplyCore({ text, object, goal, scene, tone, inputAsIntent }) {
+  const safeText = text || goal;
+  const highTone = tone === "高";
+
+  if (inputAsIntent) {
+    const intent = safeText.replace(/[。！？\s]+$/g, "");
+    return {
+      balanced: `我说这件事不是为了跟你耗，是要把问题讲清楚：${intent}。请你正面回应，而不是继续绕开。`,
+      strong: `我不接受你把重点带偏。我的意思很明确：${intent}。这件事需要一个正面说法和处理结果。`,
+      sharp: `别急着给我扣态度问题，我现在讲的是：${intent}。能回应就回应，不能回应也别装没听懂。`
+    };
+  }
+
+  if (/敏感|上纲上线|小事|又开始|想太多|事多/.test(safeText)) {
+    return {
+      balanced: `别把问题说成我太敏感。现在讨论的是${scene}里已经发生的事，以及你准备怎么处理。我的要求是：${goal}。`,
+      strong: `你可以不认同我的感受，但不能用“我太敏感”把事情盖过去。问题还在这儿：${goal}，请正面回应。`,
+      sharp: `把具体问题包装成我情绪大，这招不新鲜。我们别演了，回到事实：${goal}。`
+    };
+  }
+
+  if (/规则|不符合|自己看|没看清|不是我们|不关我|流程/.test(safeText)) {
+    return {
+      balanced: `规则我可以看，但你也要说明这件事具体怎么处理。别只把责任推回来，我要的是明确方案：${goal}。`,
+      strong: `别用一句规则就结束问题。你现在需要回答的是责任和处理方案，不是让我自己消化损失。我的诉求是：${goal}。`,
+      sharp: `规则不是挡箭牌。能处理就说方案，不能处理就说依据，别只会把锅推给用户。`
+    };
+  }
+
+  if (/随你|行吧|呵呵|你开心|懂的都懂|至于吗|不会吧|无语/.test(safeText)) {
+    return {
+      balanced: `你如果有具体意见可以直接说，别用这种话把问题悬着。我们回到事情本身：${goal}。`,
+      strong: `阴阳怪气解决不了问题。你要么说清楚哪里不同意，要么正面回应我的诉求：${goal}。`,
+      sharp: `这种话术省力，但不解决事。你要表达不满就明说，别拿语气逃避主线。`
+    };
+  }
+
+  if (/那你想|怎么办|怎么做|还要怎样|你说/.test(safeText)) {
+    return {
+      balanced: `我说得很具体：先承认这件事造成的影响，再给出处理办法。我的诉求是：${goal}。`,
+      strong: `别把责任又丢回来让我替你想。你需要给的是回应和方案，我的要求就是：${goal}。`,
+      sharp: `不是我替你补作业。问题是你这边造成的，方案也该由你先给。`
+    };
+  }
+
+  if (/为你好|不听劝|后悔|都是关心|我还不是/.test(safeText)) {
+    return {
+      balanced: `如果是关心，就应该尊重我的选择，而不是把控制包装成建议。现在我要讲清楚的是：${goal}。`,
+      strong: `别用“为你好”压住我的表达。关心不能替代尊重，我的边界和诉求是：${goal}。`,
+      sharp: `打着关心的旗号替我做决定，这不叫为我好，叫不尊重。`
+    };
+  }
+
+  return {
+    balanced: `我先把话说清楚：这件事的重点不是谁声音大，而是${scene}已经影响到我。我的诉求是：${goal}。`,
+    strong: `别继续绕开重点。现在要解决的是这件事本身，以及你准备怎么回应我的诉求：${goal}。`,
+    sharp: highTone
+      ? `别把话题搅浑。你可以有情绪，但问题不会因为你转移重点就消失。回到主线：${goal}。`
+      : `我不接跑题。事情说回具体的：${goal}，请你正面回应。`
   };
 }
 
