@@ -18,14 +18,14 @@ export function normalizeTrainingGameConfig(config = {}) {
   return {
     scene: String(config.scene || "").trim(),
     roleA: normalizeRoleConfig(config.roleA, {
-      name: "我",
+      name: "角色A",
       description: "场景中的主动表达者",
       goal: "说清问题，守住主线"
     }),
     roleB: normalizeRoleConfig(config.roleB, {
-      name: "对方",
+      name: "角色B",
       description: "场景中的冲突对象",
-      goal: "反驳玩家，制造压力"
+      goal: "反驳另一方，制造压力"
     }),
     playerRoleKey,
     aiRoleKey: oppositeRoleKey(playerRoleKey),
@@ -106,25 +106,25 @@ export function inferScenarioRoles(scenario = {}, previousConfig = {}) {
   const text = `${scenario.title || ""} ${scenario.background || ""} ${scenario.relationship || ""} ${scenario.category || ""}`;
   if (/男朋友|女朋友|情侣|恋爱|冷战|对象/.test(text)) {
     return {
-      roleA: { name: "我", description: "被临时改约影响的人", goal: "说清感受和要求，不被太敏感带偏" },
-      roleB: { name: "男朋友", description: "临时改约后觉得对方反应太大", goal: "为临时改约找理由，反驳对方太敏感" }
+      roleA: { name: "角色A", description: "被临时改约影响的人", goal: "说清感受和要求，不被太敏感带偏" },
+      roleB: { name: "男朋友", description: "临时改约后觉得角色A反应太大", goal: "为临时改约找理由，反驳角色A太敏感" }
     };
   }
   if (/室友|宿舍|合租|垃圾/.test(text)) {
     return {
-      roleA: { name: "我", description: "被室友不倒垃圾影响的人", goal: "让室友承担责任，不要再嘲讽和转移话题" },
-      roleB: { name: "室友", description: "不想倒垃圾，还觉得对方管太多", goal: "为自己辩解，反驳对方，说对方小题大做" }
+      roleA: { name: "角色A", description: "被室友不倒垃圾影响的人", goal: "让室友承担责任，不要再嘲讽和转移话题" },
+      roleB: { name: "室友", description: "不想倒垃圾，还觉得角色A管太多", goal: "为自己辩解，反驳角色A，说角色A小题大做" }
     };
   }
   if (/同事|职场|工作|项目|客户/.test(text)) {
     return {
-      roleA: { name: "我", description: "被同事甩锅影响的人", goal: "澄清责任，要求对方正面处理问题" },
-      roleB: { name: "同事", description: "把工作压力和责任推给别人", goal: "为自己推脱，强调对方也有责任" }
+      roleA: { name: "角色A", description: "被同事甩锅影响的人", goal: "澄清责任，要求同事正面处理问题" },
+      roleB: { name: "同事", description: "把工作压力和责任推给角色A", goal: "为自己推脱，强调角色A也有责任" }
     };
   }
   return {
-    roleA: previousConfig.roleA || { name: "我", description: "场景中的主动表达者", goal: "说清问题，守住主线" },
-    roleB: previousConfig.roleB || { name: "对方", description: "场景中的冲突对象", goal: "反驳玩家，制造压力" }
+    roleA: previousConfig.roleA || { name: "角色A", description: "场景中的主动表达者", goal: "说清问题，守住主线" },
+    roleB: previousConfig.roleB || { name: "角色B", description: "场景中的冲突对象", goal: "反驳另一方，制造压力" }
   };
 }
 
@@ -132,11 +132,13 @@ export function buildScenarioFromGameConfig(config) {
   const playerRole = getPlayerRoleFromConfig(config);
   const aiRole = getAiRoleFromConfig(config);
   const goal = formatTrainingGoals(config.trainingGoals);
+  const playerName = playerRole.name || `角色${config.playerRoleKey}`;
+  const aiName = aiRole.name || `角色${config.aiRoleKey}`;
   const mainline = {
     fact: config.scene,
-    impact: "玩家需要在压力下稳定表达，不被对手带偏。",
+    impact: `${playerName}需要在压力下稳定表达，不被${aiName}带偏。`,
     request: `围绕“${goal}”推进对话。`,
-    boundary: "AI 对手不能替玩家说话，也不能跳出场景。"
+    boundary: `AI 对手只能扮演${aiName}，不能替${playerName}说话，也不能跳出场景。`
   };
   return {
     id: `config_scenario_${Date.now()}`,
@@ -153,14 +155,14 @@ export function buildScenarioFromGameConfig(config) {
     relationship: `${playerRole.name} vs ${aiRole.name}`,
     openingMessage: buildOpeningForGameConfig(config),
     userGoal: goal,
-    realMainline: `玩家要完成训练目标：${goal}。`,
+    realMainline: `${playerName}要完成训练目标：${goal}。`,
     mainline,
-    traps: ["转移重点", "反问施压", "要求玩家自证"],
+    traps: [`${aiName}转移重点`, `${aiName}反问施压`, `${aiName}要求${playerName}自证`],
     trainingFocus: config.trainingGoals,
     scoreFocus: {
       logic: "是否围绕场景和身份关系说话。",
       power: "是否能稳定推进，不被 AI 对手压住。",
-      boundary: "是否守住玩家角色目标和表达边界。",
+      boundary: `是否守住${playerName}的角色目标和表达边界。`,
       mainline: "是否持续围绕训练目标。",
       risk: "是否避免辱骂、威胁或人身攻击。"
     },
@@ -171,7 +173,8 @@ export function buildScenarioFromGameConfig(config) {
 
 export function buildOpeningForGameConfig(config) {
   const aiRole = getAiRoleFromConfig(config);
-  return `${aiRole.name}先开口：${aiRole.goal || "这事也不能只听玩家一边说法。"}。`;
+  const playerRole = getPlayerRoleFromConfig(config);
+  return `${aiRole.name}先开口：${aiRole.goal || `这事也不能只听${playerRole.name || "另一方"}一边说法。`}。`;
 }
 
 export function buildPresetScenarioDraft(input = {}) {
@@ -180,7 +183,7 @@ export function buildPresetScenarioDraft(input = {}) {
   const difficulty = pickSetupValue(input.difficulty, "普通");
   const opponentType = pickSetupValue(input.opponentType, "嘴硬型");
   const customScene = String(input.customScene || "").trim();
-  const userGoal = String(input.userGoal || "").trim() || "守住主线，让对方正面回应并给出具体做法。";
+  const userGoal = String(input.userGoal || "").trim() || "守住主线，让角色B正面回应并给出具体做法。";
   const title = customScene || `${category}里的${opponentType}训练`;
   const mainline = buildPresetMainline({ category, customScene, userGoal });
   const inferred = inferScenarioRoles({ title, category, background: customScene }, {});
@@ -204,14 +207,14 @@ export function buildPresetScenarioDraft(input = {}) {
     },
     openingMessage: openingForOpponentType({ opponentType, customScene, category }),
     userGoal,
-    realMainline: `这局要守住的是：${mainline.fact}。不要被对方带去解释态度、情绪或人品。`,
+    realMainline: `这局要守住的是：${mainline.fact}。不要被角色B带去解释态度、情绪或人品。`,
     mainline,
     traps: trapsForOpponentType(opponentType),
     trainingFocus: [
-      "先说事实，不急着解释自己",
-      "点出对方正在转移重点",
+      "角色A先说事实，不急着解释角色A自己",
+      "点出角色B正在转移重点",
       "提出明确、可执行的下一步要求",
-      difficulty === "王者" ? "在对方高压反问下继续守住主线" : "不为了缓和气氛放弃边界"
+      difficulty === "王者" ? "在角色B高压反问下继续守住主线" : "角色A不为了缓和气氛放弃边界"
     ],
     scoreFocus: {
       logic: "是否围绕事实和责任说话。",
@@ -220,7 +223,7 @@ export function buildPresetScenarioDraft(input = {}) {
       mainline: "是否持续守住本局核心问题。",
       risk: "是否避免辱骂、人身攻击或现实威胁。"
     },
-    suggestedFirstReplyHint: "先别解释你是不是太计较，直接把话拉回具体事实和要求。",
+    suggestedFirstReplyHint: "先别解释角色A是不是太计较，直接把话拉回具体事实和要求。",
     createdAt: new Date().toISOString()
   };
 }
@@ -234,15 +237,15 @@ export function buildPresetMainline({ category, customScene, userGoal }) {
   const scene = customScene || category || "这件事";
   return {
     fact: `当前冲突是：${scene}`,
-    impact: "对方正在把具体问题转成你的态度或情绪，导致事情本身没有被处理。",
-    request: userGoal || "让对方正面回应，并给出具体处理方式。",
-    boundary: "不要再用“你太敏感”“你想太多”或反问来代替正面回应。"
+    impact: "角色B正在把具体问题转成角色A的态度或情绪，导致事情本身没有被处理。",
+    request: userGoal || "让角色B正面回应，并给出具体处理方式。",
+    boundary: "角色B不要再用“角色A太敏感”“角色A想太多”或反问来代替正面回应。"
   };
 }
 
 export function buildPresetBackground({ category, difficulty, opponentType, customScene, userGoal }) {
   const scene = customScene || `一场${category}冲突`;
-  return `${scene}。本局难度：${difficulty}；对手人设：${opponentType}。你的训练目标是：${userGoal}。对方会尝试把问题从事实和责任转成你的态度、情绪或沟通方式。`;
+  return `${scene}。本局难度：${difficulty}；角色B人设：${opponentType}。角色A的训练目标是：${userGoal}。角色B会尝试把问题从事实和责任转成角色A的态度、情绪或沟通方式。`;
 }
 
 export function relationshipForCategory(category) {
@@ -258,7 +261,7 @@ export function relationshipForCategory(category) {
 
 export function personalityForOpponentType(opponentType) {
   if (/阴阳/.test(opponentType)) return "喜欢用反讽和轻飘飘的评价让你失控。";
-  if (/偷换/.test(opponentType)) return "会把原本的问题偷换成你的态度、能力或情绪问题。";
+  if (/偷换/.test(opponentType)) return "会把原本的问题偷换成角色A的态度、能力或情绪问题。";
   if (/情绪勒索/.test(opponentType)) return "会用委屈和关系压力让你放弃合理要求。";
   if (/讲道理/.test(opponentType)) return "表面讲逻辑，但会选择性忽略自己的责任。";
   return "嘴硬、不愿承认问题，会不断找借口推开责任。";
@@ -273,7 +276,7 @@ export function tacticsForOpponentType(opponentType) {
 }
 
 export function trapsForOpponentType(opponentType) {
-  return tacticsForOpponentType(opponentType).map((tactic) => `对方可能会${tactic}，不要顺着解释，拉回事实和要求。`);
+  return tacticsForOpponentType(opponentType).map((tactic) => `角色B可能会${tactic}，角色A不要顺着解释，拉回事实和要求。`);
 }
 
 export function openingForOpponentType({ opponentType, customScene, category }) {

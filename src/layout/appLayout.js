@@ -1,4 +1,5 @@
-import { features, goalOptions, navItems, proxyReplyModes, proxyReplyStrengths, tempScenarioPresets, toneOptions } from "../data/mockData.js";
+import { features, navItems, proxyReplyModes, proxyReplyStrengths, toneOptions } from "../data/mockData.js";
+import { FeatureIcon } from "../components/FeatureIcon.js";
 import { getCurrentProxyProfile, getProfileName, getProfileTagsForLayout } from "../domain/persona.js";
 import { getGameConfig, TrainingPreviewContent } from "../pages/TrainingPage.js";
 import { escapeAttr, escapeHtml } from "../utils/html.js";
@@ -28,6 +29,7 @@ export function TopNav(activePage) {
 export function DesktopSidebar(state) {
   const activePage = state.page;
   const profile = getCurrentProxyProfile(state.proxyPersona);
+  const isTempPage = activePage === "temp";
   return `
     <section class="desktop-panel">
       <h2>功能入口</h2>
@@ -36,7 +38,7 @@ export function DesktopSidebar(state) {
           .map(
             (feature) => `
               <button class="desktop-mode-card ${activePage === feature.key ? "active" : ""}" data-page="${feature.key}">
-                <b>${feature.mark}</b>
+                <b class="feature-icon">${FeatureIcon(feature.key)}</b>
                 <span>${feature.title}</span>
               </button>
             `
@@ -50,13 +52,19 @@ export function DesktopSidebar(state) {
       <p>专属嘴替：${state.proxyPersona.chatTurns.length} 条消息</p>
       <p>训练场：第 ${state.training.round || 1} 轮</p>
     </section>
-    <section class="desktop-panel">
-      <h2>当前人格</h2>
-      <p>${profile ? escapeHtml(getProfileName(profile)) : "还没创建嘴替人格"}</p>
-      <div class="desktop-tag-row">
-        ${getProfileTagsForLayout(profile).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
-      </div>
-    </section>
+    ${
+      isTempPage
+        ? ""
+        : `
+          <section class="desktop-panel">
+            <h2>当前人格</h2>
+            <p>${profile ? escapeHtml(getProfileName(profile)) : "还没创建嘴替人格"}</p>
+            <div class="desktop-tag-row">
+              ${getProfileTagsForLayout(profile).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
+            </div>
+          </section>
+        `
+    }
   `;
 }
 
@@ -75,15 +83,9 @@ export function TempDesktopContext(temp) {
       ${DesktopField("和谁吵", "temp.who", temp.who, "客服、室友、对象、同事")}
       ${DesktopField("对方说了什么", "temp.latest", temp.latest, "对方刚刚那句话")}
       ${DesktopField("前情提要", "temp.context", temp.context, "为什么吵起来")}
-      <h3>我的诉求</h3>
-      ${DesktopChipGroup("temp", "goal", goalOptions, temp.goal)}
+      ${DesktopField("我的诉求", "temp.goal", temp.goal, "想达成什么结果")}
       <h3>语气强度</h3>
       ${DesktopChipGroup("temp", "tone", toneOptions, temp.tone)}
-      <div class="desktop-preset-list">
-        ${tempScenarioPresets
-          .map((item, index) => `<button class="tiny-button" data-action="use-temp-scenario" data-scenario-index="${index}">${escapeHtml(item.label)}</button>`)
-          .join("")}
-      </div>
     </section>
   `;
 }

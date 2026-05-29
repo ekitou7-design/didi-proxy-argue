@@ -1,4 +1,5 @@
-import { goalOptions, tempScenarioPresets, toneOptions } from "../data/mockData.js";
+import { toneOptions } from "../data/mockData.js";
+import { ChatBubble, CopyAction } from "../components/ChatBubble.js";
 import { escapeAttr, escapeHtml } from "../utils/html.js";
 import { splitReplyMessages } from "../utils/message.js";
 
@@ -42,27 +43,13 @@ function TempSettingsSheet(session) {
           ${session.scenarioStatus === "loading" ? "生成中..." : "生成临时吵架场景"}
         </button>
         ${session.generatedScenario ? TempScenarioSummary(session.generatedScenario) : ""}
-        <div class="preset-row">
-          ${tempScenarioPresets
-            .map(
-              (item, index) => `
-                <button class="chip tiny-chip" data-action="use-temp-scenario" data-scenario-index="${index}">
-                  ${escapeHtml(item.label)}
-                </button>
-              `
-            )
-            .join("")}
-        </div>
         <div class="settings-grid">
-          ${SmallField("目前对方是谁？", "temp.who", session.who, "比如：客服、同学、对象、室友")}
-          ${SmallField("对方第一句话 / 最新一句", "temp.latest", session.latest, "把对方刚刚说的话放这里")}
+          ${SmallField("和谁吵", "temp.who", session.who, "用户自己填写，例如：客服、同学、对象、室友")}
+          ${SmallField("对方说了什么", "temp.latest", session.latest, "把对方刚刚说的话放这里")}
           ${SmallField("前情提要", "temp.context", session.context, "简单说一下为什么吵起来", "wide")}
+          ${SmallField("我的诉求", "temp.goal", session.goal, "写清楚这次想达到什么，例如：要求退款、要求道歉、讲清责任", "wide")}
         </div>
         <div class="settings-inline-groups">
-          <div>
-            <span class="mini-field-title">我想要的效果</span>
-            ${ChipGroup("goal", goalOptions, session.goal)}
-          </div>
           <div>
             <span class="mini-field-title">攻击力</span>
             ${ChipGroup("tone", toneOptions, session.tone, "intensity")}
@@ -98,14 +85,18 @@ function TempChatPanel(session) {
           visibleRounds.length
             ? visibleRounds.map(ChatRound).join("")
             : `
-              <article class="persona-bubble from-user">
-                <span>对方</span>
-                <p>${escapeHtml(session.generatedScenario?.openingMessage || session.latest || "先生成场景，或把对方刚说的话发给我。")}</p>
-              </article>
-              <article class="persona-bubble from-proxy">
-                <span>代吵助手</span>
-                <p>我会根据上面的场景、人设、目标和攻击力，帮你实时接下一句。</p>
-              </article>
+              ${ChatBubble({
+                side: "left",
+                label: "对方",
+                avatar: "对",
+                content: session.generatedScenario?.openingMessage || session.latest || "先生成场景，或把对方刚说的话发给我。"
+              })}
+              ${ChatBubble({
+                side: "right",
+                label: "可发送回复",
+                avatar: "吵",
+                content: "我会根据上面的场景、人设、目标和攻击力，帮你实时接下一句。"
+              })}
             `
         }
       </div>
@@ -118,10 +109,7 @@ function ChatRound(round) {
   const otherReplies = (round.replies || []).slice(1);
   return `
     <article class="realtime-round">
-      <div class="persona-bubble from-user">
-        <span>对方</span>
-        <p>${escapeHtml(round.opponent)}</p>
-      </div>
+      ${ChatBubble({ side: "left", label: "对方", avatar: "对", content: round.opponent })}
       ${ReplyBubbles(bestReply)}
       <details class="round-more">
         <summary>看分析和备选</summary>
@@ -144,13 +132,14 @@ function ChatRound(round) {
 function ReplyBubbles(text) {
   return splitReplyMessages(text)
     .map(
-      (piece) => `
-        <div class="persona-bubble from-proxy">
-          <span>代吵助手</span>
-          <p>${escapeHtml(piece)}</p>
-          <button class="mini-copy inline-copy" data-copy-reply="${escapeAttr(piece)}">复制</button>
-        </div>
-      `
+      (piece) =>
+        ChatBubble({
+          side: "right",
+          label: "可发送回复",
+          avatar: "吵",
+          content: piece,
+          actions: CopyAction(piece)
+        })
     )
     .join("");
 }
@@ -158,13 +147,13 @@ function ReplyBubbles(text) {
 function TempInputBar(session) {
   return `
     <section class="realtime-input-bar">
-      <textarea data-session-input="temp" placeholder="可输入对方新一句，也可以输入你想表达的意思；留空则按对方上一句帮你回。">${escapeHtml(session.input)}</textarea>
+      <textarea data-session-input="temp" placeholder="输入对方新一句，或写下你想表达的意思">${escapeHtml(session.input)}</textarea>
       <div class="temp-input-actions">
         <button class="secondary-button warm" data-action="temp-reply-intent" ${session.isSubmitting ? "disabled" : ""}>
-          按我的意思回
+          按我的意思
         </button>
         <button class="primary-button" data-action="temp-reply" ${session.isSubmitting ? "disabled" : ""}>
-          ${session.isSubmitting ? "正在接话..." : "帮我回"}
+          ${session.isSubmitting ? "接话中..." : "按对方新话"}
         </button>
       </div>
     </section>

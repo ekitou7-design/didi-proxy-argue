@@ -110,7 +110,7 @@ export async function generateRandomTrainingScenario(app) {
     const scenario = result.scenario;
     if (!scenario?.openingMessage) throw new Error("场景生成结果为空");
 
-    applyGeneratedTrainingScenario(app, scenario, "AI 已随机生成一局，仍可在中间区域手动修改。");
+    applyGeneratedTrainingScenario(app, scenario, "已生成完整训练局，你可以修改场景、角色和目标，再开始训练。");
   } catch (error) {
     app.setState({
       training: {
@@ -137,7 +137,7 @@ export async function generatePresetTrainingScenario(app) {
   const requestId = `preset_${Date.now()}`;
   const draftScenario = buildPresetScenarioDraft(request);
 
-  applyGeneratedTrainingScenario(app, draftScenario, "已按本局配置生成训练草稿，正在用 API 精修...", "loading", requestId);
+  applyGeneratedTrainingScenario(app, draftScenario, "已按本局配置生成训练草稿，正在用 API 精修。精修完成后仍可继续修改。", "loading", requestId);
 
   try {
     const result = await requestPresetTrainingScenario(request);
@@ -145,7 +145,7 @@ export async function generatePresetTrainingScenario(app) {
     if (!scenario?.openingMessage) throw new Error("场景生成结果为空");
     if (app.state.training.scenarioRequestId !== requestId || app.state.training.gameState !== "idle") return;
 
-    applyGeneratedTrainingScenario(app, scenario, "已按本局配置生成训练草稿，可以继续修改或开始训练。");
+    applyGeneratedTrainingScenario(app, scenario, "已生成完整训练局，你可以修改场景、角色和目标，再开始训练。");
   } catch (error) {
     if (app.state.training.scenarioRequestId !== requestId || app.state.training.gameState !== "idle") return;
     app.setState({

@@ -25,8 +25,7 @@ import {
 } from "./controllers/personaController.js";
 import {
   generateTempScenario,
-  handleTempReply,
-  useTempScenario
+  handleTempReply
 } from "./controllers/tempController.js";
 import {
   applyGeneratedTrainingScenario,
@@ -321,10 +320,6 @@ export default class App {
       await this.generateTempScenario();
       return;
     }
-    if (action === "use-temp-scenario") {
-      this.useTempScenario(actionTarget.dataset.scenarioIndex);
-      return;
-    }
     if (action === "start-persona-chat") {
       this.setState({
         activePersona: this.state.persona.who,
@@ -494,10 +489,6 @@ export default class App {
 
   toggleTrainingGoal(goal) {
     return toggleTrainingGoal(this, goal);
-  }
-
-  useTempScenario(index) {
-    return useTempScenario(this, index);
   }
 
   setNestedState(rootKey, groupKey, field, value, render = true) {

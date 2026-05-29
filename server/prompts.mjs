@@ -300,6 +300,7 @@ export function buildRandomTrainingScenarioPrompt(input = {}) {
 场景可以有冲突张力，但禁止生成违法威胁、歧视、人肉、骚扰、现实报复、人身安全风险或鼓励伤害的内容。
 不要写成模板作文。不要只写“你们发生了矛盾”。必须有具体触发事件、对方动机、用户要守住的主线和话术陷阱。
 openingMessage 要像真实人会说的一句话，不要像 AI 总结。
+除 openingMessage 外，title、scene、background、userGoal、realMainline、mainline、traps、trainingFocus、scoreFocus、suggestedFirstReplyHint 不要用“我、别人、对方、玩家”指代冲突方。必须使用明确角色名、roleA.name、roleB.name，或“角色A”“角色B”。
 `,
     user: `
 输入偏好：
@@ -336,11 +337,11 @@ ${JSON.stringify(input, null, 2)}
 如果 userGoal 有内容，场景要围绕这个训练目标设计。
 不要生成抽象观点题，不要写成支持/反对某观点，不要使用“正方”“反方”“立场A”“立场B”“辩论主题”。
 要生成真实生活吵架场景，例如：
-- 宿舍里室友不倒垃圾，还嘲讽玩家小题大做
-- 男朋友临时改约，还说玩家太敏感
-- 同事把工作甩给玩家，出问题后还怪玩家没提醒
-- 家庭聚餐上亲戚催婚，还拿表妹二胎来压玩家
-- 朋友总是迟到，被指出后反说玩家太计较
+- 宿舍里角色B不倒垃圾，还嘲讽角色A小题大做
+- 角色A的男朋友临时改约，并说角色A太敏感
+- 同事把工作甩给角色A，出问题后还怪角色A没提醒
+- 家庭聚餐上亲戚催婚，还拿表妹二胎来压角色A
+- 朋友总是迟到，被指出后反说角色A太计较
 
 如果 gameConfig 有内容，必须沿用里面的角色设定：
 - gameConfig.scene 是本局场景。
@@ -348,7 +349,7 @@ ${JSON.stringify(input, null, 2)}
 - gameConfig.playerRoleKey 是玩家选择的角色，aiRoleKey 必须自动取另一个角色。
 - gameConfig.trainingGoals 是玩家训练目标。
 - gameConfig.difficulty 是训练难度。
-- title/background/userGoal/realMainline/mainline/traps/trainingFocus 里描述玩家时，用“玩家”或玩家角色名，不要用“我”代指玩家。
+- title/background/userGoal/realMainline/mainline/traps/trainingFocus/scoreFocus/suggestedFirstReplyHint 里描述冲突双方时，用 roleA.name / roleB.name 或“角色A / 角色B”，不要用“我、别人、对方、玩家”。
 - openingMessage 必须由 AI 角色发出，站在 AI 角色目标上说话，不得替玩家说话。
 
 必须返回这个 JSON 结构：
@@ -404,18 +405,20 @@ ${JSON.stringify(input, null, 2)}
 }
 
 字段要求：
-- title 要具体，例如“室友连续三次不倒垃圾，还说你太计较”。
+- title 要具体，例如“室友连续三次不倒垃圾，还说角色A太计较”。
 - scene 是完整生活场景，不是观点题。
-- roleA 和 roleB 必须是场景里的具体人物，例如“我 / 室友”“女朋友 / 男朋友”“员工 / 同事”。
+- roleA 和 roleB 必须是场景里的具体人物，例如“角色A / 室友”“女朋友 / 男朋友”“员工 / 同事”。
 - 每个 role.goal 都要像真实吵架里的角色目标，不要写成抽象观点。
 - playerRoleKey 默认可以是 "A"，aiRoleKey 必须是另一个角色。
-- background 必须有完整前情，包含触发事件和对方为什么会这样说。
+- background 必须有完整前情，包含触发事件和角色B为什么会这样说。
+- background 这类说明性字段必须让玩家在设置页一眼看出谁做了什么：使用“角色A”“角色B”或具体角色名，不要写“我提醒后”“别人说”“对方觉得”“玩家被说”。
 - realMainline 是本局真正要守住的争吵主线。
 - mainline 必须是 FIRB：Fact 事实、Impact 影响、Request 诉求、Boundary 边界。
-- traps 至少 3 条，必须是对方可能把用户带偏的话术陷阱。
+- traps 至少 3 条，必须是角色B可能把角色A带偏的话术陷阱。
 - trainingFocus 至少 3 条。
 - scoreFocus 五项都要有清楚观察点。
 - suggestedFirstReplyHint 只给轻提示，不要直接替用户吵完。
+- openingMessage 是唯一允许出现“我 / 你”的字段，因为它是 AI 对手说出口的话。
 `
   };
 }

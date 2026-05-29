@@ -1,4 +1,5 @@
 import { proxyReplyModes, proxyReplyStrengths } from "../data/mockData.js";
+import { ChatBubble as SharedChatBubble } from "../components/ChatBubble.js";
 import { escapeAttr, escapeHtml } from "../utils/html.js";
 import { getMessageContent } from "../utils/messageModel.js";
 
@@ -11,6 +12,7 @@ export default function PersonaPage(state) {
       ${PersonaHeader(activeProfile)}
       ${hasProfile ? PersonaChatPanel(state, activeProfile) : EmptyPersonaState()}
       ${hasProfile ? PersonaInputBar(state) : EmptyCreateActions()}
+      ${hasProfile ? FloatingFeishuButton() : ""}
       ${state.personaInfoOpen && activeProfile ? PersonaInfoSheet(activeProfile) : ""}
       ${state.createSheetOpen ? PersonaCreateSheet(state, activeProfile) : ""}
       ${state.replySettingsOpen ? ReplySettingsSheet(state) : ""}
@@ -46,6 +48,7 @@ function PersonaHeader(profile) {
       <div class="persona-header-actions">
         <button class="tiny-button" data-action="open-persona-info">查看档案</button>
         <button class="secondary-button compact-action" data-action="open-persona-create">创建 / 切换</button>
+        <button class="tiny-button" data-action="open-feishu-settings">飞书设置</button>
       </div>
     </section>
   `;
@@ -121,29 +124,31 @@ function PersonaChatPanel(state, profile) {
         }
       ];
 
+  const latestAssistant = getLatestAssistantTurn({ chatTurns: turns });
   return `
     <section class="persona-chat-panel" aria-label="专属嘴替聊天记录">
       <div class="persona-chat-scroll">
-        ${turns.map((turn) => ChatBubble(turn, profile, state)).join("")}
+        ${turns.map((turn) => PersonaMessageBubble(turn, profile, state, latestAssistant?.id)).join("")}
       </div>
       ${state.message ? `<p class="persona-chat-note">${escapeHtml(state.message)}</p>` : ""}
     </section>
   `;
 }
 
-function ChatBubble(turn, profile, state) {
+function PersonaMessageBubble(turn, profile, state, latestAssistantId) {
   const isUser = turn.role === "user";
-  const feishuStatus = state.feishu?.sendingByTurnId?.[turn.id] || "";
-  return `
-    <article class="persona-bubble ${isUser ? "from-user" : "from-proxy"}">
-      <span>${isUser ? "你" : escapeHtml(getProfileName(profile))}</span>
-      <p>${escapeHtml(getMessageContent(turn))}</p>
-      ${isUser ? "" : FeishuSendButton(turn, feishuStatus)}
-    </article>
-  `;
+  const profileName = getProfileName(profile);
+  const isLatestAssistant = !isUser && String(turn.id) === String(latestAssistantId);
+  return SharedChatBubble({
+    side: isUser ? "right" : "left",
+    label: isUser ? "你" : profileName,
+    avatar: isUser ? "我" : "替",
+    content: getMessageContent(turn),
+    actions: isLatestAssistant ? FeishuBubbleAction(turn, state.feishu?.sendingByTurnId?.[turn.id] || "") : ""
+  });
 }
 
-function FeishuSendButton(turn, status) {
+function FeishuBubbleAction(turn, status) {
   const label =
     status === "sending"
       ? "发送中"
@@ -151,7 +156,7 @@ function FeishuSendButton(turn, status) {
         ? "已发送"
         : status === "error"
           ? "发送失败"
-          : "发送到飞书";
+          : "发送飞书";
   return `
     <button
       class="feishu-send-button ${status ? `is-${status}` : ""}"
@@ -162,6 +167,18 @@ function FeishuSendButton(turn, status) {
       ${label}
     </button>
   `;
+}
+
+function FloatingFeishuButton() {
+  return `
+    <button class="floating-feishu-button" data-action="open-feishu-settings" aria-label="飞书设置" title="飞书设置">
+      飞
+    </button>
+  `;
+}
+
+function getLatestAssistantTurn(state) {
+  return [...(state.chatTurns || [])].reverse().find((turn) => turn.role === "assistant" && getMessageContent(turn));
 }
 
 function PersonaInputBar(state) {

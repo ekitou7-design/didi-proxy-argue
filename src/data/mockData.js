@@ -34,47 +34,7 @@ export const features = [
 ];
 
 export const whoOptions = ["情侣", "朋友", "室友", "同事", "家人", "商家", "陌生人", "网友", "同学"];
-export const goalOptions = [
-  "压回去",
-  "要道歉",
-  "讲清楚",
-  "体面结束"
-];
 export const toneOptions = ["低", "中", "高"];
-export const tempScenarioPresets = [
-  {
-    label: "客服扯皮",
-    who: "态度很差的客服",
-    context: "我买的东西有明显质量问题，联系客服后对方一直让我自己看规则，不正面处理退款。",
-    latest: "这个不是我们的问题，你自己也没有看清楚规则。",
-    goal: "要道歉",
-    tone: "中"
-  },
-  {
-    label: "对象改约",
-    who: "临时改约的对象",
-    context: "昨天约好一起吃饭，他临时说要和朋友出去，我表达不满后他说我太敏感。",
-    latest: "你怎么又开始了？这点小事也要上纲上线？",
-    goal: "讲清楚",
-    tone: "中"
-  },
-  {
-    label: "室友装傻",
-    who: "经常装没看见的室友",
-    context: "公共卫生说好轮流做，对方经常跳过，被提醒后说我要求太多。",
-    latest: "你也别说得自己多守规矩，宿舍又不是你一个人的。",
-    goal: "压回去",
-    tone: "中"
-  },
-  {
-    label: "同事甩锅",
-    who: "项目里甩锅的同事",
-    context: "对方没按时交付，影响了我的部分，现在想把延期说成大家都有责任。",
-    latest: "这也不能全怪我吧，你要求这么高，那你来做不是更快吗？",
-    goal: "讲清楚",
-    tone: "高"
-  }
-];
 export const proxyStyleOptions = ["冷静拆台", "阴阳怪气", "高压控场", "体面反击"];
 export const proxyReplyModes = ["像我本人", "说得更清楚", "攻击力加强"];
 export const proxyReplyStrengths = ["低", "中", "高"];
@@ -137,12 +97,12 @@ export const initialProxyPersonaState = {
 export const initialTempSession = {
   type: "临时代吵",
   step: "setup",
-  who: "态度很差的客服",
-  context: "我买的东西有明显质量问题，联系客服后对方一直让我自己看规则，不正面处理退款。",
-  latest: "这个不是我们的问题，你自己也没有看清楚规则。",
-  goal: "压回去",
+  who: "",
+  context: "",
+  latest: "",
+  goal: "",
   tone: "中",
-  boundary: "不要骂脏话，不要人身攻击，只要求对方给明确处理方案。",
+  boundary: "不要骂脏话，不要人身攻击，只围绕主线表达。",
   generatedScenario: null,
   scenarioStatus: "idle",
   scenarioMessage: "",
@@ -175,26 +135,26 @@ export const initialTrainingSession = {
   type: "吵架训练",
   step: "setup",
   gameState: "idle",
-  scene: "宿舍里，室友一直不倒垃圾。玩家提醒后，室友还嘲讽玩家小题大做。",
-  debateTopic: "宿舍里，室友一直不倒垃圾。玩家提醒后，室友还嘲讽玩家小题大做。",
-  playerIdentity: "我",
+  scene: "宿舍里，角色B一直不倒垃圾。角色A提醒后，角色B还嘲讽角色A小题大做。",
+  debateTopic: "宿舍里，角色B一直不倒垃圾。角色A提醒后，角色B还嘲讽角色A小题大做。",
+  playerIdentity: "角色A",
   aiIdentity: "室友",
   playerSide: "A",
   aiSide: "B",
   aiDifficulty: "正常争论",
   difficulty: "普通",
-  goal: "守住主线，不被对方带偏",
+  goal: "守住主线，不被角色B带偏",
   gameConfig: {
-    scene: "宿舍里，室友一直不倒垃圾。玩家提醒后，室友还嘲讽玩家小题大做。",
+    scene: "宿舍里，角色B一直不倒垃圾。角色A提醒后，角色B还嘲讽角色A小题大做。",
     roleA: {
-      name: "我",
+      name: "角色A",
       description: "被室友不倒垃圾影响的人",
       goal: "让室友承担责任，不要再嘲讽和转移话题"
     },
     roleB: {
       name: "室友",
-      description: "不想倒垃圾，还觉得对方管太多",
-      goal: "为自己辩解，反驳对方，说对方小题大做"
+      description: "不想倒垃圾，还觉得角色A管太多",
+      goal: "为自己辩解，反驳角色A，说角色A小题大做"
     },
     playerRoleKey: "A",
     aiRoleKey: "B",

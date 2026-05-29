@@ -1,7 +1,9 @@
+import { FeatureIcon } from "./FeatureIcon.js";
+
 export default function FeatureCard(feature) {
   return `
     <button class="feature-card ${feature.color}" data-page="${feature.key}">
-      <span class="feature-tone">${feature.mark}</span>
+      <span class="feature-tone feature-icon">${FeatureIcon(feature.key)}</span>
       <div>
         <h3>${feature.title}</h3>
         <p>${feature.desc}</p>

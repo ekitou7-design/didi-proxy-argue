@@ -1,26 +1,9 @@
-import { buildTempChatTurn, tempScenarioPresets } from "../data/mockData.js";
+import { buildTempChatTurn } from "../data/mockData.js";
 import { buildLocalTempScenario, normalizeTempScenario, uniqueReplyOptions } from "../domain/temp.js";
 import {
   generateTempReply,
   generateTempScenario as requestTempScenario
 } from "../services/api.js";
-
-export function useTempScenario(app, index) {
-  const preset = tempScenarioPresets[Number(index)];
-  if (!preset) return;
-  app.setState({
-    temp: {
-      ...app.state.temp,
-      ...preset,
-      generatedScenario: null,
-      scenarioStatus: "idle",
-      scenarioMessage: "",
-      settingsOpen: false,
-      input: "",
-      rounds: []
-    }
-  });
-}
 
 export async function handleTempReply(app, { inputAsIntent = false } = {}) {
   const temp = app.state.temp;
