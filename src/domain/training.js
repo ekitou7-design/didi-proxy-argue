@@ -134,16 +134,24 @@ export function buildScenarioFromGameConfig(config) {
   const goal = formatTrainingGoals(config.trainingGoals);
   const playerName = playerRole.name || `角色${config.playerRoleKey}`;
   const aiName = aiRole.name || `角色${config.aiRoleKey}`;
+  const concreteScene = buildConcreteSceneDraft(config.scene, {
+    playerName,
+    aiName,
+    aiGoal: aiRole.goal,
+    userGoal: goal,
+    difficulty: difficultyLabelForConfig(config.difficulty)
+  });
   const mainline = {
-    fact: config.scene,
-    impact: `${playerName}需要在压力下稳定表达，不被${aiName}带偏。`,
-    request: `围绕“${goal}”推进对话。`,
-    boundary: `AI 对手只能扮演${aiName}，不能替${playerName}说话，也不能跳出场景。`
+    fact: concreteScene.fact,
+    impact: concreteScene.impact,
+    request: goal || concreteScene.request,
+    boundary: `${playerName}要求${aiName}正面回应具体行为，不接受被扣成“太敏感”“太计较”或态度问题。`
   };
   return {
     id: `config_scenario_${Date.now()}`,
-    title: config.scene,
-    background: config.scene,
+    title: concreteScene.title,
+    scene: concreteScene.scene,
+    background: concreteScene.background,
     roleA: config.roleA,
     roleB: config.roleB,
     playerRoleKey: config.playerRoleKey,
@@ -153,27 +161,34 @@ export function buildScenarioFromGameConfig(config) {
     aiDifficulty: difficultyLabelForConfig(config.difficulty),
     difficulty: difficultyLabelForConfig(config.difficulty),
     relationship: `${playerRole.name} vs ${aiRole.name}`,
-    openingMessage: buildOpeningForGameConfig(config),
+    openingMessage: buildOpeningForGameConfig(config, concreteScene),
     userGoal: goal,
-    realMainline: `${playerName}要完成训练目标：${goal}。`,
+    realMainline: `${playerName}要守住的主线是：${concreteScene.fact}。不要被${aiName}带去解释态度、情绪或人品。`,
     mainline,
-    traps: [`${aiName}转移重点`, `${aiName}反问施压`, `${aiName}要求${playerName}自证`],
-    trainingFocus: config.trainingGoals,
+    traps: [
+      `${aiName}把具体行为说成${playerName}太敏感或太计较`,
+      `${aiName}用“之前也这样”淡化这次影响`,
+      `${aiName}反问${playerName}为什么当时不处理，逼${playerName}自证`
+    ],
+    trainingFocus: config.trainingGoals.length
+      ? config.trainingGoals
+      : ["抓住具体事实", "点出实际影响", "提出下一步要求"],
     scoreFocus: {
-      logic: "是否围绕场景和身份关系说话。",
+      logic: "是否围绕具体触发事件和责任说话。",
       power: "是否能稳定推进，不被 AI 对手压住。",
       boundary: `是否守住${playerName}的角色目标和表达边界。`,
       mainline: "是否持续围绕训练目标。",
       risk: "是否避免辱骂、威胁或人身攻击。"
     },
-    suggestedFirstReplyHint: "先抓住场景里的核心问题，再回应 AI 对手的施压点。",
+    suggestedFirstReplyHint: `先点出${concreteScene.fact}，再要求${aiName}给出具体处理方式。`,
     createdAt: new Date().toISOString()
   };
 }
 
-export function buildOpeningForGameConfig(config) {
+export function buildOpeningForGameConfig(config, concreteScene = null) {
   const aiRole = getAiRoleFromConfig(config);
   const playerRole = getPlayerRoleFromConfig(config);
+  if (concreteScene?.openingMessage) return concreteScene.openingMessage;
   return `${aiRole.name}先开口：${aiRole.goal || `这事也不能只听${playerRole.name || "另一方"}一边说法。`}。`;
 }
 
@@ -234,18 +249,27 @@ export function pickSetupValue(value, fallback) {
 }
 
 export function buildPresetMainline({ category, customScene, userGoal }) {
-  const scene = customScene || category || "这件事";
+  const concreteScene = buildConcreteSceneDraft(customScene || category || "这件事", {
+    playerName: "角色A",
+    aiName: "角色B",
+    userGoal
+  });
   return {
-    fact: `当前冲突是：${scene}`,
-    impact: "角色B正在把具体问题转成角色A的态度或情绪，导致事情本身没有被处理。",
+    fact: concreteScene.fact,
+    impact: concreteScene.impact,
     request: userGoal || "让角色B正面回应，并给出具体处理方式。",
     boundary: "角色B不要再用“角色A太敏感”“角色A想太多”或反问来代替正面回应。"
   };
 }
 
 export function buildPresetBackground({ category, difficulty, opponentType, customScene, userGoal }) {
-  const scene = customScene || `一场${category}冲突`;
-  return `${scene}。本局难度：${difficulty}；角色B人设：${opponentType}。角色A的训练目标是：${userGoal}。角色B会尝试把问题从事实和责任转成角色A的态度、情绪或沟通方式。`;
+  const concreteScene = buildConcreteSceneDraft(customScene || `一场${category}冲突`, {
+    playerName: "角色A",
+    aiName: "角色B",
+    userGoal,
+    difficulty
+  });
+  return `${concreteScene.background} 本局难度：${difficulty}；角色B人设：${opponentType}。角色A的训练目标是：${userGoal}。`;
 }
 
 export function relationshipForCategory(category) {
@@ -280,10 +304,100 @@ export function trapsForOpponentType(opponentType) {
 }
 
 export function openingForOpponentType({ opponentType, customScene, category }) {
-  const scene = customScene || category || "这件事";
+  const concreteScene = buildConcreteSceneDraft(customScene || category || "这件事", {
+    playerName: "角色A",
+    aiName: "角色B"
+  });
+  const scene = concreteScene.shortEvent;
   if (/阴阳/.test(opponentType)) return `行，就你最有道理，${scene}都能被你说得这么严重。`;
   if (/偷换/.test(opponentType)) return `你现在一直说${scene}，那你自己就一点问题都没有吗？`;
   if (/情绪勒索/.test(opponentType)) return `我都已经这样了，你还要拿${scene}一直逼我吗？`;
   if (/讲道理/.test(opponentType)) return `${scene}我不是不认，但你也不能只站在你自己的角度看。`;
   return `${scene}不能全怪我吧，你现在说得好像都是我的问题。`;
+}
+
+export function buildConcreteSceneDraft(rawScene, options = {}) {
+  const scene = String(rawScene || "").trim() || "一件被拖着没有解决的具体冲突";
+  const playerName = options.playerName || "角色A";
+  const aiName = options.aiName || "角色B";
+  const userGoal = String(options.userGoal || "").trim() || `让${aiName}正面回应并给出具体做法`;
+  const shortEvent = scene.replace(/[。！？!?，,；;：:]+$/g, "");
+  const detail = inferConcreteSceneDetail(shortEvent, { playerName, aiName });
+
+  return {
+    title: `${detail.titlePrefix}${shortEvent}`,
+    shortEvent,
+    scene: `${detail.place}，${playerName}因为“${shortEvent}”和${aiName}起了冲突。${detail.trigger}`,
+    background: `${detail.time}，${detail.place}，${detail.trigger}${detail.history}${playerName}刚把问题摊开，${aiName}没有正面处理，反而准备把重点转成${playerName}的态度。${playerName}的目标是：${userGoal}。`,
+    fact: `${aiName}${detail.factAction || `涉及“${shortEvent}”的行为`}，${playerName}已经明确指出这件事需要处理。`,
+    impact: `${detail.impact}${playerName}如果顺着解释情绪，问题会继续被拖过去。`,
+    request: userGoal,
+    openingMessage: `${detail.openingLead}${detail.openingEvent || shortEvent}这事不能全怪我吧，你现在说得好像都是我的问题。`
+  };
+}
+
+function inferConcreteSceneDetail(scene, { playerName, aiName }) {
+  if (/室友|宿舍|合租|垃圾|卫生|厨房|水电|公共区/.test(scene)) {
+    return {
+      titlePrefix: "合租公共区里",
+      time: "周日晚 10 点半",
+      place: "合租房厨房门口",
+      trigger: `${aiName}第三次把公共区收尾留给${playerName}，还在群里说“谁看不惯谁收”。`,
+      history: `${playerName}之前提醒过两次，这次已经影响到第二天使用公共空间。`,
+      factAction: "连续没有处理约定好的公共区责任",
+      impact: "公共空间被占用，原本说好的分工被打破。",
+      openingLead: "不就一点公共区的事吗，",
+      openingEvent: "收拾"
+    };
+  }
+  if (/男朋友|女朋友|对象|情侣|恋爱|约会|冷战|消息/.test(scene)) {
+    return {
+      titlePrefix: "约定被临时改掉后",
+      time: "周五晚上出门前半小时",
+      place: "两人的微信聊天里",
+      trigger: `${aiName}临时改掉早就约好的安排，被${playerName}追问时只回“你别这么敏感”。`,
+      history: `这已经是本月第二次，${playerName}提前空出了时间。`,
+      factAction: "临时改变约定又没有提前商量",
+      impact: `${playerName}的时间安排被打乱，感受也被一句话否定。`,
+      openingLead: "我又不是故意的，",
+      openingEvent: "改约"
+    };
+  }
+  if (/同事|职场|工作|项目|客户|老板|汇报|需求|任务|甩锅/.test(scene)) {
+    return {
+      titlePrefix: "项目出问题后",
+      time: "周一上午例会前十分钟",
+      place: "项目群和会议室之间",
+      trigger: `${aiName}把没有同步的材料问题推到${playerName}身上，说是${playerName}没有提醒到位。`,
+      history: `${playerName}上周已经在群里确认过截止时间和负责人。`,
+      factAction: "把自己负责的交付问题转成别人没提醒",
+      impact: `${playerName}可能在团队里背锅，后续协作边界也会被模糊。`,
+      openingLead: "你现在怪我也没用吧，",
+      openingEvent: "材料"
+    };
+  }
+  if (/朋友|借钱|还钱|转账|迟到|放鸽子|约饭/.test(scene)) {
+    return {
+      titlePrefix: "朋友约定反复落空后",
+      time: "周六下午约定时间过后四十分钟",
+      place: "商场门口的聊天窗口",
+      trigger: `${aiName}又一次没有按约定处理，${playerName}催了以后被说“你怎么这么计较”。`,
+      history: `类似情况已经出现三次，${playerName}每次都在迁就。`,
+      factAction: "反复没有兑现已经说好的约定",
+      impact: `${playerName}的时间和信任被消耗，关系里的责任被单方面推开。`,
+      openingLead: "朋友之间有必要算这么清楚吗，",
+      openingEvent: "这点事"
+    };
+  }
+  return {
+    titlePrefix: "一次具体冲突中",
+    time: "当天晚上消息发出后十分钟",
+    place: "双方正在对话的聊天窗口",
+    trigger: `${aiName}在“${scene}”这件事上没有正面回应具体行为，而是先评价${playerName}说话方式。`,
+    history: `${playerName}之前已经说明过这件事造成的影响。`,
+    factAction: `没有正面处理“${scene}”`,
+    impact: `事情本身没有被解决，${playerName}还被迫解释自己的态度。`,
+    openingLead: "",
+    openingEvent: scene
+  };
 }

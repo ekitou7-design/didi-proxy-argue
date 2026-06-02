@@ -59,13 +59,19 @@ export function mockGenerateRandomTrainingScenario(input = {}) {
   if (!randomValues.has(normalizedInput.difficulty)) scenario.difficulty = normalizedInput.difficulty;
   if (!randomValues.has(normalizedInput.opponentType)) scenario.opponentProfile.type = normalizedInput.opponentType;
   if (normalizedInput.customScene) {
-    scenario.title = normalizedInput.customScene;
-    scenario.background = buildCustomSceneBackground(normalizedInput, scenario);
-    scenario.openingMessage = buildCustomOpeningMessage(normalizedInput);
+    const customDraft = buildConcreteCustomScenario(normalizedInput, scenario);
+    scenario.title = customDraft.title;
+    scenario.scene = customDraft.scene;
+    scenario.background = customDraft.background;
+    scenario.roleA = normalizedInput.roleA;
+    scenario.roleB = normalizedInput.roleB;
+    scenario.playerRoleKey = normalizedInput.playerRoleKey;
+    scenario.aiRoleKey = normalizedInput.aiRoleKey;
+    scenario.openingMessage = buildCustomOpeningMessage(normalizedInput, customDraft);
     scenario.relationship = "自定义训练对象";
-    scenario.realMainline = "角色A不要被角色B带去解释情绪，持续围绕具体行为、影响和下一步要求。";
-    scenario.mainline = buildCustomMainline(normalizedInput);
-    scenario.traps = buildCustomTraps(normalizedInput);
+    scenario.realMainline = `${customDraft.playerName}不要被${customDraft.aiName}带去解释情绪，持续围绕“${customDraft.fact}”和下一步要求。`;
+    scenario.mainline = buildCustomMainline(normalizedInput, customDraft);
+    scenario.traps = buildCustomTraps(normalizedInput, customDraft);
     scenario.trainingFocus = ["先抓具体行为", "点出影响", "提出下一步要求", "拒绝被贴情绪标签"];
     scenario.scoreFocus = {
       logic: "是否围绕自定义场景里的具体行为说话。",
@@ -148,7 +154,8 @@ export function normalizeScenario(scenario, input = {}) {
     category,
     difficulty,
     relationship: textOf(scenario.relationship) || "日常关系",
-    background: scene || "一次具体冲突已经发生，角色B试图把重点从事情本身转移到角色A的态度。",
+    background:
+      textOf(scenario.background) || scene || "一次具体冲突已经发生，角色B试图把重点从事情本身转移到角色A的态度。",
     opponentProfile: {
       type: opponentType,
       personality: textOf(opponentProfile.personality) || "会为自己辩解，也会试图转移重点。",
@@ -427,40 +434,128 @@ function inferOpponentName(source = {}, input = {}) {
   return "角色B";
 }
 
-function buildCustomSceneBackground(input, scenario) {
+function buildCustomSceneBackground(input, scenario, customDraft = null) {
   const category = randomValues.has(input.category) ? scenario.category : input.category;
   const difficulty = randomValues.has(input.difficulty) ? scenario.difficulty : input.difficulty;
   const opponentType = randomValues.has(input.opponentType) ? scenario.opponentProfile?.type : input.opponentType;
-  return `自定义场景：${input.customScene}。训练类型：${category}，难度：${difficulty}，对手倾向：${opponentType}。`;
+  const concrete = customDraft || buildConcreteCustomScenario(input, scenario);
+  return `${concrete.background} 训练类型：${category}，难度：${difficulty}，对手倾向：${opponentType}。`;
 }
 
-function buildCustomOpeningMessage(input) {
-  const scene = input.customScene;
+function buildCustomOpeningMessage(input, customDraft = null) {
+  const scene = customDraft?.shortEvent || input.customScene;
+  const lead = customDraft?.openingLead || "";
   const type = input.opponentType;
-  if (/阴阳/.test(type)) return `行，就你最有道理，${scene}这事你非要这么理解我也没办法。`;
-  if (/偷换/.test(type)) return `你现在怪我也没用吧，${scene}这事难道你自己就一点问题没有？`;
-  if (/情绪勒索/.test(type)) return `我都已经这样了，你还要拿${scene}这事一直逼我吗？`;
-  if (/讲道理/.test(type)) return `${scene}这件事我不是不认，但你也不能只看你自己的角度。`;
-  return `${scene}这事不能全怪我吧，你现在说得好像都是我的问题。`;
+  if (/阴阳/.test(type)) return `行，就你最有道理，${lead}${scene}都能被你说得这么严重。`;
+  if (/偷换/.test(type)) return `你现在怪我也没用吧，${lead}${scene}难道你自己就一点问题没有？`;
+  if (/情绪勒索/.test(type)) return `我都已经这样了，你还要拿${lead}${scene}一直逼我吗？`;
+  if (/讲道理/.test(type)) return `${lead}${scene}这件事我不是不认，但你也不能只看你自己的角度。`;
+  return `${lead}${scene}不能全怪我吧，你现在说得好像都是我的问题。`;
 }
 
-function buildCustomMainline(input) {
-  const scene = input.customScene;
+function buildCustomMainline(input, customDraft = null) {
   const goal = input.userGoal || "让角色B正面回应并给出具体做法";
+  const concrete = customDraft || buildConcreteCustomScenario(input, {});
   return {
-    fact: `当前冲突是：${scene}`,
-    impact: "角色B正在把具体问题转成角色A的态度或情绪，导致事情本身没有被处理。",
+    fact: concrete.fact,
+    impact: concrete.impact,
     request: goal,
-    boundary: "角色B不要再用“角色A太敏感”“角色A想太多”来代替正面回应。"
+    boundary: `${concrete.aiName}不要再用“${concrete.playerName}太敏感”“${concrete.playerName}想太多”来代替正面回应。`
   };
 }
 
-function buildCustomTraps(input) {
-  const traps = ["把具体行为说成角色A的情绪问题", "要求角色A自证是不是太计较"];
+function buildCustomTraps(input, customDraft = null) {
+  const playerName = customDraft?.playerName || "角色A";
+  const aiName = customDraft?.aiName || "角色B";
+  const traps = [
+    `${aiName}把具体行为说成${playerName}的情绪问题`,
+    `${aiName}要求${playerName}自证是不是太计较`
+  ];
   if (/阴阳/.test(input.opponentType)) traps.push("用反讽让角色A失控");
   if (/偷换/.test(input.opponentType)) traps.push("把责任偷换成角色A也有问题");
   if (/情绪勒索/.test(input.opponentType)) traps.push("用委屈压角色A放弃要求");
   return traps;
+}
+
+function buildConcreteCustomScenario(input, scenario = {}) {
+  const playerName = input.playerRole?.name || input.roleA?.name || "角色A";
+  const aiName = input.aiRole?.name || input.roleB?.name || inferOpponentName(scenario, input);
+  const shortEvent = input.customScene.replace(/[。！？!?，,；;：:]+$/g, "");
+  const detail = inferConcreteCustomDetail(shortEvent, { playerName, aiName });
+  const goal = input.userGoal || `${playerName}要求${aiName}正面回应并给出具体做法`;
+
+  return {
+    title: `${detail.titlePrefix}${shortEvent}`,
+    shortEvent,
+    playerName,
+    aiName,
+    openingLead: detail.openingLead,
+    scene: `${detail.place}，${playerName}因为“${shortEvent}”和${aiName}起了冲突。${detail.trigger}`,
+    background: `${detail.time}，${detail.place}，${detail.trigger}${detail.history}${playerName}刚把问题摊开，${aiName}没有正面处理，反而准备把重点转成${playerName}的态度。${playerName}的目标是：${goal}。`,
+    fact: `${aiName}${detail.factAction || `涉及“${shortEvent}”的行为`}，${playerName}已经明确指出这件事需要处理。`,
+    impact: `${detail.impact}${playerName}如果顺着解释情绪，问题会继续被拖过去。`
+  };
+}
+
+function inferConcreteCustomDetail(scene, { playerName, aiName }) {
+  if (/室友|宿舍|合租|垃圾|卫生|厨房|水电|公共区/.test(scene)) {
+    return {
+      titlePrefix: "合租公共区里",
+      time: "周日晚 10 点半",
+      place: "合租房厨房门口",
+      trigger: `${aiName}第三次把公共区收尾留给${playerName}，还在群里说“谁看不惯谁收”。`,
+      history: `${playerName}之前提醒过两次，这次已经影响到第二天使用公共空间。`,
+      factAction: "连续没有处理约定好的公共区责任",
+      impact: "公共空间被占用，原本说好的分工被打破。",
+      openingLead: "不就一点公共区的事吗，"
+    };
+  }
+  if (/男朋友|女朋友|对象|情侣|恋爱|约会|冷战|消息/.test(scene)) {
+    return {
+      titlePrefix: "约定被临时改掉后",
+      time: "周五晚上出门前半小时",
+      place: "两人的微信聊天里",
+      trigger: `${aiName}临时改掉早就约好的安排，被${playerName}追问时只回“你别这么敏感”。`,
+      history: `这已经是本月第二次，${playerName}提前空出了时间。`,
+      factAction: "临时改变约定又没有提前商量",
+      impact: `${playerName}的时间安排被打乱，感受也被一句话否定。`,
+      openingLead: "我又不是故意的，"
+    };
+  }
+  if (/同事|职场|工作|项目|客户|老板|汇报|需求|任务|甩锅/.test(scene)) {
+    return {
+      titlePrefix: "项目出问题后",
+      time: "周一上午例会前十分钟",
+      place: "项目群和会议室之间",
+      trigger: `${aiName}把没有同步的材料问题推到${playerName}身上，说是${playerName}没有提醒到位。`,
+      history: `${playerName}上周已经在群里确认过截止时间和负责人。`,
+      factAction: "把自己负责的交付问题转成别人没提醒",
+      impact: `${playerName}可能在团队里背锅，后续协作边界也会被模糊。`,
+      openingLead: "你现在怪我也没用吧，"
+    };
+  }
+  if (/朋友|借钱|还钱|转账|迟到|放鸽子|约饭/.test(scene)) {
+    return {
+      titlePrefix: "朋友约定反复落空后",
+      time: "周六下午约定时间过后四十分钟",
+      place: "商场门口的聊天窗口",
+      trigger: `${aiName}又一次没有按约定处理，${playerName}催了以后被说“你怎么这么计较”。`,
+      history: `类似情况已经出现三次，${playerName}每次都在迁就。`,
+      factAction: "反复没有兑现已经说好的约定",
+      impact: `${playerName}的时间和信任被消耗，关系里的责任被单方面推开。`,
+      openingLead: "朋友之间有必要算这么清楚吗，"
+    };
+  }
+  return {
+    titlePrefix: "一次具体冲突中",
+    time: "当天晚上消息发出后十分钟",
+    place: "双方正在对话的聊天窗口",
+    trigger: `${aiName}在“${scene}”这件事上没有正面回应具体行为，而是先评价${playerName}说话方式。`,
+    history: `${playerName}之前已经说明过这件事造成的影响。`,
+    factAction: `没有正面处理“${scene}”`,
+    impact: `事情本身没有被解决，${playerName}还被迫解释自己的态度。`,
+    openingLead: ""
+  };
 }
 
 function fallbackTraps(opponentType) {
