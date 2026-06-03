@@ -152,7 +152,7 @@ function ReplyBubbles(text) {
 function TempInputBar(session) {
   return `
     <section class="realtime-input-bar">
-      <textarea data-session-input="temp" placeholder="输入对方新一句，或写下你想表达的意思">${escapeHtml(session.input)}</textarea>
+      <textarea data-session-input="temp" data-enter-action="temp-reply" placeholder="输入对方新一句，或写下你想表达的意思">${escapeHtml(session.input)}</textarea>
       <div class="temp-input-actions">
         <button class="secondary-button warm" data-action="temp-reply-intent" ${session.isSubmitting ? "disabled" : ""}>
           按我的意思

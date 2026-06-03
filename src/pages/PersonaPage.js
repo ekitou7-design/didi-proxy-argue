@@ -187,6 +187,7 @@ function PersonaInputBar(state) {
     <section class="persona-input-bar">
       <textarea
         data-setup-input="proxyPersona.replyForm.opponentMessage"
+        data-enter-action="generate-proxy-reply"
         placeholder="把前情提要、对方刚说的话，或者你想表达的意思发给嘴替……"
       >${escapeHtml(form.opponentMessage)}</textarea>
       <div class="persona-send-row">

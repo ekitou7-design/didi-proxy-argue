@@ -96,6 +96,7 @@ export default class App {
     };
 
     this.root.addEventListener("click", (event) => this.handleClick(event));
+    this.root.addEventListener("keydown", (event) => this.handleKeyDown(event));
     this.root.addEventListener("input", (event) => this.handleInput(event));
     this.root.addEventListener("change", (event) => this.handleChange(event));
     window.addEventListener("hashchange", () => {
@@ -363,6 +364,18 @@ export default class App {
     if (action === "training-submit") {
       await this.handleTrainingSubmit();
     }
+  }
+
+  handleKeyDown(event) {
+    const action = event.target.dataset.enterAction;
+    if (!action || event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+
+    event.preventDefault();
+    const actionTarget = [...this.root.querySelectorAll("[data-action]")].find(
+      (target) => target.dataset.action === action
+    );
+    if (!actionTarget || actionTarget.disabled) return;
+    actionTarget.click();
   }
 
   handleInput(event) {

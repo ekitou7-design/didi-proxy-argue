@@ -277,7 +277,7 @@ function FeedbackText(title, text) {
 function TrainingInputBar(session) {
   return `
     <section class="realtime-input-bar training-input-boundary">
-      <textarea data-session-input="training" placeholder="以当前练习视角发言">${escapeHtml(session.input)}</textarea>
+      <textarea data-session-input="training" data-enter-action="training-submit" placeholder="以当前练习视角发言">${escapeHtml(session.input)}</textarea>
       <button class="primary-button" data-action="training-submit" ${session.isSubmitting ? "disabled" : ""}>
         ${session.isSubmitting ? "判断中..." : "发送"}
       </button>
