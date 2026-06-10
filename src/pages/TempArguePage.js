@@ -25,10 +25,10 @@ function TempSettings(session) {
           <p>${escapeHtml(scenario?.background || session.context || "先补一下前情，嘴替才好接话。")}</p>
         </div>
         <div class="temp-settings-actions">
-          <button class="secondary-button warm random-scenario-button" data-action="generate-temp-scenario" ${session.scenarioStatus === "loading" ? "disabled" : ""}>
+          <button class="secondary-button warm random-scenario-button" data-action="generate-temp-scenario" data-tour="temp-generate-scenario" ${session.scenarioStatus === "loading" ? "disabled" : ""}>
             ${session.scenarioStatus === "loading" ? "刷新中..." : "换个场景"}
           </button>
-          <button class="primary-button random-scenario-button" data-action="open-temp-settings">场景设置</button>
+          <button class="primary-button random-scenario-button" data-action="open-temp-settings" data-tour="temp-settings">场景设置</button>
         </div>
       </div>
       ${session.scenarioMessage ? `<p class="section-note compact-status-note">${escapeHtml(session.scenarioMessage)}</p>` : ""}
@@ -54,7 +54,7 @@ function TempSettingsSheet(session) {
           ${SmallField("前情提要", "temp.context", session.context, "简单说一下为什么吵起来", "wide")}
           ${SmallField("我的诉求", "temp.goal", session.goal, "写清楚这次想达到什么，例如：要求退款、要求道歉、讲清责任", "wide")}
         </div>
-        <div class="settings-inline-groups">
+        <div class="settings-inline-groups" data-tour="temp-intensity">
           <div>
             <span class="mini-field-title">攻击力</span>
             ${ChipGroup("tone", toneOptions, session.tone, "intensity")}
@@ -152,12 +152,12 @@ function ReplyBubbles(text) {
 function TempInputBar(session) {
   return `
     <section class="realtime-input-bar">
-      <textarea data-session-input="temp" data-enter-action="temp-reply" placeholder="输入对方新一句，或写下你想表达的意思">${escapeHtml(session.input)}</textarea>
+      <textarea data-session-input="temp" data-enter-action="temp-reply" data-tour="temp-opponent-input" placeholder="输入对方新一句，或写下你想表达的意思">${escapeHtml(session.input)}</textarea>
       <div class="temp-input-actions">
-        <button class="secondary-button warm" data-action="temp-reply-intent" ${session.isSubmitting ? "disabled" : ""}>
+        <button class="secondary-button warm" data-action="temp-reply-intent" data-tour="temp-reply-intent" ${session.isSubmitting ? "disabled" : ""}>
           按我的意思
         </button>
-        <button class="primary-button" data-action="temp-reply" ${session.isSubmitting ? "disabled" : ""}>
+        <button class="primary-button" data-action="temp-reply" data-tour="temp-reply-opponent" ${session.isSubmitting ? "disabled" : ""}>
           ${session.isSubmitting ? "接话中..." : "按对方新话"}
         </button>
       </div>

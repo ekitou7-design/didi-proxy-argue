@@ -78,14 +78,14 @@ export function DesktopContextPanel(state) {
 
 export function TempDesktopContext(temp) {
   return `
-    <section class="desktop-panel context-panel">
+    <section class="desktop-panel context-panel" data-tour="temp-settings" data-tour-priority="1">
       <h2>主线锁定</h2>
       ${DesktopField("和谁吵", "temp.who", temp.who, "客服、室友、对象、同事")}
       ${DesktopField("对方说了什么", "temp.latest", temp.latest, "对方刚刚那句话")}
       ${DesktopField("前情提要", "temp.context", temp.context, "为什么吵起来")}
       ${DesktopField("我的诉求", "temp.goal", temp.goal, "想达成什么结果")}
       <h3>语气强度</h3>
-      ${DesktopChipGroup("temp", "tone", toneOptions, temp.tone)}
+      <div data-tour="temp-intensity" data-tour-priority="1">${DesktopChipGroup("temp", "tone", toneOptions, temp.tone)}</div>
     </section>
   `;
 }
@@ -99,14 +99,18 @@ export function PersonaDesktopContext(proxyPersona) {
       <div class="desktop-tag-row">
         ${getProfileTagsForLayout(profile).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
       </div>
-      <button class="secondary-button warm compact-full-button" data-action="open-persona-create">创建 / 切换人格</button>
-      <button class="secondary-button compact-full-button" data-page="personaDistill">上传 txt 蒸馏</button>
-      <button class="secondary-button compact-full-button" data-page="personaTest">做人格测试</button>
-      <h3>生成策略</h3>
-      ${DesktopChipGroup("proxyPersona.replyForm", "mode", proxyReplyModes, proxyPersona.replyForm.mode)}
-      ${DesktopChipGroup("proxyPersona.replyForm", "strength", proxyReplyStrengths, proxyPersona.replyForm.strength)}
-      ${DesktopField("前情提要", "proxyPersona.replyForm.background", proxyPersona.replyForm.background, "这次冲突的背景")}
-      ${DesktopField("我想表达", "proxyPersona.replyForm.goal", proxyPersona.replyForm.goal, "想守住的主线")}
+      <button class="secondary-button warm compact-full-button" data-action="open-persona-create" data-tour="persona-create">创建 / 切换人格</button>
+      <button class="secondary-button compact-full-button" data-page="personaDistill" data-tour="persona-distill">上传 txt 蒸馏</button>
+      <button class="secondary-button compact-full-button" data-page="personaTest" data-tour="persona-test">做人格测试</button>
+      <div data-tour="persona-reply-settings" data-tour-priority="1">
+        <h3>生成策略</h3>
+        ${DesktopChipGroup("proxyPersona.replyForm", "mode", proxyReplyModes, proxyPersona.replyForm.mode)}
+        ${DesktopChipGroup("proxyPersona.replyForm", "strength", proxyReplyStrengths, proxyPersona.replyForm.strength)}
+      </div>
+      <div data-tour="persona-generate-reply" data-tour-priority="1">
+        ${DesktopField("前情提要", "proxyPersona.replyForm.background", proxyPersona.replyForm.background, "这次冲突的背景")}
+        ${DesktopField("我想表达", "proxyPersona.replyForm.goal", proxyPersona.replyForm.goal, "想守住的主线")}
+      </div>
     </section>
   `;
 }
@@ -115,7 +119,7 @@ export function TrainingDesktopContext(training) {
   const config = getGameConfig(training);
   return `
     <section class="desktop-panel context-panel">
-      ${TrainingPreviewContent(training, config)}
+      ${TrainingPreviewContent(training, config, { includeTourTargets: true })}
     </section>
   `;
 }

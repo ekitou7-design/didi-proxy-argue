@@ -30,10 +30,10 @@ function PersonaHeader(profile) {
           <p>先创建一个嘴替人格，再让它帮你说话。</p>
         </div>
         <div class="persona-header-actions">
-          <button class="secondary-button compact-action" data-action="open-persona-create">创建嘴替</button>
-          <button class="tiny-button" data-page="personaDistill">上传蒸馏</button>
-          <button class="tiny-button" data-page="personaTest">人格测试</button>
-          <button class="tiny-button" data-action="open-feishu-settings">飞书设置</button>
+          <button class="secondary-button compact-action" data-action="open-persona-create" data-tour="persona-create">创建嘴替</button>
+          <button class="tiny-button" data-page="personaDistill" data-tour="persona-distill">上传蒸馏</button>
+          <button class="tiny-button" data-page="personaTest" data-tour="persona-test">人格测试</button>
+          <button class="tiny-button" data-action="open-feishu-settings" data-tour="persona-feishu">飞书设置</button>
         </div>
       </section>
     `;
@@ -47,8 +47,8 @@ function PersonaHeader(profile) {
       </div>
       <div class="persona-header-actions">
         <button class="tiny-button" data-action="open-persona-info">查看档案</button>
-        <button class="secondary-button compact-action" data-action="open-persona-create">创建 / 切换</button>
-        <button class="tiny-button" data-action="open-feishu-settings">飞书设置</button>
+        <button class="secondary-button compact-action" data-action="open-persona-create" data-tour="persona-create">创建 / 切换</button>
+        <button class="tiny-button" data-action="open-feishu-settings" data-tour="persona-feishu">飞书设置</button>
       </div>
     </section>
   `;
@@ -98,9 +98,9 @@ function PersonaInfoSheet(profile) {
         </div>
 
         <div class="persona-info-actions">
-          <button class="tiny-button" data-page="personaDistill">上传蒸馏</button>
-          <button class="tiny-button" data-page="personaTest">人格测试</button>
-          <button class="tiny-button" data-action="open-feishu-settings">飞书设置</button>
+          <button class="tiny-button" data-page="personaDistill" data-tour="persona-distill">上传蒸馏</button>
+          <button class="tiny-button" data-page="personaTest" data-tour="persona-test">人格测试</button>
+          <button class="tiny-button" data-action="open-feishu-settings" data-tour="persona-feishu">飞书设置</button>
         </div>
       </div>
     </section>
@@ -171,7 +171,7 @@ function FeishuBubbleAction(turn, status) {
 
 function FloatingFeishuButton() {
   return `
-    <button class="floating-feishu-button" data-action="open-feishu-settings" aria-label="飞书设置" title="飞书设置">
+    <button class="floating-feishu-button" data-action="open-feishu-settings" data-tour="persona-feishu" aria-label="飞书设置" title="飞书设置">
       飞
     </button>
   `;
@@ -191,11 +191,11 @@ function PersonaInputBar(state) {
         placeholder="把前情提要、对方刚说的话，或者你想表达的意思发给嘴替……"
       >${escapeHtml(form.opponentMessage)}</textarea>
       <div class="persona-send-row">
-        <button class="settings-icon-button" data-action="open-reply-settings" aria-label="打开回复设置">
+        <button class="settings-icon-button" data-action="open-reply-settings" data-tour="persona-reply-settings" aria-label="打开回复设置">
           <span aria-hidden="true">⚙</span>
           <b>${escapeHtml(form.mode)} · ${escapeHtml(form.strength)}</b>
         </button>
-        <button class="primary-button" data-action="generate-proxy-reply" ${state.isReplyGenerating ? "disabled" : ""}>
+        <button class="primary-button" data-action="generate-proxy-reply" data-tour="persona-generate-reply" ${state.isReplyGenerating ? "disabled" : ""}>
           ${state.isReplyGenerating ? "嘴替正在憋大招..." : "生成回怼"}
         </button>
       </div>
@@ -259,8 +259,8 @@ function EmptyPersonaState() {
 function EmptyCreateActions() {
   return `
     <section class="persona-empty-actions">
-      <button class="primary-button" data-page="personaDistill">上传 txt 蒸馏</button>
-      <button class="secondary-button warm" data-page="personaTest">做测试题生成</button>
+      <button class="primary-button" data-page="personaDistill" data-tour="persona-distill">上传 txt 蒸馏</button>
+      <button class="secondary-button warm" data-page="personaTest" data-tour="persona-test">做测试题生成</button>
     </section>
   `;
 }
@@ -275,7 +275,7 @@ function PersonaCreateSheet(state, activeProfile) {
         </div>
 
         <div class="create-choice-grid">
-          <button class="feature-card pink upload-entry" data-page="personaDistill">
+          <button class="feature-card pink upload-entry" data-page="personaDistill" data-tour="persona-distill">
             <span class="feature-tone">TXT</span>
             <div>
               <h3>上传 txt，蒸馏我的说话方式</h3>
@@ -284,7 +284,7 @@ function PersonaCreateSheet(state, activeProfile) {
             </div>
             <span class="feature-arrow">›</span>
           </button>
-          <button class="feature-card blue upload-entry" data-page="personaTest">
+          <button class="feature-card blue upload-entry" data-page="personaTest" data-tour="persona-test">
             <span class="feature-tone">测</span>
             <div>
               <h3>做一套测试题，生成嘴替人格</h3>

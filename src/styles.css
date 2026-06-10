@@ -2825,6 +2825,127 @@ textarea:focus {
   margin-top: 10px;
 }
 
+.onboarding-global-tip,
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  pointer-events: auto;
+}
+
+.onboarding-global-tip {
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(33, 20, 15, 0.2);
+}
+
+.onboarding-overlay {
+  --tour-top: 120px;
+  --tour-left: 18px;
+  --tour-width: 220px;
+  --tour-height: 64px;
+  background: rgba(33, 20, 15, 0.42);
+}
+
+.onboarding-highlight {
+  position: fixed;
+  top: var(--tour-top);
+  left: var(--tour-left);
+  width: var(--tour-width);
+  height: var(--tour-height);
+  border: 3px solid var(--yellow);
+  border-radius: 18px;
+  box-shadow:
+    0 0 0 9999px rgba(33, 20, 15, 0.42),
+    5px 5px 0 var(--ink);
+  pointer-events: none;
+}
+
+.onboarding-card {
+  position: fixed;
+  top: calc(var(--tour-top) + var(--tour-height) + 14px);
+  left: clamp(16px, var(--tour-left), calc(100vw - 376px));
+  width: min(360px, calc(100vw - 32px));
+  padding: 16px;
+  background: var(--white);
+  border: var(--line);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+}
+
+.onboarding-card.compact {
+  position: static;
+}
+
+.onboarding-overlay.card-above .onboarding-card {
+  top: auto;
+  bottom: calc(100vh - var(--tour-top) + 14px);
+}
+
+.onboarding-overlay.no-target .onboarding-highlight {
+  display: none;
+}
+
+.onboarding-overlay.no-target .onboarding-card {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.onboarding-kicker {
+  display: inline-block;
+  padding: 5px 9px;
+  background: var(--yellow);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 1000;
+}
+
+.onboarding-card h2 {
+  margin: 10px 0 0;
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.onboarding-card p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+  font-weight: 900;
+}
+
+.onboarding-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.onboarding-primary,
+.onboarding-secondary {
+  min-height: 44px;
+  font-size: 15px;
+}
+
+.onboarding-reset-toast {
+  position: fixed;
+  right: 16px;
+  bottom: 112px;
+  left: 16px;
+  z-index: 60;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 12px 14px;
+  background: var(--yellow);
+  border: 2px solid var(--ink);
+  border-radius: 16px;
+  box-shadow: 3px 3px 0 var(--ink);
+  font-weight: 1000;
+  text-align: center;
+}
+
 @media (max-width: 380px) {
   .persona-header-card {
     grid-template-columns: 1fr;

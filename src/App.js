@@ -1,4 +1,5 @@
 import BottomNav from "./components/BottomNav.js";
+import { OnboardingCoach, OnboardingGlobalTip, onboardingModules } from "./components/OnboardingCoach.js";
 import HomePage from "./pages/HomePage.js";
 import TempArguePage from "./pages/TempArguePage.js";
 import PersonaPage from "./pages/PersonaPage.js";
@@ -50,10 +51,11 @@ import {
   CURRENT_PROFILE_KEY,
   DISTILL_RESULTS_KEY,
   FEISHU_WEBHOOK_KEY,
+  ONBOARDING_KEY,
   PERSONA_CHAT_KEY,
   TEST_RESULTS_KEY
 } from "./constants/storageKeys.js";
-import { readJson } from "./utils/storage.js";
+import { readJson, writeJson } from "./utils/storage.js";
 import { dedicatedPersonaQuizQuestions } from "./data/njutiQuizData.js";
 import {
   buildPersonaChatTurn,
@@ -90,6 +92,10 @@ export default class App {
         mainlineLock: "开启"
       },
       feishu: createFeishuState(),
+      onboarding: createOnboardingState(),
+      onboardingStep: 0,
+      onboardingActivePage: "",
+      onboardingMessage: "",
       temp: structuredClone(initialTempSession),
       persona: structuredClone(initialPersonaSession),
       training: structuredClone(initialTrainingSession)
@@ -130,6 +136,12 @@ export default class App {
   }
 
   async handleClick(event) {
+    const onboardingTarget = event.target.closest("[data-onboarding-action]");
+    if (onboardingTarget) {
+      this.handleOnboardingAction(onboardingTarget.dataset.onboardingAction);
+      return;
+    }
+
     const copyTarget = event.target.closest("[data-copy-reply]");
     if (copyTarget) {
       navigator.clipboard?.writeText(copyTarget.dataset.copyReply);
@@ -235,6 +247,10 @@ export default class App {
     }
     if (action === "open-feishu-settings") {
       this.openFeishuSettings();
+      return;
+    }
+    if (action === "reset-onboarding") {
+      this.resetOnboarding();
       return;
     }
     if (action === "close-feishu-settings") {
@@ -458,6 +474,75 @@ export default class App {
     this.setState({ page });
   }
 
+  handleOnboardingAction(action) {
+    if (action === "next-global-step") {
+      this.setState({ onboardingStep: this.state.onboardingStep + 1 });
+      return;
+    }
+
+    if (action === "dismiss-global") {
+      this.updateOnboarding({ seenGlobalTip: true });
+      return;
+    }
+
+    if (action === "skip-all") {
+      this.updateOnboarding({
+        seenGlobalTip: true,
+        skipAll: true,
+        modules: {
+          temp: true,
+          persona: true,
+          training: true
+        }
+      });
+      return;
+    }
+
+    if (action === "next-step") {
+      this.setState({ onboardingStep: this.state.onboardingStep + 1 });
+      return;
+    }
+
+    if (action === "finish-module") {
+      const page = this.state.onboardingActivePage;
+      if (!onboardingModules[page]) return;
+      this.updateOnboarding({
+        modules: {
+          ...this.state.onboarding.modules,
+          [page]: true
+        }
+      });
+    }
+  }
+
+  resetOnboarding() {
+    this.setState({
+      onboarding: createDefaultOnboardingState(),
+      onboardingStep: 0,
+      onboardingActivePage: "",
+      onboardingMessage: "已重置，新手攻略会在你第一次进入各功能时再次出现。"
+    });
+    writeJson(ONBOARDING_KEY, createDefaultOnboardingState());
+  }
+
+  updateOnboarding(partial) {
+    const next = normalizeOnboardingState({
+      ...this.state.onboarding,
+      ...partial,
+      modules: {
+        ...this.state.onboarding.modules,
+        ...(partial.modules || {})
+      }
+    });
+    writeJson(ONBOARDING_KEY, next);
+    this.setState({
+      onboarding: next,
+      onboardingActivePage: "",
+      onboardingStep: 0,
+      onboardingMessage: ""
+    });
+  }
+
   updateProxyPersona(partial) {
     this.setState({
       proxyPersona: {
@@ -580,6 +665,7 @@ export default class App {
   }
 
   render() {
+    this.syncOnboardingForPage();
     const { page } = this.state;
     const isRealtimePage =
       page === "temp" ||
@@ -605,10 +691,97 @@ export default class App {
             <aside class="desktop-context">${DesktopContextPanel(this.state)}</aside>
           </div>
           ${BottomNav(page)}
+          ${this.state.onboardingMessage ? `<p class="onboarding-reset-toast">${this.state.onboardingMessage}</p>` : ""}
+          ${this.getOnboardingMarkup()}
         </div>
       </div>
     `;
     this.scrollChatAreasToBottom();
+    this.positionOnboardingCoach();
+  }
+
+  syncOnboardingForPage() {
+    const onboarding = this.state.onboarding;
+    if (!onboarding || onboarding.skipAll) {
+      this.state.onboardingActivePage = "";
+      this.state.onboardingStep = 0;
+      return;
+    }
+
+    if (!onboarding.seenGlobalTip) {
+      this.state.onboardingActivePage = "";
+      return;
+    }
+
+    const page = this.state.page;
+    if (!onboardingModules[page] || onboarding.modules[page]) {
+      this.state.onboardingActivePage = "";
+      this.state.onboardingStep = 0;
+      return;
+    }
+
+    if (this.state.onboardingActivePage !== page) {
+      this.state.onboardingActivePage = page;
+      this.state.onboardingStep = 0;
+    }
+  }
+
+  getOnboardingMarkup() {
+    const onboarding = this.state.onboarding;
+    if (!onboarding?.seenGlobalTip && !onboarding?.skipAll) return OnboardingGlobalTip(this.state.onboardingStep);
+    if (!this.state.onboardingActivePage) return "";
+    return OnboardingCoach({
+      page: this.state.onboardingActivePage,
+      step: this.state.onboardingStep
+    });
+  }
+
+  positionOnboardingCoach() {
+    window.requestAnimationFrame?.(() => {
+      const overlay = this.root.querySelector("[data-onboarding-overlay]");
+      if (!overlay) return;
+      const targetKey = overlay.dataset.onboardingTarget;
+      const target = targetKey ? this.findOnboardingTarget(targetKey) : null;
+      if (!target) {
+        overlay.classList.add("no-target");
+        return;
+      }
+      target.scrollIntoView?.({ block: "center", inline: "nearest", behavior: "smooth" });
+      window.requestAnimationFrame?.(() => {
+        const visibleTarget = this.findOnboardingTarget(targetKey) || target;
+        if (!isVisibleTourTarget(visibleTarget)) {
+          overlay.classList.add("no-target");
+          return;
+        }
+        const rect = visibleTarget.getBoundingClientRect();
+        overlay.classList.remove("no-target");
+        overlay.style.setProperty("--tour-top", `${Math.max(8, rect.top - 8)}px`);
+        overlay.style.setProperty("--tour-left", `${Math.max(8, rect.left - 8)}px`);
+        overlay.style.setProperty("--tour-width", `${Math.max(48, rect.width + 16)}px`);
+        overlay.style.setProperty("--tour-height", `${Math.max(48, rect.height + 16)}px`);
+        overlay.classList.toggle("card-above", rect.top > window.innerHeight * 0.55);
+      });
+    });
+  }
+
+  findOnboardingTarget(targetKey) {
+    const candidates = Array.from(this.root.querySelectorAll(`[data-tour="${targetKey}"]`)).filter(isRenderableTourTarget);
+    if (!candidates.length) return null;
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    return candidates
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        const priority = Number(element.dataset.tourPriority || 0);
+        const visibleWidth = Math.max(0, Math.min(rect.right, viewportWidth) - Math.max(rect.left, 0));
+        const visibleHeight = Math.max(0, Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0));
+        const visibleArea = visibleWidth * visibleHeight;
+        const distanceFromCenter =
+          Math.abs(rect.left + rect.width / 2 - viewportWidth / 2) +
+          Math.abs(rect.top + rect.height / 2 - viewportHeight / 2);
+        return { element, priority, visibleArea, distanceFromCenter };
+      })
+      .sort((a, b) => b.priority - a.priority || b.visibleArea - a.visibleArea || a.distanceFromCenter - b.distanceFromCenter)[0].element;
   }
 
   scrollChatAreasToBottom() {
@@ -672,6 +845,51 @@ function createFeishuState() {
     sendingByTurnId: {},
     status: ""
   };
+}
+
+function createDefaultOnboardingState() {
+  return {
+    seenGlobalTip: false,
+    skipAll: false,
+    modules: {
+      temp: false,
+      persona: false,
+      training: false
+    }
+  };
+}
+
+function normalizeOnboardingState(value) {
+  return {
+    seenGlobalTip: Boolean(value?.seenGlobalTip),
+    skipAll: Boolean(value?.skipAll),
+    modules: {
+      temp: Boolean(value?.modules?.temp),
+      persona: Boolean(value?.modules?.persona),
+      training: Boolean(value?.modules?.training)
+    }
+  };
+}
+
+function createOnboardingState() {
+  return normalizeOnboardingState(readJson(ONBOARDING_KEY, createDefaultOnboardingState()));
+}
+
+function isRenderableTourTarget(element) {
+  if (!element) return false;
+  const style = window.getComputedStyle?.(element);
+  if (style?.display === "none" || style?.visibility === "hidden" || style?.opacity === "0") return false;
+  const rect = element.getBoundingClientRect();
+  if (rect.width < 4 || rect.height < 4) return false;
+  return true;
+}
+
+function isVisibleTourTarget(element) {
+  if (!isRenderableTourTarget(element)) return false;
+  const rect = element.getBoundingClientRect();
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+  return rect.bottom > 0 && rect.right > 0 && rect.top < viewportHeight && rect.left < viewportWidth;
 }
 
 function pageFromHash() {

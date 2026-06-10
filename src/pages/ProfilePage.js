@@ -42,6 +42,7 @@ export default function ProfilePage({ preferences, feishu = {} }) {
         <button class="list-strip">对方说一句，你输入一句，App 一轮一轮帮你接话</button>
         <button class="list-strip">先看话术分析，再选稳妥版、强硬版或嘴替版</button>
         <button class="list-strip">重点是守住主线，不是把冲突无限升级</button>
+        <button class="list-strip" data-action="reset-onboarding">重新查看新手攻略</button>
       </section>
 
       ${feishu.settingsOpen ? FeishuSettingsSheet(feishu) : ""}

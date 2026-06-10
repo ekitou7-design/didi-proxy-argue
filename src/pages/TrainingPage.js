@@ -30,10 +30,10 @@ function TrainingSetupStatus(session, config) {
           <p>${escapeHtml(formatGoals(config.trainingGoals))} · ${escapeHtml(difficultyLabel(config.difficulty))}</p>
         </div>
         <div class="training-status-actions">
-          <button class="secondary-button warm compact-action" data-action="generate-random-training-scenario" ${session.scenarioStatus === "loading" ? "disabled" : ""}>
+          <button class="secondary-button warm compact-action" data-action="generate-random-training-scenario" data-tour="training-generate" ${session.scenarioStatus === "loading" ? "disabled" : ""}>
             ${session.scenarioStatus === "loading" ? "生成中..." : "AI生成一局训练"}
           </button>
-          <button class="primary-button compact-action" data-action="start-training-game" ${session.scenarioStatus === "loading" ? "disabled" : ""}>开始训练</button>
+          <button class="primary-button compact-action" data-action="start-training-game" data-tour="training-start" ${session.scenarioStatus === "loading" ? "disabled" : ""}>开始训练</button>
         </div>
       </div>
       ${session.scenarioMessage ? `<p class="section-note compact-status-note">${escapeHtml(session.scenarioMessage)}</p>` : ""}
@@ -73,7 +73,7 @@ function TrainingStartSettings(session, config) {
 
       <div class="training-setting-group">
         <h3>训练目标</h3>
-        <div class="training-choice-grid">
+        <div class="training-choice-grid" data-tour="training-goals">
           ${trainingGoalOptions
             .map(
               (goal) => `
@@ -106,7 +106,7 @@ function TrainingStartSettings(session, config) {
         </div>
       </div>
 
-      <button class="primary-button compact-full-button" data-action="start-training-game" ${session.scenarioStatus === "loading" ? "disabled" : ""}>开始训练</button>
+      <button class="primary-button compact-full-button" data-action="start-training-game" data-tour="training-start" ${session.scenarioStatus === "loading" ? "disabled" : ""}>开始训练</button>
     </section>
   `;
 }
@@ -149,9 +149,10 @@ function TrainingMobilePreview(session, config) {
   `;
 }
 
-export function TrainingPreviewContent(session, config = getGameConfig(session)) {
+export function TrainingPreviewContent(session, config = getGameConfig(session), options = {}) {
   const playerRole = getPlayerRole(config);
   const aiRole = getAiRole(config);
+  const goalTourAttr = options.includeTourTargets ? ` data-tour="training-goals" data-tour-priority="1"` : "";
   return `
     <div class="training-preview-content">
       <h2>本局预览</h2>
@@ -160,7 +161,7 @@ export function TrainingPreviewContent(session, config = getGameConfig(session))
       <p><b>练习视角目标：</b>${escapeHtml(playerRole.goal || "未填写")}</p>
       <p><b>AI 对手：</b>角色${escapeHtml(config.aiRoleKey)} · ${escapeHtml(aiRole.name || "未选择")}</p>
       <p><b>AI 对手目标：</b>${escapeHtml(aiRole.goal || "未填写")}</p>
-      <p><b>训练目标：</b>${escapeHtml(formatGoals(config.trainingGoals))}</p>
+      <p${goalTourAttr}><b>训练目标：</b>${escapeHtml(formatGoals(config.trainingGoals))}</p>
       <p><b>难度：</b>${escapeHtml(difficultyLabel(config.difficulty))}</p>
     </div>
   `;
@@ -189,7 +190,7 @@ function TrainingGameHud(session) {
           <h2>${escapeHtml(config.scene || "吵架训练")}</h2>
           <p>你：${escapeHtml(playerRole.name)} / AI 对手：${escapeHtml(aiRole.name)}</p>
         </div>
-        <button class="tiny-button" data-action="finish-training-game" ${session.isSubmitting ? "disabled" : ""}>结束本轮</button>
+        <button class="tiny-button" data-action="finish-training-game" data-tour="training-finish" ${session.isSubmitting ? "disabled" : ""}>结束本轮</button>
       </div>
       <div class="training-role-summary compact">
         <span>目标：<b>${escapeHtml(formatGoals(config.trainingGoals))}</b></span>
@@ -278,7 +279,7 @@ function TrainingInputBar(session) {
   return `
     <section class="realtime-input-bar training-input-boundary">
       <textarea data-session-input="training" data-enter-action="training-submit" placeholder="以当前练习视角发言">${escapeHtml(session.input)}</textarea>
-      <button class="primary-button" data-action="training-submit" ${session.isSubmitting ? "disabled" : ""}>
+      <button class="primary-button" data-action="training-submit" data-tour="training-submit" ${session.isSubmitting ? "disabled" : ""}>
         ${session.isSubmitting ? "判断中..." : "发送"}
       </button>
     </section>
