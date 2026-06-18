@@ -67,7 +67,6 @@ import { getMessageContent, normalizeMessage } from "./utils/messageModel.js";
 import { readJson, writeJson } from "./utils/storage.js";
 import { dedicatedPersonaQuizQuestions } from "./data/njutiQuizData.js";
 import {
-  buildPersonaChatTurn,
   initialPersonaSession,
   initialProxyPersonaState,
   initialTempSession,
@@ -315,7 +314,7 @@ export default class App {
       return;
     }
     if (action === "submit-persona-test") {
-      this.createPersonaFromTest();
+      await this.createPersonaFromTest();
       return;
     }
     if (action === "set-current-profile") {
@@ -344,6 +343,10 @@ export default class App {
     }
     if (action === "generate-random-training-scenario") {
       await this.generateRandomTrainingScenario();
+      return;
+    }
+    if (action === "generate-preset-training-scenario") {
+      await this.generatePresetTrainingScenario();
       return;
     }
     if (action === "toggle-training-goal") {
@@ -422,16 +425,16 @@ export default class App {
       return;
     }
     if (action === "persona-reply") {
-      const text = this.state.persona.input.trim();
-      if (!text) return;
-      const turn = buildPersonaChatTurn(this.state.persona, text);
       this.setState({
-        persona: { ...this.state.persona, latest: text, input: "", rounds: [...this.state.persona.rounds, turn] }
+        persona: {
+          ...this.state.persona,
+          scenarioMessage: "这个旧入口已停用，避免使用本地固定话术。请使用“专属嘴替”页面底部的生成回怼，它会调用真实 AI API。"
+        }
       });
       return;
     }
     if (action === "start-training-game" || action === "start-training-chat") {
-      this.startTrainingGame();
+      await this.startTrainingGame();
       return;
     }
     if (action === "finish-training-game") {
@@ -759,7 +762,7 @@ export default class App {
     return saveDistillPersona(this);
   }
 
-  createPersonaFromTest() {
+  async createPersonaFromTest() {
     return createPersonaFromTest(this);
   }
 
@@ -811,7 +814,7 @@ export default class App {
     return applyGeneratedTrainingScenario(this, scenario, scenarioMessage, scenarioStatus, scenarioRequestId);
   }
 
-  startTrainingGame() {
+  async startTrainingGame() {
     return startTrainingGame(this);
   }
 

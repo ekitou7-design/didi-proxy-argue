@@ -29,6 +29,10 @@ export function generatePersonaReply(payload) {
   return postJson("/api/persona/reply", payload);
 }
 
+export function generatePersonaTestResult(payload) {
+  return postJson("/api/persona/test-result", payload);
+}
+
 export function generateTempReply(payload) {
   return postJson("/api/temp-chat", payload);
 }

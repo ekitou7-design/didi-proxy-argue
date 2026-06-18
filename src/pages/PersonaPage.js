@@ -1,5 +1,6 @@
 import { proxyReplyModes, proxyReplyStrengths } from "../data/mockData.js";
 import { ChatBubble as SharedChatBubble } from "../components/ChatBubble.js";
+import { AiSourceBadge } from "../utils/aiSource.js";
 import { escapeAttr, escapeHtml } from "../utils/html.js";
 import { getMessageContent } from "../utils/messageModel.js";
 
@@ -143,6 +144,7 @@ function PersonaMessageBubble(turn, profile, state, latestAssistantId) {
     label: isOpponent ? "对方" : profileName,
     avatar: isOpponent ? "对" : "替",
     content: getMessageContent(turn),
+    meta: !isOpponent && turn.source ? AiSourceBadge(turn.source, "真实 AI") : "",
     actions: isLatestAssistant ? FeishuBubbleAction(turn, state.feishu?.sendingByTurnId?.[turn.id] || "") : ""
   });
 }
@@ -322,6 +324,7 @@ function PersonaList(state, activeProfile) {
                     .map((tag) => `<span>${escapeHtml(tag)}</span>`)
                     .join("")}
                   <span>${profile.sourceType === "test" ? "测试题生成" : "txt 蒸馏"}</span>
+                  ${profile.source ? AiSourceBadge(profile.source, "真实 AI") : ""}
                 </div>
               </div>
               <button class="tiny-button" data-action="set-current-profile" data-profile-id="${escapeAttr(profile.id)}">

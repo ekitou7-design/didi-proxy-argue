@@ -4,6 +4,7 @@ import {
   generateTempScenario as requestTempScenario
 } from "../services/api.js";
 import { TEMP_CHAT_HISTORY_KEY } from "../constants/storageKeys.js";
+import { assertAiSource } from "../utils/aiSource.js";
 import { readJson, writeJson } from "../utils/storage.js";
 
 export async function handleTempReply(app, { inputAsIntent = false } = {}) {
@@ -49,7 +50,7 @@ export async function handleTempReply(app, { inputAsIntent = false } = {}) {
       }))
     });
     if (app.state.temp.generationRequestId !== requestId) return;
-    if (result.source === "fallback") throw new Error("AI 调用失败：后端返回了 fallback 回复");
+    assertAiSource(result, "临时代吵回复");
     const resultMainline = result.mainline && typeof result.mainline === "object"
       ? [result.mainline.fact, result.mainline.impact, result.mainline.request, result.mainline.boundary].filter(Boolean).join(" ")
       : "";
@@ -61,7 +62,7 @@ export async function handleTempReply(app, { inputAsIntent = false } = {}) {
     if (!replies.length) throw new Error("AI 调用失败：回复内容为空");
     turn = {
       id: Date.now(),
-      source: result.source || "ai",
+      source: result.source,
       opponent: inputAsIntent ? "我想表达：" + userIntent : opponentText,
       analysis: result.opponentTactic || "AI 已生成回应。",
       mainline: [result.strategy, resultMainline, result.offTopicWarning].filter(Boolean).join(" "),
@@ -176,7 +177,12 @@ export async function generateTempScenario(app) {
       latest: latestForScenario,
       refreshCount: nextRefreshCount
     });
-    const scenario = normalizeTempScenario(result.scenario || result, temp);
+    assertAiSource(result, "临时代吵场景");
+    const rawScenario = result.scenario || result;
+    if (!rawScenario?.openingMessage || !rawScenario?.background || !rawScenario?.mainline?.request) {
+      throw new Error("AI 临时场景返回不完整");
+    }
+    const scenario = normalizeTempScenario(rawScenario, temp);
     app.setState({
       temp: {
         ...app.state.temp,
@@ -186,7 +192,7 @@ export async function generateTempScenario(app) {
         goal: scenario.userGoal || app.state.temp.goal,
         generatedScenario: scenario,
         scenarioStatus: "done",
-        scenarioMessage: "临时场景已生成，对方先开口了。",
+        scenarioMessage: "真实 AI 已生成临时场景，对方先开口了。",
         scenarioRefreshCount: nextRefreshCount,
         input: "",
         rounds: []

@@ -209,40 +209,6 @@ export function buildTempChatTurn(session, text, options = {}) {
   return buildTargetedTempTurn(session, text, options);
 }
 
-export function buildPersonaChatTurn(session, opponentText) {
-  return buildRealtimeTurn(session, opponentText, true);
-}
-
-function buildRealtimeTurn(session, opponentText, hasPersona = false) {
-  const analysis = detectTactic(opponentText);
-  const object = session.who || "对方";
-  const goal = session.goal || "把诉求说清楚";
-  const tone = session.tone || "冷静有理";
-  const boundary = session.boundary || "不越界、不人身攻击";
-
-  return {
-    id: Date.now(),
-    opponent: opponentText,
-    analysis,
-    mainline: `这一轮抓住“${goal}”。你面对的是${object}，不要被对方带去证明自己有没有资格生气；只讲事实、影响、责任和下一步。表达边界：${boundary}`,
-    replies: [
-      {
-        label: "稳妥版",
-        text: `我不是要把事情闹大，我是在说这件事确实对我造成了影响。我们先回到具体问题：${goal}。请你正面回应这件事，而不是把重点转成评价我的情绪。`
-      },
-      {
-        label: "强硬版",
-        text: `别把问题绕成“我太敏感”或者“我要求太多”。现在讨论的是你刚才这句话背后的责任和处理方式。我的要求很明确：${goal}，请直接回应。`
-      },
-      {
-        label: hasPersona ? "嘴替版/阴阳版" : "嘴替版/阴阳版",
-        text: `这个转移重点的角度挺熟练的，但我不接。事情不会因为你给我贴个情绪标签就自动消失。我们还是回到主线：${goal}。`
-      }
-    ],
-    toneReminder: `按“${tone}”来，但别为了显得好说话把边界让没了。`
-  };
-}
-
 function buildTargetedTempTurn(session, text, { inputAsIntent = false } = {}) {
   const rawText = String(text || "").trim();
   const object = session.who || session.generatedScenario?.opponentPersona || "对方";
@@ -355,21 +321,6 @@ function detectTactic(text) {
   return "对方这句话里可能混着情绪压迫和转移话题。先别急着解释自己，先把主线拉回事实、影响和诉求。";
 }
 
-export function makeOpeningOpponent(scene) {
-  if (/男朋友|女朋友|对象|恋爱|暧昧/.test(scene)) {
-    return "你怎么又开始了？我只是临时有点事，你非要把气氛弄成这样吗？";
-  }
-  if (/组员|同事|工作|项目/.test(scene)) {
-    return "这也不能全怪我吧，你要求这么高，那你来做不是更快吗？";
-  }
-  if (/室友|卫生|宿舍/.test(scene)) {
-    return "你也别说得自己多守规矩，宿舍又不是你一个人的。";
-  }
-  if (/商家|客服|退款|售后/.test(scene)) {
-    return "这个不符合我们的处理规则，你自己下单前也应该看清楚。";
-  }
-  return "你现在这样说就很没必要，本来不是什么大事，被你一讲反而变复杂了。";
-}
 
 export function buildTrainingChatTurn(session, userReply) {
   const hasMainline = /重点|现在|问题|责任|处理|解决|规则|影响|诉求|要求/.test(userReply);

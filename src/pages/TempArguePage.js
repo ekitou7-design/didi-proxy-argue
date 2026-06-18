@@ -1,5 +1,6 @@
 import { toneOptions } from "../data/mockData.js";
 import { ChatBubble, CopyAction } from "../components/ChatBubble.js";
+import { AiSourceBadge } from "../utils/aiSource.js";
 import { escapeAttr, escapeHtml } from "../utils/html.js";
 import { splitReplyMessages } from "../utils/message.js";
 
@@ -120,6 +121,7 @@ function ChatRound(round) {
       }
       <details class="round-more">
         <summary>看分析和备选</summary>
+        <div class="ai-source-row">${AiSourceBadge(round.source, "真实 AI")}</div>
         <div class="temp-result-block">
           <h3>对方话术</h3>
           <p>${escapeHtml(round.analysis)}</p>

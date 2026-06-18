@@ -1,5 +1,6 @@
 import { toneOptions, trainingDifficultyOptions, trainingGoalOptions } from "../data/mockData.js";
 import { ChatBubble } from "../components/ChatBubble.js";
+import { AiSourceBadge } from "../utils/aiSource.js";
 import { escapeAttr, escapeHtml } from "../utils/html.js";
 import { getMessageContent } from "../utils/messageModel.js";
 
@@ -32,8 +33,9 @@ function TrainingSetupStatus(session, config) {
         </div>
         <div class="training-status-actions">
           <button class="secondary-button warm compact-action" data-action="generate-random-training-scenario" data-tour="training-generate" ${session.scenarioStatus === "loading" ? "disabled" : ""}>
-            ${session.scenarioStatus === "loading" ? "生成中..." : "AI生成一局训练"}
+            ${session.scenarioStatus === "loading" ? "生成中..." : "AI随机生成一局"}
           </button>
+          <button class="secondary-button compact-action" data-action="generate-preset-training-scenario" ${session.scenarioStatus === "loading" ? "disabled" : ""}>基于当前设定扩写</button>
           <button class="primary-button compact-action" data-action="start-training-game" data-tour="training-start" ${session.scenarioStatus === "loading" ? "disabled" : ""}>开始训练</button>
         </div>
       </div>
@@ -122,7 +124,10 @@ function TrainingStartSettings(session, config) {
       <div class="training-main-actions">
         <button class="primary-button compact-full-button" data-action="start-training-game" data-tour="training-start" ${session.scenarioStatus === "loading" ? "disabled" : ""}>开始训练</button>
         <button class="secondary-button warm compact-full-button" data-action="generate-random-training-scenario" data-tour="training-generate" ${session.scenarioStatus === "loading" ? "disabled" : ""}>
-          ${session.scenarioStatus === "loading" ? "生成中..." : "AI 帮我生成一局"}
+          ${session.scenarioStatus === "loading" ? "生成中..." : "AI 随机生成一局"}
+        </button>
+        <button class="secondary-button compact-full-button" data-action="generate-preset-training-scenario" ${session.scenarioStatus === "loading" ? "disabled" : ""}>
+          基于当前设定扩写
         </button>
       </div>
       ${session.scenarioMessage ? `<p class="section-note compact-status-note">${escapeHtml(session.scenarioMessage)}</p>` : ""}
@@ -314,7 +319,7 @@ function MessageBubble(message, feedbacks, index, config) {
     label: isUser ? `你：${role.name}` : `AI 对手：${role.name}`,
     avatar: isUser ? "我" : "AI",
     content: getMessageContent(message),
-    meta: feedback ? RoundFeedback(feedback) : "",
+    meta: !isUser ? (feedback ? RoundFeedback(feedback) : AiSourceBadge(message.source, "真实 AI")) : "",
     className: "training-message-bubble"
   });
 }
@@ -325,7 +330,7 @@ function RoundFeedback(item) {
   const scores = roundScore.scores || {};
   return `
     <details class="training-round-feedback">
-      <summary>本轮反馈 ${delta >= 0 ? `+${delta}` : delta}</summary>
+      <summary>本轮反馈 ${delta >= 0 ? `+${delta}` : delta} ${AiSourceBadge(item.source, "真实 AI")}</summary>
       <p>${escapeHtml(item.feedback || "本轮已记录。")}</p>
       ${roundScore.overallScore != null ? `<strong>综合评分：${clampScore(roundScore.overallScore)}</strong>` : ""}
       ${ScoreRow("逻辑", scores.logic)}

@@ -246,6 +246,7 @@ export async function extractPersonaProfile(body) {
 
 export function buildMockPersonaProfile(input) {
   return {
+    source: "fallback",
     profileId: `mock-${Date.now()}`,
     profileName: "克制解释型嘴替",
     targetSpeaker: input.targetSpeaker,
@@ -422,6 +423,7 @@ export function normalizePersonaExtractionResult(result, input) {
   }
 
   return {
+    source: "ai",
     profileName: result.profileName,
     sourceSummary: result.sourceSummary,
     targetSpeaker: result.targetSpeaker || input.targetSpeaker || "unknown",

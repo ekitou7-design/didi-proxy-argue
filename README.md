@@ -2,7 +2,7 @@
 
 一个移动端 App 原型 Demo，定位是 AI 情绪表达与“嘴替”工具。核心不是鼓励攻击别人，而是帮助用户在冲突场景中整理逻辑、稳定情绪，并在对话里一轮一轮接住对方的话。
 
-当前版本使用本地 mock 数据，不接入真实 AI API。
+当前版本默认调用真实 AI API。只有显式设置 `DEMO_MODE=true` 时，后端才允许使用 demo / fallback 数据；正式演示和真实使用请保持 `DEMO_MODE=false`。
 
 ## Demo 功能
 
@@ -36,7 +36,13 @@ npm run dev
 http://localhost:3000
 ```
 
-当前项目使用零依赖本地开发服务器，避免因为依赖安装问题影响 Demo 展示。
+运行前请在 `.env` 或 `api.env` 中配置 `DEEPSEEK_API_KEY` 或 `OPENAI_API_KEY`。如果 `.env` 没写 `DEMO_MODE`，默认等同于 `false`。
+
+正式演示 / 真实使用建议：
+
+```env
+DEMO_MODE=false
+```
 
 ## 检查项目
 
@@ -78,16 +84,16 @@ npm run build
 ## 主要模块
 
 - `src/App.js`：页面状态、简单路由、交互事件分发
-- `src/data/mockData.js`：功能入口、回复示例、人格数据、训练题目
+- `src/data/mockData.js`：导航、选项和部分静态配置；AI 生成链路默认不使用本地 mock 成功兜底
 - `src/styles.css`：统一移动端 UI 样式和漫画风视觉系统
 - `src/pages/TempArguePage.js`：临时代吵页面，包含开局设置和实时接话聊天窗口
 - `src/pages/PersonaPage.js`：专属嘴替页面，包含人格设置和按本人风格接话的聊天窗口
 - `src/pages/TrainingPage.js`：吵架训练场页面，包含训练设置和多轮评分反馈
 - `src/pages/RecordsPage.js`：统一历史记录页面
 
-## 后续接 AI API
+## AI API 约定
 
-可以优先替换 `src/data/mockData.js` 中的写死回合数据，再把 `src/App.js` 里的每轮接话逻辑改成异步请求。
+所有 AI 对话、生成、评分、蒸馏功能默认必须调用真实后端 API。真实响应应带 `source: "ai"`；只有显式 `DEMO_MODE=true` 时，fallback / demo 响应才允许出现，并应带 `source: "fallback"`。前端会把 fallback 或缺失 source 的结果显示为错误，而不是当成成功结果。
 
 临时代吵建议后端接口输入：
 

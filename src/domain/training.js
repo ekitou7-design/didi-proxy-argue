@@ -108,8 +108,8 @@ export function scenarioToGameConfig(scenario = {}, previousConfig = {}) {
     trainingGoals: goals?.length ? goals : ["抓住核心问题"],
     difficulty,
     toneStrength: previousConfig.toneStrength,
-    contextSummary: previousConfig.contextSummary,
-    userMainline: previousConfig.userMainline,
+    contextSummary: scenario.background || scenario.scene || previousConfig.contextSummary,
+    userMainline: scenario.realMainline || scenario.userGoal || previousConfig.userMainline,
     sessionControl: previousConfig.sessionControl
   });
 }

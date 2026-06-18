@@ -304,13 +304,14 @@ export function buildRandomTrainingScenarioPrompt(input = {}) {
 场景可以有冲突张力，但禁止生成违法威胁、歧视、人肉、骚扰、现实报复、人身安全风险或鼓励伤害的内容。
 不要写成模板作文。不要只写“你们发生了矛盾”。必须有具体触发事件、对方动机、用户要守住的主线和话术陷阱。
 openingMessage 要像真实人会说的一句话，不要像 AI 总结。
+生成要有新鲜感，允许随心所欲地发散到生活里少见但成立的冲突现场，例如排练室、宠物寄养、剧本杀组局、二手交易、拼车、合租厨房、实习署名、亲戚饭局、楼上噪音、婚礼伴郎伴娘分工、同城搭子爽约、线上社群管理等。不要总是宿舍、情侣、借钱、职场。
 除 openingMessage 外，title、scene、background、userGoal、realMainline、mainline、traps、trainingFocus、scoreFocus、suggestedFirstReplyHint 不要用“我、别人、对方、玩家”指代冲突方。必须使用明确角色名、roleA.name、roleB.name，或“角色A”“角色B”。
 `,
     user: `
 输入偏好：
 ${JSON.stringify(input, null, 2)}
 
-可参考场景池：
+可参考场景池，但不要被它限制；如果用户输入了自己的场景，优先按用户场景生成：
 - 宿舍卫生大战
 - 情侣冷战
 - 朋友借钱不还
@@ -337,9 +338,16 @@ ${JSON.stringify(input, null, 2)}
 - 偷换概念型：把原本的问题转成用户态度不好、太敏感、太计较。
 - 情绪勒索型：用“你要是这样想我也没办法”“我都这样了你还想怎样”来压用户。
 
+生成模式：
+- scenarioMode=random：这是“AI 随机生成一局”。必须忽略旧的 scene/background/contextSummary/userMainline/openingMessage，不要把页面当前已有场景当成用户设定继续扩写。只保留训练目标、难度、语气、会话控制、玩家视角这类训练偏好。必须生成一局全新冲突。
+- scenarioMode=expand：这是“基于当前设定扩写”。如果 customScene/gameConfig.scene/contextSummary/userMainline 有内容，必须尊重用户设定，不要扭曲用户意思。
+
 如果 category/difficulty/opponentType 为空或“随机”，请自行选择一个真实生活冲突设定。
 如果 userGoal 有内容，场景要围绕这个训练目标设计。
-如果 customScene 有内容，customScene 只能当作用户给出的粗略素材，不能原样当 title、scene 或 background。必须把它扩写成一个具体训练现场：包含发生时间/地点、双方关系、刚刚发生的触发事件、此前是否提醒过、角色B为什么要辩解或转移重点、角色A现在要守住的具体诉求。
+如果 scenarioMode=expand 且 customScene 有内容，必须尊重用户的设定，不要把它扭曲成宿舍/情侣/职场等常见模板。你可以补全细节，但不能改掉核心人物关系、物品、场所、冲突类型和用户想玩的设定。如果用户写得很随意、很怪、很抽象，也尽量顺着它创作成一个可训练的真实对话场景。
+如果 scenarioMode=expand 且 contextSummary 有内容，把它当作前情补充；它不能覆盖 customScene，只能帮助补充背景。
+如果 previousScenario 或 previousScenarioSummary 有内容，本次必须明显不同：换人物关系、场所、触发事件、核心矛盾、开场句和话术陷阱，不要只替换几个词。
+如果 creativitySeed 有内容，把它当作随机灵感种子；同样输入也要生成不同角度。
 不要生成抽象观点题，不要写成支持/反对某观点，不要使用“正方”“反方”“立场A”“立场B”“辩论主题”。
 要生成真实生活吵架场景，例如：
 - 宿舍里角色B不倒垃圾，还嘲讽角色A小题大做
@@ -348,9 +356,10 @@ ${JSON.stringify(input, null, 2)}
 - 家庭聚餐上亲戚催婚，还拿表妹二胎来压角色A
 - 朋友总是迟到，被指出后反说角色A太计较
 
-如果 gameConfig 有内容，必须沿用里面的角色设定：
-- gameConfig.scene 是本局场景。
-- gameConfig.roleA / roleB 是两个生活场景角色，各自有 name、description、goal。
+如果 gameConfig 有内容，必须沿用里面的训练偏好：
+- 只有 scenarioMode=expand 时，gameConfig.scene 才是本局场景；如果用户在 scene 里自由创作，必须优先保留这个设定。
+- scenarioMode=random 时，即使 gameConfig.scene/contextSummary/userMainline 有内容，也视为旧页面状态，不得沿用。
+- gameConfig.roleA / roleB 是两个生活场景角色，各自有 name、description、goal。可以在不违背用户设定的情况下让角色描述更具体、更像真实人物。
 - gameConfig.playerRoleKey 是玩家选择的角色，aiRoleKey 必须自动取另一个角色。
 - gameConfig.trainingGoals 是玩家训练目标。
 - gameConfig.difficulty 是训练难度。
@@ -416,6 +425,7 @@ ${JSON.stringify(input, null, 2)}
 字段要求：
 - title 要具体，例如“室友连续三次不倒垃圾，还说角色A太计较”。
 - scene 是完整生活场景，不是观点题。
+- scene 不要机械复读 customScene，要把用户设定扩写成完整现场；但必须保留用户设定的核心。
 - roleA 和 roleB 必须是场景里的具体人物，例如“角色A / 室友”“女朋友 / 男朋友”“员工 / 同事”。
 - 每个 role.goal 都要像真实吵架里的角色目标，不要写成抽象观点。
 - playerRoleKey 默认可以是 "A"，aiRoleKey 必须是另一个角色。

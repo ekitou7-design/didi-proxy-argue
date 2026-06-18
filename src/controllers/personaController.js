@@ -10,11 +10,11 @@ import {
   getProfileName,
   getProfileTone,
   makeDistillResult,
-  makeTestResult,
   mapReplyMode,
   mergePersonas
 } from "../domain/persona.js";
-import { extractPersona, generatePersonaReply } from "../services/api.js";
+import { extractPersona, generatePersonaReply, generatePersonaTestResult } from "../services/api.js";
+import { assertAiSource } from "../utils/aiSource.js";
 import { splitReplyMessages } from "../utils/message.js";
 import { readJson, writeJson } from "../utils/storage.js";
 import { getMessageContent, normalizeMessage } from "../utils/messageModel.js";
@@ -30,10 +30,11 @@ export async function generateDistillPersona(app) {
       targetSpeaker: upload.targetSpeaker || "我",
       sourceType: upload.sourceType || "chat"
     });
+    assertAiSource(result, "人格蒸馏");
     app.updateProxyPersona({
       distillStatus: "done",
       distillResult: makeDistillResult(result, upload),
-      message: "蒸馏完成，可以保存档案。"
+      message: "蒸馏完成（真实 AI），可以保存档案。"
     });
   } catch (error) {
     app.updateProxyPersona({
@@ -68,7 +69,7 @@ export function saveDistillPersona(app) {
   if (window.location.hash !== "#/persona") window.location.hash = "#/persona";
 }
 
-export function createPersonaFromTest(app) {
+export async function createPersonaFromTest(app) {
   const answered = Object.values(app.state.proxyPersona.testAnswers).filter(Boolean).length;
   const unanswered = dedicatedPersonaQuizQuestions.length - answered;
   if (unanswered > 1) {
@@ -76,23 +77,65 @@ export function createPersonaFromTest(app) {
     return;
   }
 
-  const result = makeTestResult(app.state.proxyPersona.testAnswers);
-  const testResults = [result, ...app.state.proxyPersona.testResults];
-  writeJson(TEST_RESULTS_KEY, testResults);
-  writeJson(CURRENT_PROFILE_KEY, result);
-  app.setState({
-    page: "persona",
-    proxyPersona: {
-      ...app.state.proxyPersona,
-      testResults,
-      personas: mergePersonas(app.state.proxyPersona.distillResults, testResults),
-      selectedPersonaId: result.id,
-      currentProfile: result,
-      createSheetOpen: false,
-      message: `已生成专属嘴替人格：${result.typeName}，并设为当前嘴替。`
+  app.updateProxyPersona({ isTestGenerating: true, message: "正在调用 AI 生成人格测试结果..." });
+
+  try {
+    const result = await generatePersonaTestResult({
+      answers: app.state.proxyPersona.testAnswers,
+      questions: dedicatedPersonaQuizQuestions.map((question) => ({
+        id: question.id,
+        title: question.title,
+        answer: app.state.proxyPersona.testAnswers[question.id] || ""
+      }))
+    });
+    assertAiSource(result, "人格测试");
+    const profile = normalizeAiTestResult(result);
+    const testResults = [profile, ...app.state.proxyPersona.testResults];
+    writeJson(TEST_RESULTS_KEY, testResults);
+    writeJson(CURRENT_PROFILE_KEY, profile);
+    app.setState({
+      page: "persona",
+      proxyPersona: {
+        ...app.state.proxyPersona,
+        isTestGenerating: false,
+        testResults,
+        personas: mergePersonas(app.state.proxyPersona.distillResults, testResults),
+        selectedPersonaId: profile.id,
+        currentProfile: profile,
+        createSheetOpen: false,
+        message: `真实 AI 已生成专属嘴替人格：${getProfileName(profile)}，并设为当前嘴替。`
+      }
+    });
+    if (window.location.hash !== "#/persona") window.location.hash = "#/persona";
+  } catch (error) {
+    app.updateProxyPersona({
+      isTestGenerating: false,
+      message: `AI 调用失败：${error.message || "人格测试生成失败，请检查 API key / 后端服务 / 模型配置。"}`
+    });
+  }
+}
+
+function normalizeAiTestResult(result = {}) {
+  const profile = result.personaProfile || result.profile || result;
+  return {
+    id: `test-${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    source: result.source,
+    sourceType: "test",
+    typeName: profile.name || profile.profileName || "AI 人格测试嘴替",
+    nickname: profile.logicStyle || profile.replyStrategy || "AI 生成嘴替",
+    subtitle: profile.profileSummary || "根据人格测试答案生成。",
+    tags: profile.commonPhrases || [],
+    styleProfile: {
+      tone: profile.tone || "按测试结果生成",
+      emotionLevel: Number(profile.emotionLevel || 3),
+      logicStyle: profile.logicStyle || "",
+      commonPhrases: profile.commonPhrases || [],
+      avoidWords: profile.avoidWords || ["脏话", "人身攻击"],
+      replyStrategy: profile.replyStrategy || "",
+      profileSummary: profile.profileSummary || ""
     }
-  });
-  if (window.location.hash !== "#/persona") window.location.hash = "#/persona";
+  };
 }
 
 export function setCurrentProfile(app, profileId) {
@@ -181,14 +224,15 @@ export async function generateProxyReply(app) {
       history: pendingTurns
     });
     if (app.state.proxyPersona.generationRequestId !== requestId) return;
-    if (result.source === "fallback") throw new Error("AI 调用失败：后端返回了 fallback 回复");
+    assertAiSource(result, "专属嘴替回复");
     const reply = result.reply || result.myStyleReply || result.data?.reply;
     if (!reply) throw new Error("AI 调用失败：回复内容为空");
     const assistantTurns = splitReplyMessages(reply).map((text, index) =>
       normalizeMessage({
         id: `assistant-${Date.now()}-${index}`,
         role: "assistant",
-        content: text
+        content: text,
+        source: result.source
       })
     );
     const chatTurns = [...pendingTurns, ...assistantTurns];
@@ -197,7 +241,7 @@ export async function generateProxyReply(app) {
       chatTurns,
       replyResult: {
         reply,
-        source: result.source || "ai",
+        source: result.source,
         strategy: result.styleAnalysis,
         tone: getProfileTone(styleProfile)
       },

@@ -704,6 +704,36 @@ textarea:focus {
   transform: rotate(4deg);
 }
 
+.ai-source-row {
+  margin: 8px 0;
+}
+
+.ai-source-pill,
+.training-round-feedback .ai-source-pill {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  margin: 0;
+  padding: 3px 7px;
+  background: var(--green);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  box-shadow: 1px 1px 0 var(--ink);
+  font-size: 11px;
+  font-weight: 1000;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.ai-source-pill.fallback,
+.ai-source-pill.unknown,
+.training-round-feedback .ai-source-pill.fallback,
+.training-round-feedback .ai-source-pill.unknown {
+  background: var(--pink);
+  color: var(--red);
+}
+
 .speech-paper {
   padding: 14px;
   background:

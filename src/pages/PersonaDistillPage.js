@@ -1,3 +1,5 @@
+import { AiSourceBadge } from "../utils/aiSource.js";
+
 export default function PersonaDistillPage(state) {
   return `
     <div class="page persona-distill-page">
@@ -150,7 +152,7 @@ function DistillResult(result) {
           <h2>${escapeHtml(result.profileName)}</h2>
           <p>${escapeHtml(persona.oneLineSummary || result.styleProfile?.profileSummary || "已生成一个可用的嘴替人格。")}</p>
         </div>
-        <span class="stamp">${persona.isMock ? "Demo" : "已生成"}</span>
+        ${result.source ? AiSourceBadge(result.source, "真实 AI") : `<span class="ai-source-pill unknown">来源异常</span>`}
       </div>
 
       <div class="tag-row">

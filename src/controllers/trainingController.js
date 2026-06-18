@@ -1,7 +1,5 @@
-import { makeOpeningOpponent } from "../data/mockData.js";
 import {
   buildPresetScenarioDraft,
-  buildScenarioFromGameConfig,
   difficultyLabelForConfig,
   formatTrainingGoals,
   getAiRoleFromConfig,
@@ -18,6 +16,7 @@ import {
   submitTrainingReply
 } from "../services/api.js";
 import { TRAINING_CHAT_HISTORY_KEY } from "../constants/storageKeys.js";
+import { assertAiSource } from "../utils/aiSource.js";
 import { readJson, writeJson } from "../utils/storage.js";
 import { getMessageContent, normalizeMessage } from "../utils/messageModel.js";
 
@@ -105,15 +104,28 @@ export async function generateRandomTrainingScenario(app) {
   const training = app.state.training;
   if (training.scenarioStatus === "loading") return;
   const config = getGameConfig(training);
+  const scenarioConfig = freeCreativeScenarioConfig(config);
+  const previousScenarioSummary = summarizePreviousScenario(training.generatedScenario);
   const payload = {
-    gameConfig: config,
-    customScene: config.scene,
-    userGoal: config.userMainline || formatTrainingGoals(config.trainingGoals),
+    scenarioMode: "random",
+    gameConfig: scenarioConfig,
+    customScene: "",
+    userGoal: "",
     aiDifficulty: difficultyLabelForConfig(config.difficulty),
     toneStrength: config.toneStrength,
-    contextSummary: config.contextSummary,
-    userMainline: config.userMainline,
-    sessionControl: config.sessionControl
+    contextSummary: "",
+    userMainline: "",
+    sessionControl: config.sessionControl,
+    creativitySeed: `creative_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    previousScenarioSummary,
+    previousScenario: training.generatedScenario
+      ? {
+          title: training.generatedScenario.title,
+          scene: training.generatedScenario.scene || training.generatedScenario.background,
+          background: training.generatedScenario.background,
+          openingMessage: training.generatedScenario.openingMessage
+        }
+      : null
   };
 
   app.setState({
@@ -127,20 +139,45 @@ export async function generateRandomTrainingScenario(app) {
   try {
     console.log("[training/scenario/random] request payload", payload);
     const result = await requestRandomTrainingScenario(payload);
-    if (result.source === "fallback") throw new Error("AI 调用失败：后端返回了 fallback 场景");
-    const scenario = result.scenario;
+    console.log("[training/scenario/random] response scenario", result.scenario);
+    assertAiSource(result, "训练场景");
+    const scenario = { ...(result.scenario || {}), source: result.source };
     if (!scenario?.openingMessage) throw new Error("场景生成结果为空");
 
-    applyGeneratedTrainingScenario(app, scenario, "已生成完整训练局，你可以修改场景、角色和目标，再开始训练。");
+    applyGeneratedTrainingScenario(app, scenario, "真实 AI 已生成完整训练局，你可以修改场景、角色和目标，再开始训练。");
   } catch (error) {
     app.setState({
       training: {
         ...app.state.training,
         scenarioStatus: "error",
-        scenarioMessage: error.message || "场景生成失败，请再试一次。"
+        scenarioMessage: `AI 生成失败，请检查 API key / 后端服务 / 模型配置：${error.message || "场景生成失败，请再试一次。"}`
       }
     });
   }
+}
+
+function freeCreativeScenarioConfig(config) {
+  return {
+    ...config,
+    scene: "",
+    contextSummary: "",
+    userMainline: "",
+    roleA: {
+      name: "角色A",
+      description: "冲突中需要表达诉求、守住边界的一方",
+      goal: formatTrainingGoals(config.trainingGoals)
+    },
+    roleB: {
+      name: "角色B",
+      description: "冲突中会辩解、回避或反击的一方",
+      goal: "为自己的行为找理由，反驳角色A，并试图转移重点"
+    }
+  };
+}
+
+function summarizePreviousScenario(scenario) {
+  if (!scenario) return "";
+  return [scenario.title, scenario.scene || scenario.background, scenario.openingMessage].filter(Boolean).join(" / ");
 }
 
 export async function generatePresetTrainingScenario(app) {
@@ -149,6 +186,7 @@ export async function generatePresetTrainingScenario(app) {
   const config = getGameConfig(training);
   const request = {
     ...(training.randomScenarioForm || {}),
+    scenarioMode: "expand",
     gameConfig: config,
     customScene: config.scene,
     userGoal: config.userMainline || formatTrainingGoals(config.trainingGoals),
@@ -167,12 +205,12 @@ export async function generatePresetTrainingScenario(app) {
   try {
     console.log("[training/scenario/preset] request payload", request);
     const result = await requestPresetTrainingScenario(request);
-    if (result.source === "fallback") throw new Error("AI 调用失败：后端返回了 fallback 场景");
-    const scenario = result.scenario;
+    assertAiSource(result, "训练场景");
+    const scenario = { ...(result.scenario || {}), source: result.source };
     if (!scenario?.openingMessage) throw new Error("场景生成结果为空");
     if (app.state.training.scenarioRequestId !== requestId || app.state.training.gameState !== "idle") return;
 
-    applyGeneratedTrainingScenario(app, scenario, "已生成完整训练局，你可以修改场景、角色和目标，再开始训练。");
+    applyGeneratedTrainingScenario(app, scenario, "真实 AI 已生成完整训练局，你可以修改场景、角色和目标，再开始训练。");
   } catch (error) {
     if (app.state.training.scenarioRequestId !== requestId || app.state.training.gameState !== "idle") return;
     app.setState({
@@ -225,11 +263,11 @@ export function applyGeneratedTrainingScenario(app, scenario, scenarioMessage, s
   });
 }
 
-export function startTrainingGame(app) {
+export async function startTrainingGame(app) {
   const training = app.state.training;
-  const config = getGameConfig(training);
-  const playerRole = getPlayerRoleFromConfig(config);
-  const aiRole = getAiRoleFromConfig(config);
+  let config = getGameConfig(training);
+  let playerRole = getPlayerRoleFromConfig(config);
+  let aiRole = getAiRoleFromConfig(config);
   if (!config.scene.trim()) {
     app.setState({
       training: {
@@ -248,8 +286,47 @@ export function startTrainingGame(app) {
     });
     return;
   }
-  const scenario = training.generatedScenario || buildScenarioFromGameConfig(config);
-  const opponent = scenario?.openingMessage || training.opponent || makeOpeningOpponent(config.scene);
+
+  let scenario = training.generatedScenario;
+  if (!scenario?.openingMessage) {
+    app.setState({
+      training: {
+        ...training,
+        scenarioStatus: "loading",
+        scenarioMessage: "正在调用 AI 生成开场白..."
+      }
+    });
+    try {
+      const result = await requestRandomTrainingScenario({
+        gameConfig: config,
+        customScene: config.scene,
+        userGoal: config.userMainline || formatTrainingGoals(config.trainingGoals),
+        aiDifficulty: difficultyLabelForConfig(config.difficulty),
+        toneStrength: config.toneStrength,
+        contextSummary: config.contextSummary,
+        userMainline: config.userMainline,
+        sessionControl: config.sessionControl,
+        creativitySeed: `start_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+      });
+      assertAiSource(result, "训练开场");
+      scenario = { ...(result.scenario || {}), source: result.source };
+      if (!scenario?.openingMessage) throw new Error("AI 训练场景返回不完整");
+      config = scenarioToGameConfig(scenario, config);
+      playerRole = getPlayerRoleFromConfig(config);
+      aiRole = getAiRoleFromConfig(config);
+    } catch (error) {
+      app.setState({
+        training: {
+          ...app.state.training,
+          scenarioStatus: "error",
+          scenarioMessage: `AI 生成失败，请检查 API key / 后端服务 / 模型配置：${error.message || "训练场景生成失败。"}`
+        }
+      });
+      return;
+    }
+  }
+
+  const opponent = scenario.openingMessage;
   app.setState({
     training: {
       ...training,
@@ -282,7 +359,7 @@ export function startTrainingGame(app) {
       review: null,
       result: "",
       feedbacks: [],
-      messages: [{ role: "assistant", content: opponent }],
+      messages: [{ role: "assistant", content: opponent, source: scenario.source || "ai" }],
       scenarioMessage: "",
       generationRequestId: ""
     }
@@ -481,9 +558,9 @@ export async function submitTrainingGame(app, { userReply = "", forceEnd = false
         }
       });
     }
-    if (result.source === "fallback") throw new Error("AI 调用失败：后端返回了 fallback 训练回复");
+    assertAiSource(result, "训练回复");
     const assistantMessage = result.assistantMessage || training.opponent || "";
-    const nextMessages = assistantMessage ? [...messages, { role: "assistant", content: assistantMessage }] : messages;
+    const nextMessages = assistantMessage ? [...messages, { role: "assistant", content: assistantMessage, source: result.source }] : messages;
     const feedback = userReply
       ? {
           id: Date.now(),
@@ -493,7 +570,8 @@ export async function submitTrainingGame(app, { userReply = "", forceEnd = false
           persuasionScore: result.persuasionScore || 0,
           feedback: result.feedback || "",
           roundScore: result.roundScore || null,
-          opponentState: result.opponentState || "strong"
+          opponentState: result.opponentState || "strong",
+          source: result.source
         }
       : null;
 

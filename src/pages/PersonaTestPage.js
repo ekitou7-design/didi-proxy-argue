@@ -19,8 +19,11 @@ export default function PersonaTestPage(state) {
         </div>
         ${dedicatedPersonaQuizQuestions.map((question) => Question(question, state.testAnswers[question.id])).join("")}
         <div class="button-row">
-          <button class="primary-button" data-action="submit-persona-test">生成嘴替人格</button>
+          <button class="primary-button" data-action="submit-persona-test" ${state.isTestGenerating ? "disabled" : ""}>
+            ${state.isTestGenerating ? "AI 生成中..." : "生成嘴替人格"}
+          </button>
         </div>
+        ${state.message ? `<p class="section-note">${escapeHtml(state.message)}</p>` : ""}
       </section>
     </div>
   `;

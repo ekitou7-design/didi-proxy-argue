@@ -10,13 +10,33 @@ export async function generateRandomTrainingScenario(input = {}) {
   const normalizedInput = normalizeScenarioInput(input);
 
   try {
-    const result = await requestJsonFromAI({
-      ...buildRandomTrainingScenarioPrompt(normalizedInput),
-      temperature: 0.75,
-      maxCompletionTokens: 1800
-    });
-
-    return { source: "ai", scenario: normalizeScenario(result?.scenario || result, normalizedInput) };
+    let lastScenario = null;
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      const attemptInput = {
+        ...normalizedInput,
+        creativitySeed: [normalizedInput.creativitySeed, `attempt_${attempt}_${Date.now()}`].filter(Boolean).join("_")
+      };
+      const result = await requestJsonFromAI({
+        ...buildRandomTrainingScenarioPrompt(attemptInput),
+        temperature: 0.98,
+        maxCompletionTokens: 1800
+      });
+      const scenario = normalizeScenario(result?.scenario || result, attemptInput);
+      lastScenario = scenario;
+      if (!isScenarioTooSimilar(scenario, normalizedInput.previousScenario)) {
+        return { source: "ai", scenario };
+      }
+      console.warn("[training/scenario/random] generated scenario too similar to previous, retrying", {
+        attempt,
+        previousTitle: normalizedInput.previousScenario?.title,
+        newTitle: scenario.title
+      });
+    }
+    const error = new Error(
+      `AI 生成的新场景和上一局过于相似，请再点一次随机生成。上一局：${normalizedInput.previousScenario?.title || "未知"}；新局：${lastScenario?.title || "未知"}`
+    );
+    error.status = 502;
+    throw error;
   } catch (error) {
     console.error("[training/scenario/random] AI client failed:", error);
     if (isDemoMode()) return { source: "fallback", scenario: mockGenerateRandomTrainingScenario(normalizedInput) };
@@ -91,14 +111,43 @@ export function mockGenerateRandomTrainingScenario(input = {}) {
 }
 
 export function normalizeScenarioInput(input = {}) {
+  const scenarioMode = input.scenarioMode === "expand" ? "expand" : "random";
   const config = input.gameConfig && typeof input.gameConfig === "object" ? input.gameConfig : {};
-  const gameConfig = normalizeGameConfig(config, input);
+  const sanitizedInput =
+    scenarioMode === "random"
+      ? {
+          ...input,
+          customScene: "",
+          contextSummary: "",
+          userMainline: "",
+          userGoal: ""
+        }
+      : input;
+  const sanitizedConfig =
+    scenarioMode === "random"
+      ? {
+          ...config,
+          scene: "",
+          topic: "",
+          contextSummary: "",
+          userMainline: ""
+        }
+      : config;
+  const gameConfig = normalizeGameConfig(sanitizedConfig, sanitizedInput);
   return {
+    scenarioMode,
     category: normalizeOption(input.category, categories),
-    difficulty: normalizeScenarioDifficulty(input.difficulty || config.difficulty),
+    difficulty: normalizeScenarioDifficulty(input.difficulty || sanitizedConfig.difficulty),
     opponentType: normalizeOption(input.opponentType, opponentTypes),
-    customScene: textOf(input.contextSummary) || textOf(config.contextSummary) || textOf(input.customScene) || textOf(config.scene) || textOf(config.topic),
-    userGoal: textOf(input.userMainline) || textOf(config.userMainline) || textOf(input.userGoal) || gameConfig.trainingGoals.join("、"),
+    customScene:
+      scenarioMode === "expand" ? textOf(sanitizedInput.customScene) || textOf(sanitizedConfig.scene) || textOf(sanitizedConfig.topic) : "",
+    userGoal:
+      scenarioMode === "expand"
+        ? textOf(sanitizedInput.userMainline) ||
+          textOf(sanitizedConfig.userMainline) ||
+          textOf(sanitizedInput.userGoal) ||
+          gameConfig.trainingGoals.join("、")
+        : gameConfig.trainingGoals.join("、"),
     gameConfig,
     scene: gameConfig.scene,
     roleA: gameConfig.roleA,
@@ -108,9 +157,12 @@ export function normalizeScenarioInput(input = {}) {
     playerRole: roleFromConfig(gameConfig, gameConfig.playerRoleKey),
     aiRole: roleFromConfig(gameConfig, gameConfig.aiRoleKey),
     aiDifficulty: textOf(input.aiDifficulty),
-    toneStrength: textOf(input.toneStrength) || textOf(config.toneStrength),
-    contextSummary: textOf(input.contextSummary) || textOf(config.contextSummary),
-    userMainline: textOf(input.userMainline) || textOf(config.userMainline)
+    toneStrength: textOf(input.toneStrength) || textOf(sanitizedConfig.toneStrength),
+    contextSummary: scenarioMode === "expand" ? textOf(sanitizedInput.contextSummary) || textOf(sanitizedConfig.contextSummary) : "",
+    userMainline: scenarioMode === "expand" ? textOf(sanitizedInput.userMainline) || textOf(sanitizedConfig.userMainline) : "",
+    creativitySeed: textOf(input.creativitySeed),
+    previousScenario: input.previousScenario && typeof input.previousScenario === "object" ? input.previousScenario : null,
+    previousScenarioSummary: textOf(input.previousScenarioSummary)
   };
 }
 
@@ -494,6 +546,89 @@ function buildCustomTraps(input, customDraft = null) {
   if (/偷换/.test(input.opponentType)) traps.push("把责任偷换成角色A也有问题");
   if (/情绪勒索/.test(input.opponentType)) traps.push("用委屈压角色A放弃要求");
   return traps;
+}
+
+function isScenarioTooSimilar(scenario, previousScenario) {
+  if (!scenario || !previousScenario) return false;
+  const currentText = scenarioComparableText(scenario);
+  const previousText = scenarioComparableText(previousScenario);
+  if (!currentText || !previousText) return false;
+  if (currentText.includes(previousText.slice(0, 80)) || previousText.includes(currentText.slice(0, 80))) return true;
+  const bigramScore = jaccardSimilarity(charBigrams(currentText), charBigrams(previousText));
+  const keywordScore = keywordOverlap(currentText, previousText);
+  const domainScore = domainKeywordOverlap(currentText, previousText);
+  return bigramScore >= 0.34 || keywordScore >= 0.42 || (domainScore >= 2 && bigramScore >= 0.18);
+}
+
+function scenarioComparableText(scenario) {
+  return [scenario.title, scenario.scene, scenario.background, scenario.openingMessage]
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, "")
+    .slice(0, 900);
+}
+
+function charBigrams(text) {
+  const clean = String(text || "").replace(/[，。！？、；：,.!?;:\s]/g, "");
+  const grams = new Set();
+  for (let index = 0; index < clean.length - 1; index += 1) {
+    grams.add(clean.slice(index, index + 2));
+  }
+  return grams;
+}
+
+function jaccardSimilarity(a, b) {
+  if (!a?.size || !b?.size) return 0;
+  let intersection = 0;
+  a.forEach((item) => {
+    if (b.has(item)) intersection += 1;
+  });
+  return intersection / (a.size + b.size - intersection);
+}
+
+function keywordOverlap(a, b) {
+  const ignored = new Set(["角色A", "角色B", "问题", "对方", "自己", "要求", "影响", "事情", "场景"]);
+  const wordsA = meaningfulChunks(a).filter((item) => !ignored.has(item));
+  const wordsB = new Set(meaningfulChunks(b).filter((item) => !ignored.has(item)));
+  if (!wordsA.length || !wordsB.size) return 0;
+  const hits = wordsA.filter((item) => wordsB.has(item)).length;
+  return hits / Math.max(wordsA.length, wordsB.size);
+}
+
+function domainKeywordOverlap(a, b) {
+  const domainKeywords = [
+    "合租",
+    "室友",
+    "客厅",
+    "快递",
+    "纸箱",
+    "垃圾",
+    "宿舍",
+    "噪音",
+    "游戏",
+    "剧本杀",
+    "拼车",
+    "迟到",
+    "宠物",
+    "寄养",
+    "猫咪",
+    "狗",
+    "小组",
+    "作业",
+    "同事",
+    "项目",
+    "客服",
+    "退款",
+    "亲戚",
+    "催婚",
+    "社团",
+    "婚礼"
+  ];
+  return domainKeywords.filter((keyword) => a.includes(keyword) && b.includes(keyword)).length;
+}
+
+function meaningfulChunks(text) {
+  return Array.from(String(text || "").matchAll(/[\u4e00-\u9fa5]{2,6}|[a-zA-Z0-9]{3,}/g)).map((match) => match[0]);
 }
 
 function buildConcreteCustomScenario(input, scenario = {}) {

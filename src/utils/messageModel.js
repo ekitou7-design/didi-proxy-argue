@@ -5,12 +5,13 @@ function createMessageId() {
   return `msg-${randomId}`;
 }
 
-export function createMessage({ role, content, text, id, createdAt } = {}) {
+export function createMessage({ role, content, text, id, createdAt, source } = {}) {
   return {
     id: id || createMessageId(),
     role: role || "user",
     content: content ?? text ?? "",
-    createdAt: createdAt || new Date().toISOString()
+    createdAt: createdAt || new Date().toISOString(),
+    ...(source ? { source } : {})
   };
 }
 
@@ -19,7 +20,8 @@ export function normalizeMessage(message = {}) {
     id: message.id || createMessageId(),
     role: message.role || "user",
     content: message.content ?? message.text ?? "",
-    createdAt: message.createdAt || new Date().toISOString()
+    createdAt: message.createdAt || new Date().toISOString(),
+    ...(message.source ? { source: message.source } : {})
   };
 }
 
@@ -33,7 +35,8 @@ export function toLegacyTextMessage(message = {}) {
     id: normalized.id,
     role: normalized.role,
     text: normalized.content,
-    createdAt: normalized.createdAt
+    createdAt: normalized.createdAt,
+    ...(normalized.source ? { source: normalized.source } : {})
   };
 }
 
@@ -43,6 +46,7 @@ export function toLegacyContentMessage(message = {}) {
     id: normalized.id,
     role: normalized.role,
     content: normalized.content,
-    createdAt: normalized.createdAt
+    createdAt: normalized.createdAt,
+    ...(normalized.source ? { source: normalized.source } : {})
   };
 }
