@@ -8,7 +8,9 @@ export async function postJson(url, body) {
     let message = `请求失败：${response.status}`;
     try {
       const data = await response.json();
-      if (data.error === "Missing OPENAI_API_KEY") message = "还没有配置 OPENAI_API_KEY";
+      if (data.error === "Missing OPENAI_API_KEY" || data.error === "Missing DEEPSEEK_API_KEY or OPENAI_API_KEY") {
+        message = "还没有配置 DEEPSEEK_API_KEY 或 OPENAI_API_KEY";
+      }
       else if (data.error?.message) message = data.error.message;
       else if (data.error) message = data.detail ? `${data.error}：${data.detail}` : data.error;
     } catch {

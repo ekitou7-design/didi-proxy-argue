@@ -2,6 +2,7 @@ import { dedicatedPersonaQuizQuestions } from "../data/njutiQuizData.js";
 import {
   CURRENT_PROFILE_KEY,
   DISTILL_RESULTS_KEY,
+  PERSONA_CHAT_HISTORY_KEY,
   PERSONA_CHAT_KEY,
   TEST_RESULTS_KEY
 } from "../constants/storageKeys.js";
@@ -9,23 +10,23 @@ import {
   getProfileName,
   getProfileTone,
   makeDistillResult,
-  makeLocalReply,
-  makeMockDistillProfile,
   makeTestResult,
   mapReplyMode,
   mergePersonas
 } from "../domain/persona.js";
 import { extractPersona, generatePersonaReply } from "../services/api.js";
 import { splitReplyMessages } from "../utils/message.js";
-import { writeJson } from "../utils/storage.js";
+import { readJson, writeJson } from "../utils/storage.js";
+import { getMessageContent, normalizeMessage } from "../utils/messageModel.js";
 
 export async function generateDistillPersona(app) {
   const { upload } = app.state.proxyPersona;
   app.updateProxyPersona({ distillStatus: "loading", distillResult: null, message: "" });
+  const rawText = upload.normalizedTrainingText || upload.chatText;
 
   try {
     const result = await extractPersona({
-      rawText: upload.chatText,
+      rawText,
       targetSpeaker: upload.targetSpeaker || "我",
       sourceType: upload.sourceType || "chat"
     });
@@ -36,9 +37,9 @@ export async function generateDistillPersona(app) {
     });
   } catch (error) {
     app.updateProxyPersona({
-      distillStatus: "done",
-      distillResult: makeDistillResult(makeMockDistillProfile().personaProfile, upload),
-      message: `${error.message}。先用本地模拟结果跑通流程。`
+      distillStatus: "error",
+      distillResult: null,
+      message: `AI 调用失败：${error.message}`
     });
   }
 }
@@ -130,6 +131,11 @@ export function deleteProfileResult(app, profileId) {
 export async function generateProxyReply(app) {
   const state = app.state.proxyPersona;
   if (state.isReplyGenerating) return;
+  const opponentText = state.replyForm.opponentMessage.trim();
+  if (!opponentText) {
+    app.updateProxyPersona({ message: "先把对方刚说的话填到底部输入框。" });
+    return;
+  }
 
   const styleProfile =
     state.personas.find((persona) => String(persona.id) === String(state.selectedPersonaId)) ||
@@ -139,77 +145,160 @@ export async function generateProxyReply(app) {
     return;
   }
 
+  const requestId = `persona-reply-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const currentTurns = normalizeConversationTurns(state.chatTurns);
+  const opponentTurn = normalizeMessage({
+    id: `opponent-${Date.now()}`,
+    role: "opponent",
+    content: opponentText
+  });
+  const pendingTurns = [...currentTurns, opponentTurn];
+  writeJson(PERSONA_CHAT_KEY, pendingTurns);
+
   app.updateProxyPersona({
+    chatTurns: pendingTurns,
     isReplyGenerating: true,
+    generationRequestId: requestId,
     replyResult: null,
     message: "正在生成回应..."
   });
 
-  const userText = [
-    state.replyForm.background,
-    state.replyForm.opponentMessage,
-    state.replyForm.goal ? `我想表达：${state.replyForm.goal}` : ""
-  ]
-    .filter(Boolean)
-    .join("\n");
-
   try {
     const result = await generatePersonaReply({
+      personaId: styleProfile.id || state.selectedPersonaId,
       chatHistory: state.upload.chatText,
       personaProfile: styleProfile.personaProfile || styleProfile,
-      opponentMessage: state.replyForm.opponentMessage,
+      opponentText,
+      opponentMessage: opponentText,
+      contextSummary: state.replyForm.background,
       background: state.replyForm.background,
-      realThought: "",
+      userGoal: state.replyForm.goal,
       goal: state.replyForm.goal,
+      strategy: state.replyForm.mode,
+      intensity: state.replyForm.strength,
       strength: state.replyForm.strength,
-      mode: mapReplyMode(state.replyForm.mode)
+      mode: mapReplyMode(state.replyForm.mode),
+      history: pendingTurns
     });
+    if (app.state.proxyPersona.generationRequestId !== requestId) return;
+    if (result.source === "fallback") throw new Error("AI 调用失败：后端返回了 fallback 回复");
     const reply = result.reply || result.myStyleReply || result.data?.reply;
-    const assistantTurns = splitReplyMessages(reply).map((text, index) => ({
-      id: `assistant-${Date.now()}-${index}`,
-      role: "assistant",
-      text
-    }));
-    const chatTurns = [
-      ...state.chatTurns,
-      { id: `user-${Date.now()}`, role: "user", text: userText || state.replyForm.opponentMessage },
-      ...assistantTurns
-    ];
+    if (!reply) throw new Error("AI 调用失败：回复内容为空");
+    const assistantTurns = splitReplyMessages(reply).map((text, index) =>
+      normalizeMessage({
+        id: `assistant-${Date.now()}-${index}`,
+        role: "assistant",
+        content: text
+      })
+    );
+    const chatTurns = [...pendingTurns, ...assistantTurns];
     writeJson(PERSONA_CHAT_KEY, chatTurns);
     app.updateProxyPersona({
       chatTurns,
       replyResult: {
         reply,
+        source: result.source || "ai",
         strategy: result.styleAnalysis,
         tone: getProfileTone(styleProfile)
       },
       isReplyGenerating: false,
+      generationRequestId: "",
       replyForm: {
         ...state.replyForm,
-        opponentMessage: "",
-        background: "",
-        goal: ""
+        opponentMessage: ""
       },
       message: "嘴替已经接上了。"
     });
   } catch (error) {
-    const fallback = makeLocalReply(state.replyForm, styleProfile);
-    const assistantTurns = splitReplyMessages(fallback.reply).map((text, index) => ({
-      id: `assistant-${Date.now()}-${index}`,
-      role: "assistant",
-      text
-    }));
-    const chatTurns = [
-      ...state.chatTurns,
-      { id: `user-${Date.now()}`, role: "user", text: userText || state.replyForm.opponentMessage },
-      ...assistantTurns
-    ];
-    writeJson(PERSONA_CHAT_KEY, chatTurns);
+    if (app.state.proxyPersona.generationRequestId !== requestId) return;
     app.updateProxyPersona({
-      chatTurns,
-      replyResult: fallback,
+      chatTurns: pendingTurns,
+      replyResult: {
+        source: "fallback",
+        error: error.message,
+        reply: ""
+      },
       isReplyGenerating: false,
-      message: `${error.message}。先用本地示例回应预览。`
+      generationRequestId: "",
+      message: `AI 调用失败：${error.message}`
     });
   }
+}
+
+export function finishProxyConversation(app) {
+  const state = app.state.proxyPersona;
+  const chatTurns = normalizeConversationTurns(state.chatTurns);
+  const nextState = {
+    chatTurns: [],
+    isReplyGenerating: false,
+    generationRequestId: "",
+    replyForm: {
+      ...state.replyForm,
+      opponentMessage: ""
+    }
+  };
+
+  if (!chatTurns.length) {
+    localStorage.removeItem(PERSONA_CHAT_KEY);
+    app.updateProxyPersona({
+      ...nextState,
+      message: "当前没有可保存的对话。"
+    });
+    return;
+  }
+
+  const profile =
+    state.personas.find((persona) => String(persona.id) === String(state.selectedPersonaId)) ||
+    state.currentProfile;
+  const historyItem = {
+    id: `persona-history-${Date.now()}`,
+    type: "专属嘴替记录",
+    source: "专属嘴替",
+    personaId: profile?.id || state.selectedPersonaId || "",
+    personaName: profile ? getProfileName(profile) : "当前嘴替",
+    contextSummary: state.replyForm.background,
+    userGoal: state.replyForm.goal,
+    strategy: state.replyForm.mode,
+    intensity: state.replyForm.strength,
+    messages: chatTurns,
+    createdAt: new Date().toISOString()
+  };
+  const histories = [historyItem, ...readJson(PERSONA_CHAT_HISTORY_KEY, [])].slice(0, 50);
+  writeJson(PERSONA_CHAT_HISTORY_KEY, histories);
+  localStorage.removeItem(PERSONA_CHAT_KEY);
+  app.updateProxyPersona({
+    ...nextState,
+    chatHistories: histories,
+    message: "本轮嘴替已保存。"
+  });
+}
+
+export function clearProxyConversation(app) {
+  localStorage.removeItem(PERSONA_CHAT_KEY);
+  app.updateProxyPersona({
+    chatTurns: [],
+    isReplyGenerating: false,
+    generationRequestId: "",
+    replyForm: {
+      ...app.state.proxyPersona.replyForm,
+      opponentMessage: ""
+    },
+    message: "当前对话已清空。"
+  });
+}
+
+function normalizeConversationTurns(turns = []) {
+  return turns
+    .map((turn) => {
+      const role = turn.role === "user" ? "opponent" : turn.role;
+      return normalizeMessage({ ...turn, role });
+    })
+    .filter((turn) => ["opponent", "assistant"].includes(turn.role))
+    .filter((turn) => getMessageContent(turn).trim())
+    .filter((turn) => !isConfigLeakedTurn(turn));
+}
+
+function isConfigLeakedTurn(turn) {
+  const text = getMessageContent(turn);
+  return turn.role === "opponent" && (text.includes("\n") || /我想表达[:：]/.test(text));
 }

@@ -1,5 +1,5 @@
 import { buildTrainingScorePrompt } from "../prompts.mjs";
-import { requestJsonFromAI } from "../openaiClient.mjs";
+import { isDemoMode, requestJsonFromAI } from "../openaiClient.mjs";
 
 const insultPattern = /傻子|滚|废物|神经病|闭嘴|有病|脑子|蠢|垃圾|白痴|傻逼|sb/i;
 const evidencePattern = /什么意思|证据|谁说的|具体指什么|哪一句|凭什么|怎么证明|说清楚|具体|依据/;
@@ -15,17 +15,19 @@ export async function scoreTrainingReply(input = {}) {
     throw error;
   }
 
-  if (!process.env.DEEPSEEK_API_KEY && !process.env.OPENAI_API_KEY) {
-    return mockScoreTrainingReply(normalizedInput);
+  try {
+    const result = await requestJsonFromAI({
+      ...buildTrainingScorePrompt(normalizedInput),
+      temperature: 0.35,
+      maxCompletionTokens: 1200
+    });
+
+    return normalizeTrainingScoreResult(result);
+  } catch (error) {
+    console.error("[training/score] AI client failed:", error);
+    if (isDemoMode()) return { ...mockScoreTrainingReply(normalizedInput), source: "fallback" };
+    throw error;
   }
-
-  const result = await requestJsonFromAI({
-    ...buildTrainingScorePrompt(normalizedInput),
-    temperature: 0.35,
-    maxCompletionTokens: 1200
-  });
-
-  return normalizeTrainingScoreResult(result);
 }
 
 export function normalizeTrainingScoreInput(input = {}) {
@@ -62,6 +64,7 @@ export function normalizeTrainingScoreResult(result = {}) {
   const overallScore = clampScore(result.overallScore ?? scores.winRate);
 
   return {
+    source: "ai",
     scores,
     overallScore,
     advantages: textOf(result.advantages || result.analysis),

@@ -1,4 +1,4 @@
-import { requestJsonFromAI } from "../openaiClient.mjs";
+import { hasAIKeyConfigured, isDemoMode, requestJsonFromAI } from "../openaiClient.mjs";
 
 const insultPattern = /傻子|滚|废物|神经病|闭嘴|有病|脑子|蠢|垃圾|白痴|傻逼|sb|去死/i;
 const boundaryPattern = /我不接受|不接受|到此为止|请你|不要再|别再|先别|不要|停止|边界|正面回应|别转移|不要转移|别把|不能|别拿|别用/;
@@ -20,20 +20,20 @@ export async function handleTrainingGameReply(input = {}) {
     throw error;
   }
 
-  if (process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY) {
-    try {
-      const result = await requestJsonFromAI({
-        ...buildTrainingGamePrompt(normalizedInput),
-        temperature: 0.62,
-        maxCompletionTokens: 1600
-      });
-      return normalizeAiTrainingGameResult(result, normalizedInput);
-    } catch (error) {
-      console.error("[training/reply] AI failed, using local judge:", error);
+  try {
+    const result = await requestJsonFromAI({
+      ...buildTrainingGamePrompt(normalizedInput),
+      temperature: 0.62,
+      maxCompletionTokens: 1600
+    });
+    return normalizeAiTrainingGameResult(result, normalizedInput);
+  } catch (error) {
+    console.error("[training/reply] AI client failed:", error);
+    if (isDemoMode() && (!hasAIKeyConfigured() || error.code === "AI_REQUEST_FAILED")) {
+      return { ...localTrainingGameReply(normalizedInput, userReply), source: "fallback" };
     }
+    throw error;
   }
-
-  return localTrainingGameReply(normalizedInput, userReply);
 }
 
 export function normalizeTrainingGameInput(input = {}) {
@@ -97,6 +97,7 @@ function localTrainingGameReply(input, userReply) {
   }
 
   return {
+    source: "fallback",
     gameState: "playing",
     assistantMessage,
     round: input.round + 1,
@@ -154,6 +155,7 @@ function finishGame(input, persuasionDelta, feedback, assistantMessage, override
   const review = buildReview(input, persuasionScore, result, override.forcedLose);
 
   return {
+    source: "fallback",
     gameState: "finished",
     assistantMessage: assistantMessage || buildFinalOpponentMessage(input, persuasionScore, opponentState, override.offTrackStreak || 0),
     round: Math.min(input.round, input.maxRounds),
@@ -303,8 +305,11 @@ finished 时 review 必须是：
 }
 
 function normalizeAiTrainingGameResult(result, input) {
-  const localFallback = localTrainingGameReply(input, latestUserReply(input.messages));
-  if (!result || typeof result !== "object" || Array.isArray(result)) return localFallback;
+  if (!result || typeof result !== "object" || Array.isArray(result)) {
+    const error = new Error("AI returned invalid training reply JSON");
+    error.status = 502;
+    throw error;
+  }
 
   const persuasionDelta = clampNumber(result.persuasionDelta, -20, 35);
   const persuasionScore = clampNumber(result.persuasionScore, 0, 100);
@@ -315,14 +320,15 @@ function normalizeAiTrainingGameResult(result, input) {
 
   if (gameState === "finished") {
     return {
+      source: "ai",
       gameState,
-      assistantMessage: textOf(result.assistantMessage) || localFallback.assistantMessage,
+      assistantMessage: requiredText(result.assistantMessage, "assistantMessage"),
       round: clampNumber(result.round || input.round, 1, input.maxRounds),
       maxRounds: input.maxRounds,
       persuasionScore,
       persuasionDelta,
-      feedback: textOf(result.feedback) || localFallback.feedback,
-      roundScore: normalizeRoundScore(result.roundScore, localFallback.roundScore),
+      feedback: requiredText(result.feedback, "feedback"),
+      roundScore: normalizeRoundScore(result.roundScore),
       opponentState,
       offTrackStreak: clampNumber(result.offTrackStreak, 0, 10),
       review: normalizeReview(result.review, input, persuasionScore)
@@ -330,18 +336,27 @@ function normalizeAiTrainingGameResult(result, input) {
   }
 
   return {
+    source: "ai",
     gameState,
-    assistantMessage: textOf(result.assistantMessage) || localFallback.assistantMessage,
+    assistantMessage: requiredText(result.assistantMessage, "assistantMessage"),
     round: clampNumber(result.round || input.round + 1, 1, input.maxRounds),
     maxRounds: input.maxRounds,
     persuasionScore,
     persuasionDelta,
-    feedback: textOf(result.feedback) || localFallback.feedback,
-    roundScore: normalizeRoundScore(result.roundScore, localFallback.roundScore),
+    feedback: requiredText(result.feedback, "feedback"),
+    roundScore: normalizeRoundScore(result.roundScore),
     opponentState,
     offTrackStreak: clampNumber(result.offTrackStreak, 0, 10),
     review: null
   };
+}
+
+function requiredText(value, fieldName) {
+  const text = textOf(value);
+  if (text) return text;
+  const error = new Error(`AI training reply JSON missing ${fieldName}`);
+  error.status = 502;
+  throw error;
 }
 
 function normalizeReview(review, input, persuasionScore) {

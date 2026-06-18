@@ -17,6 +17,9 @@ import {
   generateRandomTrainingScenario as requestRandomTrainingScenario,
   submitTrainingReply
 } from "../services/api.js";
+import { TRAINING_CHAT_HISTORY_KEY } from "../constants/storageKeys.js";
+import { readJson, writeJson } from "../utils/storage.js";
+import { getMessageContent, normalizeMessage } from "../utils/messageModel.js";
 
 export function updateTrainingSetup(app, parts, value, render = true) {
   const training = app.state.training;
@@ -77,7 +80,8 @@ export function updateTrainingSetup(app, parts, value, render = true) {
     round: 1,
     scenarioStatus: "idle",
     scenarioMessage: "设置已修改，将按中间区域的本局配置开始训练。",
-    scenarioRequestId: ""
+    scenarioRequestId: "",
+    generationRequestId: ""
   };
 
   if (render) app.setState({ training: updatedTraining });
@@ -107,6 +111,7 @@ export async function generateRandomTrainingScenario(app) {
 
   try {
     const result = await requestRandomTrainingScenario();
+    if (result.source === "fallback") throw new Error("AI 调用失败：后端返回了 fallback 场景");
     const scenario = result.scenario;
     if (!scenario?.openingMessage) throw new Error("场景生成结果为空");
 
@@ -141,6 +146,7 @@ export async function generatePresetTrainingScenario(app) {
 
   try {
     const result = await requestPresetTrainingScenario(request);
+    if (result.source === "fallback") throw new Error("AI 调用失败：后端返回了 fallback 场景");
     const scenario = result.scenario;
     if (!scenario?.openingMessage) throw new Error("场景生成结果为空");
     if (app.state.training.scenarioRequestId !== requestId || app.state.training.gameState !== "idle") return;
@@ -151,8 +157,8 @@ export async function generatePresetTrainingScenario(app) {
     app.setState({
       training: {
         ...app.state.training,
-        scenarioStatus: "done",
-        scenarioMessage: `API 精修较慢或失败，已保留当前设置生成的场景。${error.message ? `（${error.message}）` : ""}`
+        scenarioStatus: "error",
+        scenarioMessage: `AI 调用失败：${error.message || "训练场景生成失败，请稍后重试。"}`
       }
     });
   }
@@ -248,7 +254,8 @@ export function startTrainingGame(app) {
       result: "",
       feedbacks: [],
       messages: [{ role: "assistant", content: opponent }],
-      scenarioMessage: ""
+      scenarioMessage: "",
+      generationRequestId: ""
     }
   });
 }
@@ -274,15 +281,60 @@ export function resetTrainingGame(app) {
       messages: [],
       feedbacks: [],
       scenarioMessage: "",
-      scenarioRequestId: ""
+      scenarioRequestId: "",
+      generationRequestId: ""
     }
   });
 }
 
 export async function finishTrainingGame(app) {
   const training = app.state.training;
-  if (training.gameState !== "playing" || training.isSubmitting) return;
-  await submitTrainingGame(app, { forceEnd: true });
+  const messages = normalizeTrainingMessages(training.messages);
+  if (!messages.length) {
+    app.setState({
+      training: {
+        ...training,
+        input: "",
+        isSubmitting: false,
+        generationRequestId: "",
+        scenarioMessage: "当前没有可保存的对话。"
+      }
+    });
+    return;
+  }
+
+  const config = getGameConfig(training);
+  const historyItem = {
+    id: `training-history-${Date.now()}`,
+    type: "吵架训练记录",
+    source: "训练场",
+    scene: config.scene,
+    goal: formatTrainingGoals(config.trainingGoals),
+    difficulty: difficultyLabelForConfig(config.difficulty),
+    playerRole: getPlayerRoleFromConfig(config).name,
+    aiRole: getAiRoleFromConfig(config).name,
+    messages,
+    feedbacks: training.feedbacks || [],
+    review: training.review || null,
+    createdAt: new Date().toISOString()
+  };
+  const histories = [historyItem, ...readJson(TRAINING_CHAT_HISTORY_KEY, [])].slice(0, 50);
+  writeJson(TRAINING_CHAT_HISTORY_KEY, histories);
+
+  app.setState({
+    training: clearTrainingSessionState(training, {
+      chatHistories: histories,
+      scenarioMessage: "本轮训练已保存。"
+    })
+  });
+}
+
+export function clearTrainingConversation(app) {
+  app.setState({
+    training: clearTrainingSessionState(app.state.training, {
+      scenarioMessage: "当前训练对话已清空。"
+    })
+  });
 }
 
 export async function handleTrainingSubmit(app) {
@@ -305,8 +357,37 @@ export async function handleTrainingSubmit(app) {
   }
 }
 
+function normalizeTrainingMessages(messages = []) {
+  return messages
+    .map((message) => normalizeMessage(message))
+    .filter((message) => ["assistant", "user"].includes(message.role))
+    .filter((message) => getMessageContent(message).trim());
+}
+
+function clearTrainingSessionState(training, partial = {}) {
+  return {
+    ...training,
+    gameState: "idle",
+    step: "setup",
+    input: "",
+    isSubmitting: false,
+    generationRequestId: "",
+    round: 1,
+    persuasionScore: 0,
+    persuasionDelta: 0,
+    opponentState: "strong",
+    offTrackStreak: 0,
+    messages: [],
+    feedbacks: [],
+    review: null,
+    result: "",
+    ...partial
+  };
+}
+
 export async function submitTrainingGame(app, { userReply = "", forceEnd = false } = {}) {
   const training = app.state.training;
+  const requestId = `training-reply-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const generatedScenario = training.generatedScenario;
   const config = getGameConfig(training);
   const userMessage = userReply ? { role: "user", content: userReply } : null;
@@ -331,6 +412,7 @@ export async function submitTrainingGame(app, { userReply = "", forceEnd = false
       ...training,
       input: userReply ? "" : training.input,
       isSubmitting: true,
+      generationRequestId: requestId,
       scenarioMessage: forceEnd ? "正在结算本轮..." : "正在判断本轮说服度...",
       messages
     }
@@ -338,6 +420,8 @@ export async function submitTrainingGame(app, { userReply = "", forceEnd = false
 
   try {
     const result = await submitTrainingReply(payload);
+    if (app.state.training.generationRequestId !== requestId) return;
+    if (result.source === "fallback") throw new Error("AI 调用失败：后端返回了 fallback 训练回复");
     const assistantMessage = result.assistantMessage || training.opponent || "";
     const nextMessages = assistantMessage ? [...messages, { role: "assistant", content: assistantMessage }] : messages;
     const feedback = userReply
@@ -360,6 +444,7 @@ export async function submitTrainingGame(app, { userReply = "", forceEnd = false
         step: result.gameState === "finished" ? "finished" : "chat",
         input: "",
         isSubmitting: false,
+        generationRequestId: "",
         scenarioMessage: "",
         round: result.round || training.round,
         maxRounds: result.maxRounds || training.maxRounds || 5,
@@ -375,13 +460,15 @@ export async function submitTrainingGame(app, { userReply = "", forceEnd = false
       }
     });
   } catch (error) {
+    if (app.state.training.generationRequestId !== requestId) return;
     console.error("training game failed", error);
     app.setState({
       training: {
         ...app.state.training,
         input: userReply || app.state.training.input,
         isSubmitting: false,
-        scenarioMessage: "本轮判断失败，请稍后重试。"
+        generationRequestId: "",
+        scenarioMessage: `AI 调用失败：${error.message || "本轮判断失败，请稍后重试。"}`
       }
     });
   }

@@ -90,7 +90,7 @@ app.post("/api/training/score", async (request, response) => {
   console.log("POST /api/training/score", request.body);
   try {
     const result = await scoreTrainingReply(request.body);
-    response.json(result);
+    response.json({ ...result, source: result?.source || "ai" });
   } catch (error) {
     console.error("[training/score] failed:", error);
     handleEndpointError(response, error, "Training score failed");
@@ -168,11 +168,11 @@ app.listen(port, () => {
 async function handleAIEndpoint(response, prompt) {
   try {
     const result = await requestJsonFromAI(prompt);
-    response.json(result);
+    response.json({ ...result, source: result?.source || "ai" });
   } catch (error) {
     console.error("[ai] failed:", error);
-    if (error.code === "MISSING_OPENAI_API_KEY") {
-      response.status(500).json({ error: "Missing OPENAI_API_KEY" });
+    if (error.code === "MISSING_AI_API_KEY" || error.code === "MISSING_OPENAI_API_KEY") {
+      response.status(500).json({ error: error.message || "Missing DEEPSEEK_API_KEY or OPENAI_API_KEY" });
       return;
     }
 
@@ -181,7 +181,7 @@ async function handleAIEndpoint(response, prompt) {
       return;
     }
 
-    response.status(502).json({ error: "AI request failed" });
+    response.status(error.status || 502).json({ error: error.message || "AI request failed" });
   }
 }
 
@@ -191,8 +191,8 @@ function handleEndpointError(response, error, fallbackMessage) {
     return;
   }
 
-  if (error.code === "MISSING_OPENAI_API_KEY") {
-    response.status(500).json({ error: "Missing OPENAI_API_KEY" });
+  if (error.code === "MISSING_AI_API_KEY" || error.code === "MISSING_OPENAI_API_KEY") {
+    response.status(500).json({ error: error.message || "Missing DEEPSEEK_API_KEY or OPENAI_API_KEY" });
     return;
   }
 
@@ -201,5 +201,5 @@ function handleEndpointError(response, error, fallbackMessage) {
     return;
   }
 
-  response.status(502).json({ error: fallbackMessage });
+  response.status(error.status || 502).json({ error: error.message || fallbackMessage });
 }

@@ -86,6 +86,11 @@ export function TempDesktopContext(temp) {
       ${DesktopField("我的诉求", "temp.goal", temp.goal, "想达成什么结果")}
       <h3>语气强度</h3>
       <div data-tour="temp-intensity" data-tour-priority="1">${DesktopChipGroup("temp", "tone", toneOptions, temp.tone)}</div>
+      ${ConversationLifecycleControls({
+        finishAction: "finish-temp-conversation",
+        clearAction: "clear-temp-conversation",
+        hasConversation: Boolean(temp.rounds?.length)
+      })}
     </section>
   `;
 }
@@ -111,6 +116,11 @@ export function PersonaDesktopContext(proxyPersona) {
         ${DesktopField("前情提要", "proxyPersona.replyForm.background", proxyPersona.replyForm.background, "这次冲突的背景")}
         ${DesktopField("我想表达", "proxyPersona.replyForm.goal", proxyPersona.replyForm.goal, "想守住的主线")}
       </div>
+      ${ConversationLifecycleControls({
+        finishAction: "finish-proxy-conversation",
+        clearAction: "clear-proxy-conversation",
+        hasConversation: Boolean(proxyPersona.chatTurns?.length)
+      })}
     </section>
   `;
 }
@@ -120,6 +130,12 @@ export function TrainingDesktopContext(training) {
   return `
     <section class="desktop-panel context-panel">
       ${TrainingPreviewContent(training, config, { includeTourTargets: true })}
+      ${ConversationLifecycleControls({
+        finishAction: "finish-training-game",
+        clearAction: "clear-training-conversation",
+        hasConversation: Boolean(training.messages?.length),
+        finishTour: "training-finish"
+      })}
     </section>
   `;
 }
@@ -145,6 +161,28 @@ export function DesktopChipGroup(sessionKey, field, options, active, labelFormat
           (item) => `<button class="chip tiny-chip ${active === item ? "active" : ""}" data-chip-session="${sessionKey}" data-chip-field="${field}" data-chip-value="${escapeAttr(item)}">${escapeHtml(labelFormatter(item))}</button>`
         )
         .join("")}
+    </div>
+  `;
+}
+
+function ConversationLifecycleControls({ finishAction, clearAction, hasConversation, finishTour = "" } = {}) {
+  return `
+    <div class="desktop-lifecycle-controls">
+      <h3>会话控制</h3>
+      <div class="desktop-lifecycle-actions">
+        <button
+          class="secondary-button warm compact-full-button"
+          data-action="${escapeAttr(finishAction)}"
+          ${finishTour ? `data-tour="${escapeAttr(finishTour)}"` : ""}
+          ${hasConversation ? "" : "disabled"}
+        >
+          结束本轮
+        </button>
+        <button class="secondary-button compact-full-button" data-action="${escapeAttr(clearAction)}">
+          清空对话
+        </button>
+      </div>
+      <p>${hasConversation ? "结束本轮会保存真实对话到历史记录。" : "当前没有可保存的对话。"}</p>
     </div>
   `;
 }

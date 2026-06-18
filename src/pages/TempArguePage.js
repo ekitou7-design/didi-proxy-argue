@@ -89,33 +89,35 @@ function TempChatPanel(session) {
         ${
           visibleRounds.length
             ? visibleRounds.map(ChatRound).join("")
-            : `
-              ${ChatBubble({
-                side: "left",
-                label: "对方",
-                avatar: "对",
-                content: session.generatedScenario?.openingMessage || session.latest || "先生成场景，或把对方刚说的话发给我。"
-              })}
-              ${ChatBubble({
-                side: "right",
-                label: "可发送回复",
-                avatar: "吵",
-                content: "我会根据上面的场景、人设、目标和攻击力，帮你实时接下一句。"
-              })}
-            `
+            : EmptyConversationState("当前还没有对话。", "输入对方新一句后，这里只显示真实对话和生成回复。")
         }
       </div>
     </section>
   `;
 }
 
+function EmptyConversationState(title, text) {
+  return `
+    <div class="conversation-empty-state">
+      <strong>${escapeHtml(title)}</strong>
+      <p>${escapeHtml(text)}</p>
+    </div>
+  `;
+}
+
 function ChatRound(round) {
   const bestReply = round.replies?.[0]?.text || "";
   const otherReplies = (round.replies || []).slice(1);
+  const replyContent = bestReply || round.analysis || "AI 调用失败，请稍后重试。";
+  const isAiFailed = round.source === "fallback" || !bestReply;
   return `
     <article class="realtime-round">
       ${ChatBubble({ side: "left", label: "对方", avatar: "对", content: round.opponent })}
-      ${ReplyBubbles(bestReply)}
+      ${
+        isAiFailed
+          ? ChatBubble({ side: "right", label: "AI 调用失败", avatar: "吵", content: replyContent })
+          : ReplyBubbles(bestReply)
+      }
       <details class="round-more">
         <summary>看分析和备选</summary>
         <div class="temp-result-block">

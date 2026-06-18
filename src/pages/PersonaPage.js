@@ -108,41 +108,40 @@ function PersonaInfoSheet(profile) {
 }
 
 function PersonaChatPanel(state, profile) {
-  const turns = state.chatTurns?.length
-    ? state.chatTurns
-    : [
-        {
-          id: "sample-user",
-          role: "user",
-          text: "他临时取消约定，还说我小题大做。"
-        },
-        {
-          id: "sample-assistant",
-          role: "assistant",
-          text:
-            "我不是非要跟你吵，我只是觉得你每次都把说好的事情轻轻带过，最后又变成我太计较。问题不是这一次取消，而是你总觉得我的感受可以被放到最后。"
-        }
-      ];
+  const turns = state.chatTurns || [];
 
   const latestAssistant = getLatestAssistantTurn({ chatTurns: turns });
   return `
     <section class="persona-chat-panel" aria-label="专属嘴替聊天记录">
       <div class="persona-chat-scroll">
-        ${turns.map((turn) => PersonaMessageBubble(turn, profile, state, latestAssistant?.id)).join("")}
+        ${
+          turns.length
+            ? turns.map((turn) => PersonaMessageBubble(turn, profile, state, latestAssistant?.id)).join("")
+            : EmptyConversationState("当前还没有对话。", "在底部输入对方刚说的话，右侧配置只会作为生成上下文。")
+        }
       </div>
       ${state.message ? `<p class="persona-chat-note">${escapeHtml(state.message)}</p>` : ""}
     </section>
   `;
 }
 
+function EmptyConversationState(title, text) {
+  return `
+    <div class="conversation-empty-state">
+      <strong>${escapeHtml(title)}</strong>
+      <p>${escapeHtml(text)}</p>
+    </div>
+  `;
+}
+
 function PersonaMessageBubble(turn, profile, state, latestAssistantId) {
-  const isUser = turn.role === "user";
+  const isOpponent = turn.role === "opponent" || turn.role === "user";
   const profileName = getProfileName(profile);
-  const isLatestAssistant = !isUser && String(turn.id) === String(latestAssistantId);
+  const isLatestAssistant = !isOpponent && String(turn.id) === String(latestAssistantId);
   return SharedChatBubble({
-    side: isUser ? "right" : "left",
-    label: isUser ? "你" : profileName,
-    avatar: isUser ? "我" : "替",
+    side: isOpponent ? "left" : "right",
+    label: isOpponent ? "对方" : profileName,
+    avatar: isOpponent ? "对" : "替",
     content: getMessageContent(turn),
     actions: isLatestAssistant ? FeishuBubbleAction(turn, state.feishu?.sendingByTurnId?.[turn.id] || "") : ""
   });
@@ -188,7 +187,7 @@ function PersonaInputBar(state) {
       <textarea
         data-setup-input="proxyPersona.replyForm.opponentMessage"
         data-enter-action="generate-proxy-reply"
-        placeholder="把前情提要、对方刚说的话，或者你想表达的意思发给嘴替……"
+        placeholder="输入对方刚说的话……"
       >${escapeHtml(form.opponentMessage)}</textarea>
       <div class="persona-send-row">
         <button class="settings-icon-button" data-action="open-reply-settings" data-tour="persona-reply-settings" aria-label="打开回复设置">

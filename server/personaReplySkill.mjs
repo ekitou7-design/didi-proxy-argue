@@ -1,4 +1,4 @@
-import { requestJsonFromAI } from "./openaiClient.mjs";
+import { isDemoMode, requestJsonFromAI } from "./openaiClient.mjs";
 
 const validModes = new Set(["close_to_user", "like_me", "clearer", "stronger", "sarcastic", "boundary"]);
 const strengthMap = new Map([
@@ -151,7 +151,8 @@ export async function generatePersonaReply(body) {
 
     return normalizePersonaReplyResult(result);
   } catch (error) {
-    if (shouldUseMockReply(error) && !hasAIKeyConfigured()) {
+    console.error("[persona/reply] AI client failed:", error);
+    if (isDemoMode() && shouldUseMockReply(error)) {
       return buildMockPersonaReply(input);
     }
     throw error;
@@ -175,6 +176,7 @@ export function buildMockPersonaReply(input = {}) {
 
   return {
     success: true,
+    source: "fallback",
     data,
     isMock: data.isMock,
     reply: data.reply,
@@ -298,6 +300,7 @@ export function normalizePersonaReplyResult(result) {
 
   const normalized = {
     success: true,
+    source: "ai",
     isMock: false,
     styleAnalysis: textOf(result.styleAnalysis),
     mainline: result.mainline || { fact: "", impact: "", request: "", boundary: "" },
@@ -380,8 +383,4 @@ function shouldUseMockReply(error) {
     error?.message === "AI returned invalid persona reply JSON" ||
     error?.message === "AI persona reply JSON missing reply"
   );
-}
-
-function hasAIKeyConfigured() {
-  return Boolean(process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY);
 }

@@ -1,5 +1,5 @@
 import { buildRandomTrainingScenarioPrompt } from "../prompts.mjs";
-import { requestJsonFromAI } from "../openaiClient.mjs";
+import { isDemoMode, requestJsonFromAI } from "../openaiClient.mjs";
 
 const randomValues = new Set(["", "随机"]);
 const categories = ["宿舍卫生", "情侣冷战", "朋友借钱不还", "小组作业", "商家扯皮", "职场甩锅", "家庭催婚", "网友阴阳怪气"];
@@ -9,33 +9,37 @@ const opponentTypes = ["讲道理型", "嘴硬型", "阴阳怪气型", "偷换�
 export async function generateRandomTrainingScenario(input = {}) {
   const normalizedInput = normalizeScenarioInput(input);
 
-  if (!process.env.DEEPSEEK_API_KEY && !process.env.OPENAI_API_KEY) {
-    return { scenario: mockGenerateRandomTrainingScenario(normalizedInput) };
+  try {
+    const result = await requestJsonFromAI({
+      ...buildRandomTrainingScenarioPrompt(normalizedInput),
+      temperature: 0.75,
+      maxCompletionTokens: 1800
+    });
+
+    return { source: "ai", scenario: normalizeScenario(result?.scenario || result, normalizedInput) };
+  } catch (error) {
+    console.error("[training/scenario/random] AI client failed:", error);
+    if (isDemoMode()) return { source: "fallback", scenario: mockGenerateRandomTrainingScenario(normalizedInput) };
+    throw error;
   }
-
-  const result = await requestJsonFromAI({
-    ...buildRandomTrainingScenarioPrompt(normalizedInput),
-    temperature: 0.75,
-    maxCompletionTokens: 1800
-  });
-
-  return { scenario: normalizeScenario(result?.scenario || result, normalizedInput) };
 }
 
 export async function generatePresetTrainingScenario(input = {}) {
   const normalizedInput = normalizeScenarioInput(input);
 
-  if (!process.env.DEEPSEEK_API_KEY && !process.env.OPENAI_API_KEY) {
-    return { scenario: mockGenerateRandomTrainingScenario(normalizedInput) };
+  try {
+    const result = await requestJsonFromAI({
+      ...buildRandomTrainingScenarioPrompt(normalizedInput),
+      temperature: 0.45,
+      maxCompletionTokens: 1800
+    });
+
+    return { source: "ai", scenario: normalizeScenario(result?.scenario || result, normalizedInput) };
+  } catch (error) {
+    console.error("[training/scenario/preset] AI client failed:", error);
+    if (isDemoMode()) return { source: "fallback", scenario: mockGenerateRandomTrainingScenario(normalizedInput) };
+    throw error;
   }
-
-  const result = await requestJsonFromAI({
-    ...buildRandomTrainingScenarioPrompt(normalizedInput),
-    temperature: 0.45,
-    maxCompletionTokens: 1800
-  });
-
-  return { scenario: normalizeScenario(result?.scenario || result, normalizedInput) };
 }
 
 export function mockGenerateRandomTrainingScenario(input = {}) {

@@ -110,6 +110,7 @@ export const initialTempSession = {
   settingsOpen: false,
   input: "",
   isSubmitting: false,
+  generationRequestId: "",
   rounds: []
 };
 
@@ -184,6 +185,7 @@ export const initialTrainingSession = {
   messages: [],
   input: "",
   isSubmitting: false,
+  generationRequestId: "",
   feedbacks: []
 };
 

@@ -1,4 +1,4 @@
-import { requestJsonFromAI } from "./openaiClient.mjs";
+import { isDemoMode, requestJsonFromAI } from "./openaiClient.mjs";
 
 const MAX_RAW_TEXT_LENGTH = 100_000;
 const MAX_ANALYZED_TEXT_LENGTH = 18_000;
@@ -236,7 +236,8 @@ export async function extractPersonaProfile(body) {
 
     return normalizePersonaExtractionResult(result, input);
   } catch (error) {
-    if (shouldUseMockPersona(error)) {
+    console.error("[persona/extract] AI client failed:", error);
+    if (isDemoMode() && shouldUseMockPersona(error)) {
       return buildMockPersonaProfile(input);
     }
     throw error;

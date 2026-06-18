@@ -17,19 +17,24 @@ import {
   updateFeishuStatusForTurn
 } from "./controllers/feishuController.js";
 import {
+  clearProxyConversation,
   createPersonaFromTest,
   deleteProfileResult,
+  finishProxyConversation,
   generateDistillPersona,
   generateProxyReply,
   saveDistillPersona,
   setCurrentProfile
 } from "./controllers/personaController.js";
 import {
+  clearTempConversation,
+  finishTempConversation,
   generateTempScenario,
   handleTempReply
 } from "./controllers/tempController.js";
 import {
   applyGeneratedTrainingScenario,
+  clearTrainingConversation,
   finishTrainingGame,
   generatePresetTrainingScenario,
   generateRandomTrainingScenario,
@@ -52,9 +57,13 @@ import {
   DISTILL_RESULTS_KEY,
   FEISHU_WEBHOOK_KEY,
   ONBOARDING_KEY,
+  PERSONA_CHAT_HISTORY_KEY,
   PERSONA_CHAT_KEY,
+  TEMP_CHAT_HISTORY_KEY,
+  TRAINING_CHAT_HISTORY_KEY,
   TEST_RESULTS_KEY
 } from "./constants/storageKeys.js";
+import { getMessageContent, normalizeMessage } from "./utils/messageModel.js";
 import { readJson, writeJson } from "./utils/storage.js";
 import { dedicatedPersonaQuizQuestions } from "./data/njutiQuizData.js";
 import {
@@ -96,10 +105,17 @@ export default class App {
       onboardingStep: 0,
       onboardingActivePage: "",
       onboardingMessage: "",
-      temp: structuredClone(initialTempSession),
+      records: {
+        expandedRecordIds: []
+      },
+      temp: {
+        ...structuredClone(initialTempSession),
+        chatHistories: readHistoryWithStableIds(TEMP_CHAT_HISTORY_KEY, "temp")
+      },
       persona: structuredClone(initialPersonaSession),
       training: structuredClone(initialTrainingSession)
     };
+    this.state.training.chatHistories = readHistoryWithStableIds(TRAINING_CHAT_HISTORY_KEY, "training");
 
     this.root.addEventListener("click", (event) => this.handleClick(event));
     this.root.addEventListener("keydown", (event) => this.handleKeyDown(event));
@@ -126,7 +142,9 @@ export default class App {
       return RecordsPage({
         temp: this.state.temp,
         persona: this.state.persona,
-        training: this.state.training
+        proxyPersona: this.state.proxyPersona,
+        training: this.state.training,
+        records: this.state.records
       });
     }
     if (this.state.page === "profile") {
@@ -213,6 +231,14 @@ export default class App {
       await this.generateDistillPersona();
       return;
     }
+    if (action === "set-distill-input-type") {
+      this.setDistillInputType(actionTarget.dataset.distillType);
+      return;
+    }
+    if (action === "distill-placeholder") {
+      window.alert?.(actionTarget.dataset.placeholderMessage || "这个入口将在后续版本支持。");
+      return;
+    }
     if (action === "save-distill-persona") {
       this.saveDistillPersona();
       return;
@@ -253,6 +279,22 @@ export default class App {
       this.resetOnboarding();
       return;
     }
+    if (action === "delete-history-record") {
+      event.preventDefault();
+      event.stopPropagation();
+      this.deleteHistoryRecord(actionTarget.dataset.historySource, actionTarget.dataset.historyId);
+      return;
+    }
+    if (action === "toggle-history-record") {
+      this.toggleHistoryRecord(actionTarget.dataset.historySource, actionTarget.dataset.historyId);
+      return;
+    }
+    if (action === "clear-history-source") {
+      event.preventDefault();
+      event.stopPropagation();
+      this.clearHistorySource(actionTarget.dataset.historySource);
+      return;
+    }
     if (action === "close-feishu-settings") {
       this.updateFeishu({ settingsOpen: false });
       return;
@@ -279,6 +321,14 @@ export default class App {
     }
     if (action === "generate-proxy-reply") {
       await this.generateProxyReply();
+      return;
+    }
+    if (action === "finish-proxy-conversation") {
+      this.finishProxyConversation();
+      return;
+    }
+    if (action === "clear-proxy-conversation") {
+      this.clearProxyConversation();
       return;
     }
     if (action === "send-reply-to-feishu") {
@@ -325,6 +375,14 @@ export default class App {
       await this.handleTempReply({ inputAsIntent: true });
       return;
     }
+    if (action === "finish-temp-conversation") {
+      this.finishTempConversation();
+      return;
+    }
+    if (action === "clear-temp-conversation") {
+      this.clearTempConversation();
+      return;
+    }
     if (action === "open-temp-settings") {
       this.setState({ temp: { ...this.state.temp, settingsOpen: true } });
       return;
@@ -363,6 +421,10 @@ export default class App {
     }
     if (action === "finish-training-game") {
       await this.finishTrainingGame();
+      return;
+    }
+    if (action === "clear-training-conversation") {
+      this.clearTrainingConversation();
       return;
     }
     if (action === "restart-training-game") {
@@ -413,6 +475,17 @@ export default class App {
         return;
       }
       if (parts.length === 3) {
+        if (parts[0] === "proxyPersona" && parts[1] === "upload" && parts[2] === "chatText") {
+          this.state.proxyPersona = {
+            ...this.state.proxyPersona,
+            upload: {
+              ...this.state.proxyPersona.upload,
+              chatText: event.target.value,
+              normalizedTrainingText: event.target.value
+            }
+          };
+          return;
+        }
         this.setNestedState(parts[0], parts[1], parts[2], event.target.value, false);
         return;
       }
@@ -446,23 +519,29 @@ export default class App {
       return;
     }
 
-    const fileInput = event.target.closest("[data-file-input='persona-distill']");
+    const fileInput = event.target.closest("[data-file-input^='persona-distill']");
     if (!fileInput) return;
     const file = fileInput.files?.[0];
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith(".txt") && file.type !== "text/plain") {
-      this.updateProxyPersona({ message: "目前只支持 txt 文本文件。" });
+    const format = fileInput.dataset.distillFormat || "text";
+    if (!isAllowedDistillFile(file, format)) {
+      this.updateProxyPersona({ message: distillFileError(format) });
       return;
     }
 
     const reader = new FileReader();
     reader.onload = () => {
+      const rawText = String(reader.result || "");
+      const parsed = parseDistillFile(rawText, format, file.name);
       this.updateProxyPersona({
         upload: {
           ...this.state.proxyPersona.upload,
-          chatText: String(reader.result || "")
+          distillInputType: format,
+          chatText: parsed.text,
+          normalizedTrainingText: parsed.normalizedTrainingText,
+          uploadedFileName: file.name
         },
-        message: "已读取 txt 文件内容。"
+        message: parsed.message
       });
     };
     reader.readAsText(file, "utf-8");
@@ -525,6 +604,52 @@ export default class App {
     writeJson(ONBOARDING_KEY, createDefaultOnboardingState());
   }
 
+  deleteHistoryRecord(source, id) {
+    const config = getHistoryConfig(source);
+    if (!config || !id) return;
+    const current = config.get(this.state);
+    const next = current.filter((item) => String(item.id) !== String(id));
+    writeJson(config.storageKey, next);
+    const recordKey = makeExpandedRecordKey(source, id);
+    this.setState({
+      ...config.set(this.state, next),
+      records: {
+        ...this.state.records,
+        expandedRecordIds: (this.state.records.expandedRecordIds || []).filter((item) => item !== recordKey)
+      }
+    });
+  }
+
+  toggleHistoryRecord(source, id) {
+    if (!source || !id) return;
+    const recordKey = makeExpandedRecordKey(source, id);
+    const expandedRecordIds = this.state.records.expandedRecordIds || [];
+    const isExpanded = expandedRecordIds.includes(recordKey);
+    this.setState({
+      records: {
+        ...this.state.records,
+        expandedRecordIds: isExpanded
+          ? expandedRecordIds.filter((item) => item !== recordKey)
+          : [...expandedRecordIds, recordKey]
+      }
+    });
+  }
+
+  clearHistorySource(source) {
+    const config = getHistoryConfig(source);
+    if (!config) return;
+    writeJson(config.storageKey, []);
+    this.setState({
+      ...config.set(this.state, []),
+      records: {
+        ...this.state.records,
+        expandedRecordIds: (this.state.records.expandedRecordIds || []).filter(
+          (item) => !item.startsWith(`${source}:`)
+        )
+      }
+    });
+  }
+
   updateOnboarding(partial) {
     const next = normalizeOnboardingState({
       ...this.state.onboarding,
@@ -549,6 +674,17 @@ export default class App {
         ...this.state.proxyPersona,
         ...partial
       }
+    });
+  }
+
+  setDistillInputType(type) {
+    if (!type) return;
+    this.updateProxyPersona({
+      upload: {
+        ...this.state.proxyPersona.upload,
+        distillInputType: type
+      },
+      message: ""
     });
   }
 
@@ -624,8 +760,24 @@ export default class App {
     return generateProxyReply(this);
   }
 
+  finishProxyConversation() {
+    return finishProxyConversation(this);
+  }
+
+  clearProxyConversation() {
+    return clearProxyConversation(this);
+  }
+
   async handleTempReply({ inputAsIntent = false } = {}) {
     return handleTempReply(this, { inputAsIntent });
+  }
+
+  finishTempConversation() {
+    return finishTempConversation(this);
+  }
+
+  clearTempConversation() {
+    return clearTempConversation(this);
   }
 
   async generateTempScenario() {
@@ -654,6 +806,10 @@ export default class App {
 
   async finishTrainingGame() {
     return finishTrainingGame(this);
+  }
+
+  clearTrainingConversation() {
+    return clearTrainingConversation(this);
   }
 
   async handleTrainingSubmit() {
@@ -805,11 +961,14 @@ function createProxyPersonaState() {
     ...structuredClone(initialProxyPersonaState),
     activeTab: "upload",
     upload: {
+      distillInputType: "text",
       targetSpeaker: "我",
       sourceType: "chat",
       relationship: "谈了 3 个月的男友",
       background: "他最近经常不回消息，临时改约后说我太敏感。",
-      chatText: "我不是想吵架，我只是希望你尊重之前说好的约定。你先别把问题说成我太敏感。"
+      chatText: "我不是想吵架，我只是希望你尊重之前说好的约定。你先别把问题说成我太敏感。",
+      normalizedTrainingText: "",
+      uploadedFileName: ""
     },
     testAnswers: Object.fromEntries(dedicatedPersonaQuizQuestions.map((question) => [question.id, ""])),
     distillResults,
@@ -829,10 +988,217 @@ function createProxyPersonaState() {
       strength: "中"
     },
     replySettingsOpen: false,
-    chatTurns: readJson(PERSONA_CHAT_KEY, []),
+    chatTurns: readPersonaChatTurns(),
+    chatHistories: readHistoryWithStableIds(PERSONA_CHAT_HISTORY_KEY, "persona"),
+    generationRequestId: "",
     replyResult: null,
     message: ""
   };
+}
+
+function readPersonaChatTurns() {
+  const rawTurns = readJson(PERSONA_CHAT_KEY, []);
+  const turns = rawTurns
+    .map((turn) => {
+      const role = turn.role === "user" ? "opponent" : turn.role;
+      return normalizeMessage({ ...turn, role });
+    })
+    .filter((turn) => ["opponent", "assistant"].includes(turn.role))
+    .filter((turn) => getMessageContent(turn).trim())
+    .filter((turn) => !isLeakedPersonaConfigTurn(turn));
+  if (turns.length !== rawTurns.length) writeJson(PERSONA_CHAT_KEY, turns);
+  return turns;
+}
+
+function isLeakedPersonaConfigTurn(turn) {
+  const text = getMessageContent(turn);
+  return turn.role === "opponent" && (text.includes("\n") || /我想表达[:：]/.test(text));
+}
+
+function getHistoryConfig(source) {
+  const configs = {
+    temp: {
+      storageKey: TEMP_CHAT_HISTORY_KEY,
+      get: (state) => state.temp.chatHistories || [],
+      set: (state, chatHistories) => ({
+        temp: {
+          ...state.temp,
+          chatHistories
+        }
+      })
+    },
+    persona: {
+      storageKey: PERSONA_CHAT_HISTORY_KEY,
+      get: (state) => state.proxyPersona.chatHistories || [],
+      set: (state, chatHistories) => ({
+        proxyPersona: {
+          ...state.proxyPersona,
+          chatHistories
+        }
+      })
+    },
+    training: {
+      storageKey: TRAINING_CHAT_HISTORY_KEY,
+      get: (state) => state.training.chatHistories || [],
+      set: (state, chatHistories) => ({
+        training: {
+          ...state.training,
+          chatHistories
+        }
+      })
+    }
+  };
+  return configs[source] || null;
+}
+
+function readHistoryWithStableIds(storageKey, source) {
+  const histories = readJson(storageKey, []);
+  let changed = false;
+  const next = histories.map((item, index) => {
+    if (item?.id) return item;
+    changed = true;
+    return {
+      ...item,
+      id: `${source}-${item?.createdAt || index}`
+    };
+  });
+  if (changed) writeJson(storageKey, next);
+  return next;
+}
+
+function makeExpandedRecordKey(source, id) {
+  return `${source}:${id}`;
+}
+
+function isAllowedDistillFile(file, format) {
+  const name = file.name.toLowerCase();
+  if (format === "text") return name.endsWith(".txt") || name.endsWith(".md") || file.type === "text/plain" || file.type === "text/markdown";
+  if (format === "csv") return name.endsWith(".csv") || file.type === "text/csv";
+  if (format === "json") return name.endsWith(".json") || file.type === "application/json";
+  return false;
+}
+
+function distillFileError(format) {
+  if (format === "csv") return "请上传 .csv 文件。";
+  if (format === "json") return "请上传 .json 文件。";
+  return "请上传 .txt 或 .md 文本文件。";
+}
+
+function parseDistillFile(rawText, format, fileName = "") {
+  if (format === "csv") {
+    const normalizedTrainingText = csvToDistillText(rawText);
+    return {
+      text: normalizedTrainingText,
+      normalizedTrainingText,
+      message: `已解析 CSV：${fileName || "未命名文件"}`
+    };
+  }
+  if (format === "json") {
+    const normalizedTrainingText = jsonToDistillText(rawText);
+    return {
+      text: normalizedTrainingText,
+      normalizedTrainingText,
+      message: `已解析 JSON：${fileName || "未命名文件"}`
+    };
+  }
+  return {
+    text: rawText,
+    normalizedTrainingText: rawText,
+    message: `已读取 ${fileName?.toLowerCase().endsWith(".md") ? "md" : "txt"} 文件内容。`
+  };
+}
+
+function csvToDistillText(rawText) {
+  const rows = parseCsvRows(rawText);
+  if (rows.length < 2) return rawText;
+  const headers = rows[0].map((item) => String(item || "").trim());
+  const records = rows.slice(1).filter((row) => row.some((cell) => String(cell || "").trim()));
+  const pick = (row, names) => {
+    const index = headers.findIndex((header) => names.includes(header));
+    return index >= 0 ? String(row[index] || "").trim() : "";
+  };
+  return records
+    .map((row, index) => {
+      const scene = pick(row, ["scene", "场景"]);
+      const opponent = pick(row, ["opponent", "对方说"]);
+      const reply = pick(row, ["reply", "回复"]);
+      const intensity = pick(row, ["intensity", "强度"]);
+      const strategy = pick(row, ["strategy", "策略"]);
+      return [
+        `样本 ${index + 1}`,
+        scene ? `场景：${scene}` : "",
+        opponent ? `对方：${opponent}` : "",
+        reply ? `我：${reply}` : "",
+        intensity ? `强度：${intensity}` : "",
+        strategy ? `策略：${strategy}` : ""
+      ]
+        .filter(Boolean)
+        .join("\n");
+    })
+    .join("\n\n");
+}
+
+function parseCsvRows(rawText) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let inQuotes = false;
+  const text = String(rawText || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+    if (char === '"' && inQuotes && next === '"') {
+      cell += '"';
+      index += 1;
+      continue;
+    }
+    if (char === '"') {
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if (char === "," && !inQuotes) {
+      row.push(cell);
+      cell = "";
+      continue;
+    }
+    if (char === "\n" && !inQuotes) {
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+      continue;
+    }
+    cell += char;
+  }
+  row.push(cell);
+  rows.push(row);
+  return rows;
+}
+
+function jsonToDistillText(rawText) {
+  let data;
+  try {
+    data = JSON.parse(rawText);
+  } catch {
+    return rawText;
+  }
+  const examples = Array.isArray(data.examples) ? data.examples : [];
+  const header = [
+    data.personaName ? `人格名称：${data.personaName}` : "",
+    Array.isArray(data.styleTags) && data.styleTags.length ? `风格标签：${data.styleTags.join("、")}` : ""
+  ].filter(Boolean);
+  const body = examples.map((item, index) =>
+    [
+      `样本 ${index + 1}`,
+      item.scene ? `场景：${item.scene}` : "",
+      item.opponent ? `对方：${item.opponent}` : "",
+      item.reply ? `我：${item.reply}` : "",
+      item.strategy ? `策略：${item.strategy}` : ""
+    ]
+      .filter(Boolean)
+      .join("\n")
+  );
+  return [...header, ...body].filter(Boolean).join("\n\n") || rawText;
 }
 
 function createFeishuState() {

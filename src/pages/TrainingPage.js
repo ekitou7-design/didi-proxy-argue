@@ -190,7 +190,6 @@ function TrainingGameHud(session) {
           <h2>${escapeHtml(config.scene || "吵架训练")}</h2>
           <p>你：${escapeHtml(playerRole.name)} / AI 对手：${escapeHtml(aiRole.name)}</p>
         </div>
-        <button class="tiny-button" data-action="finish-training-game" data-tour="training-finish" ${session.isSubmitting ? "disabled" : ""}>结束本轮</button>
       </div>
       <div class="training-role-summary compact">
         <span>目标：<b>${escapeHtml(formatGoals(config.trainingGoals))}</b></span>
@@ -208,15 +207,26 @@ function TrainingGameHud(session) {
 
 function TrainingChatPanel(session) {
   const config = getGameConfig(session);
-  const messages = session.messages?.length
-    ? session.messages
-    : [{ role: "assistant", content: session.opponent || session.generatedScenario?.openingMessage || "开始后，AI 对手会先出招。" }];
+  const messages = session.messages || [];
   return `
     <section class="realtime-chat-panel training-dialog-panel" aria-label="吵架训练对话">
       <div class="persona-chat-scroll realtime-chat-scroll training-chat-scroll">
-        ${messages.map((message, index) => MessageBubble(message, session.feedbacks, index, config)).join("")}
+        ${
+          messages.length
+            ? messages.map((message, index) => MessageBubble(message, session.feedbacks, index, config)).join("")
+            : EmptyConversationState("当前还没有对话。", "开始训练或发送回复后，这里只显示本轮真实训练对话。")
+        }
       </div>
     </section>
+  `;
+}
+
+function EmptyConversationState(title, text) {
+  return `
+    <div class="conversation-empty-state">
+      <strong>${escapeHtml(title)}</strong>
+      <p>${escapeHtml(text)}</p>
+    </div>
   `;
 }
 
