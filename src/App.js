@@ -121,6 +121,13 @@ export default class App {
     this.root.addEventListener("keydown", (event) => this.handleKeyDown(event));
     this.root.addEventListener("input", (event) => this.handleInput(event));
     this.root.addEventListener("change", (event) => this.handleChange(event));
+    this.didiDebugFlag = localStorage.getItem("didi_debug");
+    window.setInterval(() => {
+      const nextDebugFlag = localStorage.getItem("didi_debug");
+      if (nextDebugFlag === this.didiDebugFlag) return;
+      this.didiDebugFlag = nextDebugFlag;
+      if (this.state.page === "training") this.render();
+    }, 500);
     window.addEventListener("hashchange", () => {
       const page = pageFromHash();
       if (page && page !== this.state.page) this.setState({ page });
@@ -185,7 +192,7 @@ export default class App {
         return;
       }
       if (sessionKey === "training.gameConfig") {
-        this.updateTrainingSetup(["training", "gameConfig", field], chipTarget.dataset.chipValue);
+        this.updateTrainingSetup(["training", "gameConfig", ...field.split(".")], chipTarget.dataset.chipValue);
         return;
       }
       this.setState({
@@ -353,6 +360,14 @@ export default class App {
     }
     if (action === "close-training-settings") {
       this.setState({ training: { ...this.state.training, settingsOpen: false } });
+      return;
+    }
+    if (action === "open-training-dev-debug") {
+      this.setState({ training: { ...this.state.training, devDebugDrawerOpen: true } });
+      return;
+    }
+    if (action === "close-training-dev-debug") {
+      this.setState({ training: { ...this.state.training, devDebugDrawerOpen: false } });
       return;
     }
     if (action === "go-persona-distill") {
@@ -982,8 +997,8 @@ function createProxyPersonaState() {
     distillResult: null,
     replyForm: {
       opponentMessage: "你怎么又开始了？这点小事也要上纲上线？",
-      background: "昨天约好一起吃饭，他临时说要和朋友出去。",
-      goal: "反击对方逻辑",
+      background: "",
+      goal: "",
       mode: "像我本人",
       strength: "中"
     },

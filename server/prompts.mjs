@@ -354,6 +354,10 @@ ${JSON.stringify(input, null, 2)}
 - gameConfig.playerRoleKey 是玩家选择的角色，aiRoleKey 必须自动取另一个角色。
 - gameConfig.trainingGoals 是玩家训练目标。
 - gameConfig.difficulty 是训练难度。
+- gameConfig.toneStrength 是玩家练习的语气强度：低=克制礼貌，中=直接有边界，高=锋利有压迫感；它要影响 openingMessage 的压迫强度和 suggestedFirstReplyHint 的建议风格。
+- gameConfig.contextSummary / contextSummary 是用户补充的前情提要，必须影响 background、scene、mainline，不得丢弃。
+- gameConfig.userMainline / userMainline 是用户想表达或想守住的主线，必须影响 userGoal、realMainline、mainline.request、scoreFocus.mainline。
+- gameConfig.sessionControl 是会话控制，必须在 suggestedFirstReplyHint 中体现回复长度、是否提醒回主线、是否允许升级语气。
 - title/background/userGoal/realMainline/mainline/traps/trainingFocus/scoreFocus/suggestedFirstReplyHint 里描述冲突双方时，用 roleA.name / roleB.name 或“角色A / 角色B”，不要用“我、别人、对方、玩家”。
 - openingMessage 必须由 AI 角色发出，站在 AI 角色目标上说话，不得替玩家说话。
 

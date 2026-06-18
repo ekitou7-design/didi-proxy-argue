@@ -1,7 +1,9 @@
-import { trainingDifficultyOptions, trainingGoalOptions } from "../data/mockData.js";
+import { toneOptions, trainingDifficultyOptions, trainingGoalOptions } from "../data/mockData.js";
 import { ChatBubble } from "../components/ChatBubble.js";
 import { escapeAttr, escapeHtml } from "../utils/html.js";
 import { getMessageContent } from "../utils/messageModel.js";
+
+ensureImportMetaEnv();
 
 export default function TrainingPage(session) {
   if (session.gameState === "finished") return TrainingFinishedPage(session);
@@ -13,9 +15,8 @@ function TrainingIdlePage(session) {
   const config = getGameConfig(session);
   return `
     <div class="page training-game-page training-idle-page">
-      ${TrainingSetupStatus(session, config)}
       ${TrainingStartSettings(session, config)}
-      ${TrainingMobilePreview(session, config)}
+      ${TrainingDevDebugPanel(session, config)}
     </div>
   `;
 }
@@ -51,24 +52,14 @@ function TrainingStartSettings(session, config) {
         </div>
       </div>
 
-      ${TrainingTextArea("本局场景", "training.gameConfig.scene", config.scene, "例如：宿舍里，角色B一直不倒垃圾。角色A提醒后，角色B还嘲讽角色A小题大做。")}
-
       <div class="training-setting-group">
-        <h3>本局角色</h3>
-        <p class="training-setting-note">角色 A / B 是冲突里的两方，不等于玩家；你会在下方选择本局练习视角。</p>
-        <div class="training-role-edit-grid">
-          ${RoleEditor("角色A", "roleA", config.roleA)}
-          ${RoleEditor("角色B", "roleB", config.roleB)}
-        </div>
+        <h3>前情提要</h3>
+        ${TrainingTextArea("冲突背景", "training.gameConfig.contextSummary", config.contextSummary, "补充这件事之前发生了什么、谁做了什么、为什么现在爆发。")}
       </div>
 
       <div class="training-setting-group">
-        <h3>选择本局练习视角</h3>
-        <div class="training-side-options">
-          ${RoleChoice("A", config)}
-          ${RoleChoice("B", config)}
-        </div>
-        <p class="training-setting-note">你选择其中一个角色练习发言，AI 对手自动扮演另一方。</p>
+        <h3>我想守住的主线</h3>
+        ${TrainingTextArea("主线", "training.gameConfig.userMainline", config.userMainline, "例如：我不是在争态度，我要对方承认失约并给出补救方案。")}
       </div>
 
       <div class="training-setting-group">
@@ -106,18 +97,94 @@ function TrainingStartSettings(session, config) {
         </div>
       </div>
 
-      <button class="primary-button compact-full-button" data-action="start-training-game" data-tour="training-start" ${session.scenarioStatus === "loading" ? "disabled" : ""}>开始训练</button>
+      ${TrainingTextArea("本局场景", "training.gameConfig.scene", config.scene, "例如：宿舍里，角色B一直不倒垃圾。角色A提醒后，角色B还嘲讽角色A小题大做。")}
+
+      <div class="training-setting-group">
+        <h3>本局角色</h3>
+        <p class="training-setting-note">角色 A / B 是冲突里的两方，不等于玩家；你会在下方选择本局练习视角。</p>
+        <div class="training-role-edit-grid">
+          ${RoleEditor("角色A", "roleA", config.roleA)}
+          ${RoleEditor("角色B", "roleB", config.roleB)}
+        </div>
+      </div>
+
+      <div class="training-setting-group">
+        <h3>练习视角</h3>
+        <div class="training-side-options">
+          ${RoleChoice("A", config)}
+          ${RoleChoice("B", config)}
+        </div>
+        <p class="training-setting-note">你选择其中一个角色练习发言，AI 对手自动扮演另一方。</p>
+      </div>
+
+      ${AdvancedTrainingSettings(session, config)}
+
+      <div class="training-main-actions">
+        <button class="primary-button compact-full-button" data-action="start-training-game" data-tour="training-start" ${session.scenarioStatus === "loading" ? "disabled" : ""}>开始训练</button>
+        <button class="secondary-button warm compact-full-button" data-action="generate-random-training-scenario" data-tour="training-generate" ${session.scenarioStatus === "loading" ? "disabled" : ""}>
+          ${session.scenarioStatus === "loading" ? "生成中..." : "AI 帮我生成一局"}
+        </button>
+      </div>
+      ${session.scenarioMessage ? `<p class="section-note compact-status-note">${escapeHtml(session.scenarioMessage)}</p>` : ""}
     </section>
+  `;
+}
+
+function AdvancedTrainingSettings(session, config) {
+  return `
+    <details class="training-advanced-settings">
+      <summary>更多训练偏好</summary>
+      <div class="training-advanced-settings-body">
+        <div class="training-setting-group">
+          <h3>语气强度</h3>
+          <div class="training-choice-grid">
+            ${toneOptions
+            .map(
+                (item) => `
+                  <button
+                    class="chip tiny-chip ${config.toneStrength === item ? "active" : ""}"
+                    data-chip-session="training.gameConfig"
+                    data-chip-field="toneStrength"
+                    data-chip-value="${escapeAttr(item)}"
+                  >
+                    ${escapeHtml(item)}
+                  </button>
+                `
+              )
+              .join("")}
+          </div>
+        </div>
+
+        <div class="training-setting-group">
+          <h3>会话控制</h3>
+          <div class="training-choice-grid">
+            ${SessionControlChoice("每轮回复", "replyLength", ["短", "中", "长"], config.sessionControl.replyLength)}
+            ${SessionControlChoice("主线提醒", "remindMainline", ["开启", "关闭"], config.sessionControl.remindMainline)}
+            ${SessionControlChoice("升级语气", "allowEscalation", ["允许", "禁止"], config.sessionControl.allowEscalation)}
+          </div>
+        </div>
+
+        ${TrainingPreviewContent(session, config)}
+      </div>
+    </details>
   `;
 }
 
 function RoleEditor(title, key, role) {
   return `
     <article class="training-role-editor">
-      <h4>${escapeHtml(title)}</h4>
-      ${InlineField("名称", `training.gameConfig.${key}.name`, role.name, "例如：角色A、室友")}
-      ${TrainingTextArea("角色描述", `training.gameConfig.${key}.description`, role.description, "这个角色在场景里是什么状态？")}
-      ${TrainingTextArea("角色目标", `training.gameConfig.${key}.goal`, role.goal, "这个角色想达到什么？")}
+      <div class="training-role-card-head">
+        <span>${escapeHtml(title)}</span>
+        <input data-setup-input="training.gameConfig.${key}.name" value="${escapeAttr(role.name)}" placeholder="例如：角色A、室友" />
+      </div>
+      <label class="training-role-card-field">
+        <b>角色描述</b>
+        <textarea data-setup-input="training.gameConfig.${key}.description" placeholder="这个角色在场景里是什么状态？">${escapeHtml(role.description)}</textarea>
+      </label>
+      <label class="training-role-card-field">
+        <b>角色目标</b>
+        <textarea data-setup-input="training.gameConfig.${key}.goal" placeholder="这个角色想达到什么？">${escapeHtml(role.goal)}</textarea>
+      </label>
     </article>
   `;
 }
@@ -163,16 +230,22 @@ export function TrainingPreviewContent(session, config = getGameConfig(session),
       <p><b>AI 对手目标：</b>${escapeHtml(aiRole.goal || "未填写")}</p>
       <p${goalTourAttr}><b>训练目标：</b>${escapeHtml(formatGoals(config.trainingGoals))}</p>
       <p><b>难度：</b>${escapeHtml(difficultyLabel(config.difficulty))}</p>
+      <p><b>语气强度：</b>${escapeHtml(config.toneStrength)}</p>
+      <p><b>前情：</b>${escapeHtml(config.contextSummary || "未填写")}</p>
+      <p><b>主线：</b>${escapeHtml(config.userMainline || "未填写")}</p>
+      <p><b>会话控制：</b>${escapeHtml(formatSessionControl(config.sessionControl))}</p>
     </div>
   `;
 }
 
 function TrainingPlayingPage(session) {
+  const config = getGameConfig(session);
   return `
     <div class="page realtime-chat-page training-chat-page">
       ${TrainingGameHud(session)}
       ${TrainingChatPanel(session)}
       ${TrainingInputBar(session)}
+      ${TrainingDevDebugPanel(session, config)}
     </div>
   `;
 }
@@ -194,6 +267,7 @@ function TrainingGameHud(session) {
       <div class="training-role-summary compact">
         <span>目标：<b>${escapeHtml(formatGoals(config.trainingGoals))}</b></span>
         <span>难度：<b>${escapeHtml(difficultyLabel(config.difficulty))}</b></span>
+        <span>强度：<b>${escapeHtml(config.toneStrength)}</b></span>
       </div>
       <div class="training-progress-meta">
         <span>第 ${escapeHtml(session.round || 1)} / ${escapeHtml(session.maxRounds || 5)} 回合</span>
@@ -285,6 +359,72 @@ function FeedbackText(title, text) {
   `;
 }
 
+function TrainingDevDebugPanel(session, config = getGameConfig(session)) {
+  if (!isDevDebugEnabled()) return "";
+  const debug = session.devDebug || {};
+  const responseDebug = debug.lastReplyResponseDebug || {};
+  const meta = debug.lastAiResponseMeta || {};
+  const isOpen = Boolean(session.devDebugDrawerOpen);
+  return `
+    <button class="training-dev-fab" data-action="open-training-dev-debug" aria-label="打开训练 DEV 调试" ${isOpen ? "hidden" : ""}>DEV</button>
+    ${
+      isOpen
+        ? `
+          <aside class="training-dev-debug-drawer" aria-label="训练设置 DEV 调试 Drawer">
+            <div class="training-dev-debug-head">
+              <div>
+                <span class="persona-kicker">DEV</span>
+                <h3>训练设置调试</h3>
+              </div>
+              <button class="tiny-button" data-action="close-training-dev-debug">关闭</button>
+            </div>
+            <div class="training-dev-debug-meta">
+              <span>source: <b>${escapeHtml(meta.source || "未请求")}</b></span>
+              <span>model: <b>${escapeHtml(meta.model || "未返回")}</b></span>
+              <span>difficulty: <b>${escapeHtml(meta.difficulty || config.difficulty || "")}</b></span>
+              <span>toneStrength: <b>${escapeHtml(meta.toneStrength || config.toneStrength || "")}</b></span>
+            </div>
+            ${DebugJsonBlock("当前前端 gameConfig", config)}
+            ${DebugJsonBlock("最近一次 /api/training/reply request body", debug.lastReplyRequestBody)}
+            ${DebugJsonBlock("后端 debug.receivedSettings", responseDebug.receivedSettings)}
+            ${DebugJsonBlock("后端 debug.promptSummary", responseDebug.promptSummary)}
+          </aside>
+        `
+        : ""
+    }
+  `;
+}
+
+function DebugJsonBlock(title, value) {
+  const content = value == null ? "暂无" : JSON.stringify(value, null, 2);
+  return `
+    <details class="training-dev-debug-block" open>
+      <summary>${escapeHtml(title)}</summary>
+      <pre>${escapeHtml(content)}</pre>
+    </details>
+  `;
+}
+
+function isDevDebugEnabled() {
+  if (typeof window === "undefined") return false;
+  const isDevDebug = import.meta.env.DEV && localStorage.getItem("didi_debug") === "1";
+  return Boolean(isDevDebug);
+}
+
+function ensureImportMetaEnv() {
+  if (import.meta.env) return;
+  Object.defineProperty(import.meta, "env", {
+    value: { DEV: isLocalDevelopmentRuntime() },
+    configurable: true
+  });
+}
+
+function isLocalDevelopmentRuntime() {
+  if (typeof window === "undefined") return false;
+  const host = window.location.hostname;
+  return window.location.protocol === "file:" || host === "localhost" || host === "127.0.0.1" || host === "::1";
+}
+
 function TrainingInputBar(session) {
   return `
     <section class="realtime-input-bar training-input-boundary">
@@ -330,6 +470,7 @@ function TrainingFinishedPage(session) {
         <button class="primary-button" data-action="restart-training-game">再来一局</button>
         <button class="secondary-button warm" data-action="reset-training-game">换个场景</button>
       </section>
+      ${TrainingDevDebugPanel(session)}
     </div>
   `;
 }
@@ -373,6 +514,30 @@ function InlineField(label, path, value, placeholder) {
   `;
 }
 
+function SessionControlChoice(label, field, options, active) {
+  return `
+    <div class="training-control-choice">
+      <span>${escapeHtml(label)}</span>
+      <div class="training-control-options">
+        ${options
+          .map(
+            (item) => `
+              <button
+                class="chip tiny-chip ${active === item ? "active" : ""}"
+                data-chip-session="training.gameConfig"
+                data-chip-field="sessionControl.${field}"
+                data-chip-value="${escapeAttr(item)}"
+              >
+                ${escapeHtml(item)}
+              </button>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
 function resultTitle(result) {
   if (result === "win") return "你吵赢了";
   if (result === "lose") return "被带偏了";
@@ -389,7 +554,11 @@ export function getGameConfig(session) {
     playerRoleKey,
     aiRoleKey: oppositeRoleKey(playerRoleKey),
     trainingGoals: normalizeGoals(source.trainingGoals || source.goals || session.goal || session.generatedScenario?.userGoal),
-    difficulty: normalizeDifficulty(source.difficulty || session.aiDifficulty || session.difficulty)
+    difficulty: normalizeDifficulty(source.difficulty || session.aiDifficulty || session.difficulty),
+    toneStrength: normalizeToneStrength(source.toneStrength || session.toneStrength),
+    contextSummary: String(source.contextSummary || session.contextSummary || "").trim(),
+    userMainline: String(source.userMainline || session.userMainline || "").trim(),
+    sessionControl: normalizeSessionControl(source.sessionControl || session.sessionControl)
   };
   return config;
 }
@@ -440,12 +609,32 @@ function normalizeDifficulty(value) {
   return "normal";
 }
 
+function normalizeToneStrength(value) {
+  if (["低", "中", "高"].includes(value)) return value;
+  if (/低|soft|轻/i.test(String(value || ""))) return "低";
+  if (/高|strong|锋利|攻击/i.test(String(value || ""))) return "高";
+  return "中";
+}
+
+function normalizeSessionControl(value = {}) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  return {
+    replyLength: ["短", "中", "长"].includes(source.replyLength) ? source.replyLength : "中",
+    remindMainline: source.remindMainline === "关闭" ? "关闭" : "开启",
+    allowEscalation: source.allowEscalation === "禁止" ? "禁止" : "允许"
+  };
+}
+
 function difficultyLabel(value) {
   return trainingDifficultyOptions.find((item) => item.value === normalizeDifficulty(value))?.label || "正常";
 }
 
 function formatGoals(goals = []) {
   return goals.length ? goals.join("、") : "抓住核心问题";
+}
+
+function formatSessionControl(control = {}) {
+  return `每轮${control.replyLength || "中"} / 主线提醒${control.remindMainline || "开启"} / 升级语气${control.allowEscalation || "允许"}`;
 }
 
 function clampScore(value) {

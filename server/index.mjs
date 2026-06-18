@@ -98,6 +98,14 @@ app.post("/api/training/score", async (request, response) => {
 });
 
 app.post("/api/training/reply", async (request, response) => {
+  console.log("[training/reply] received settings", {
+    toneStrength: request.body?.toneStrength || request.body?.gameConfig?.toneStrength,
+    difficulty: request.body?.difficulty || request.body?.gameConfig?.difficulty,
+    trainingGoals: request.body?.gameConfig?.trainingGoals || request.body?.trainingGoals,
+    contextSummary: request.body?.contextSummary || request.body?.gameConfig?.contextSummary,
+    userMainline: request.body?.userMainline || request.body?.gameConfig?.userMainline,
+    sessionControl: request.body?.sessionControl || request.body?.gameConfig?.sessionControl
+  });
   try {
     const result = await handleTrainingGameReply(request.body);
     response.json(result);

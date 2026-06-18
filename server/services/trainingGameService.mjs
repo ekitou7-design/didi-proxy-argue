@@ -1,4 +1,4 @@
-import { hasAIKeyConfigured, isDemoMode, requestJsonFromAI } from "../openaiClient.mjs";
+import { getModelName, hasAIKeyConfigured, isDemoMode, requestJsonFromAI } from "../openaiClient.mjs";
 
 const insultPattern = /傻子|滚|废物|神经病|闭嘴|有病|脑子|蠢|垃圾|白痴|傻逼|sb|去死/i;
 const boundaryPattern = /我不接受|不接受|到此为止|请你|不要再|别再|先别|不要|停止|边界|正面回应|别转移|不要转移|别把|不能|别拿|别用/;
@@ -55,6 +55,10 @@ export function normalizeTrainingGameInput(input = {}) {
     aiIdentity: aiRole.name,
     aiDifficulty: textOf(input.aiDifficulty) || textOf(config.difficulty) || textOf(input.difficulty),
     difficulty: normalizeDifficulty(config.difficulty || input.difficulty),
+    toneStrength: normalizeToneStrength(input.toneStrength || config.toneStrength),
+    contextSummary: textOf(input.contextSummary) || textOf(config.contextSummary),
+    userMainline: textOf(input.userMainline) || textOf(config.userMainline),
+    sessionControl: normalizeSessionControl(input.sessionControl || config.sessionControl),
     trainingGoals: gameConfig.trainingGoals,
     goal: gameConfig.trainingGoals.length ? gameConfig.trainingGoals.join("、") : textOf(input.goal) || "守住主线，清楚表达诉求和边界。",
     round: clampNumber(input.round || 1, 1, maxRounds),
@@ -62,7 +66,7 @@ export function normalizeTrainingGameInput(input = {}) {
     persuasionScore: clampNumber(input.persuasionScore, 0, 100),
     forceEnd: Boolean(input.forceEnd),
     offTrackStreak: clampNumber(input.offTrackStreak, 0, 10),
-    mainline: input.mainline && typeof input.mainline === "object" ? input.mainline : {},
+    mainline: normalizeMainline(input.mainline, textOf(input.userMainline) || textOf(config.userMainline)),
     messages: Array.isArray(input.messages)
       ? input.messages
           .map((item) => ({
@@ -98,6 +102,9 @@ function localTrainingGameReply(input, userReply) {
 
   return {
     source: "fallback",
+    model: getModelName(),
+    difficulty: input.difficulty,
+    toneStrength: input.toneStrength,
     gameState: "playing",
     assistantMessage,
     round: input.round + 1,
@@ -108,7 +115,8 @@ function localTrainingGameReply(input, userReply) {
     roundScore,
     opponentState,
     offTrackStreak,
-    review: null
+    review: null,
+    debug: buildSettingsDebug(input)
   };
 }
 
@@ -116,10 +124,11 @@ function evaluateReply(input, userReply) {
   const text = userReply.replace(/\s/g, "");
   const lastOpponent = latestAssistantMessage(input.messages);
   const whole = `${userReply} ${input.goal} ${input.scene}`;
+  const mainlineText = `${input.userMainline} ${input.mainline?.fact || ""} ${input.mainline?.request || ""}`;
 
   const hasInsult = insultPattern.test(userReply);
   const hasBoundary = boundaryPattern.test(userReply);
-  const hasMainline = mainlinePattern.test(whole);
+  const hasMainline = mainlinePattern.test(whole) || sharesMainline(userReply, mainlineText);
   const responds = responsePattern.test(userReply) || sharesMeaning(userReply, lastOpponent);
   const countersTactic = counterTacticPattern.test(userReply);
   const clearLogic = /不是.*是|先.*再|事实|因为|所以|请你|现在要/.test(userReply) || hasMainline;
@@ -136,7 +145,7 @@ function evaluateReply(input, userReply) {
   raw += hasInsult ? -20 : /气死|烦|服了/.test(userReply) ? 3 : 10;
   raw += countersTactic ? 15 : 0;
 
-  const difficultyPenalty = input.difficulty === "hard" ? 12 : input.difficulty === "medium" ? 4 : 0;
+  const difficultyPenalty = input.difficulty === "hell" ? 18 : input.difficulty === "hard" ? 12 : input.difficulty === "medium" ? 4 : 0;
   const delta = clampNumber(raw - difficultyPenalty, -20, 35);
   const seriousOffTrack = hasInsult || (!hasMainline && !responds) || (tooShort && !hasBoundary);
   const feedback = buildFeedback(delta, { hasMainline, responds, hasBoundary, clearLogic, concise, hasInsult, countersTactic });
@@ -156,6 +165,9 @@ function finishGame(input, persuasionDelta, feedback, assistantMessage, override
 
   return {
     source: "fallback",
+    model: getModelName(),
+    difficulty: input.difficulty,
+    toneStrength: input.toneStrength,
     gameState: "finished",
     assistantMessage: assistantMessage || buildFinalOpponentMessage(input, persuasionScore, opponentState, override.offTrackStreak || 0),
     round: Math.min(input.round, input.maxRounds),
@@ -166,7 +178,8 @@ function finishGame(input, persuasionDelta, feedback, assistantMessage, override
     roundScore: override.roundScore || null,
     opponentState,
     offTrackStreak: override.offTrackStreak ?? input.offTrackStreak,
-    review
+    review,
+    debug: buildSettingsDebug(input)
   };
 }
 
@@ -211,6 +224,12 @@ function buildTrainingGamePrompt(input) {
 本局场景：
 ${input.scene}
 
+前情提要：
+${input.contextSummary || "无额外前情。"}
+
+玩家想表达 / 想守住的主线：
+${input.userMainline || input.mainline?.request || input.goal}
+
 玩家扮演：
 ${input.playerRole.name}
 玩家角色描述：
@@ -234,6 +253,23 @@ ${input.aiRole.goal}
 
 玩家的训练目标是：
 ${input.trainingGoals.join("、") || input.goal}
+
+语气强度必须实际影响 assistantMessage 和 betterReply：
+${toneStrengthInstruction(input.toneStrength)}
+
+难度必须实际影响 AI 对手行为：
+${difficultyInstruction(input.difficulty)}
+
+训练目标必须实际影响评分和对手压迫方向：
+${trainingGoalInstruction(input.trainingGoals)}
+
+会话控制必须遵守：
+${sessionControlInstruction(input.sessionControl)}
+
+主线判断：
+- 用户回复是否跑题，必须优先对照“玩家想表达 / 想守住的主线”和 mainline，而不是只看是否回嘴有力。
+- 如果 sessionControl.remindMainline 为“开启”，feedback、suggestion、betterReply 里要明确提醒如何回到主线。
+- 如果 allowEscalation 为“禁止”，assistantMessage 和 betterReply 都不能升级为阴阳怪气或高攻击，只能坚定、短句、清楚。
 
 assistantMessage 只能是“${input.aiRole.name}”说出的话，不能输出玩家回复、不能替玩家总结观点、不能突然替玩家发言。
 描述玩家时使用“玩家”或“${input.playerRole.name}”，不要用“我”来代指玩家。
@@ -321,6 +357,9 @@ function normalizeAiTrainingGameResult(result, input) {
   if (gameState === "finished") {
     return {
       source: "ai",
+      model: getModelName(),
+      difficulty: input.difficulty,
+      toneStrength: input.toneStrength,
       gameState,
       assistantMessage: requiredText(result.assistantMessage, "assistantMessage"),
       round: clampNumber(result.round || input.round, 1, input.maxRounds),
@@ -331,12 +370,16 @@ function normalizeAiTrainingGameResult(result, input) {
       roundScore: normalizeRoundScore(result.roundScore),
       opponentState,
       offTrackStreak: clampNumber(result.offTrackStreak, 0, 10),
-      review: normalizeReview(result.review, input, persuasionScore)
+      review: normalizeReview(result.review, input, persuasionScore),
+      debug: buildSettingsDebug(input)
     };
   }
 
   return {
     source: "ai",
+    model: getModelName(),
+    difficulty: input.difficulty,
+    toneStrength: input.toneStrength,
     gameState,
     assistantMessage: requiredText(result.assistantMessage, "assistantMessage"),
     round: clampNumber(result.round || input.round + 1, 1, input.maxRounds),
@@ -347,7 +390,8 @@ function normalizeAiTrainingGameResult(result, input) {
     roundScore: normalizeRoundScore(result.roundScore),
     opponentState,
     offTrackStreak: clampNumber(result.offTrackStreak, 0, 10),
-    review: null
+    review: null,
+    debug: buildSettingsDebug(input)
   };
 }
 
@@ -468,6 +512,9 @@ function buildContextualOpponentMessage(input, state) {
   const isMoney = /朋友|借钱|还钱|转账/.test(scene);
 
   if (!lastUser) return "";
+  if (input.difficulty === "hell" && state === "strong") {
+    return `你现在说得挺像回事，但还是没回答你自己有没有责任。${hook ? `你刚才抓着“${hook}”不放，` : ""}是不是只要不按你的来就都算我错？`;
+  }
   if (state === "nearly_convinced" || state === "defensive") {
     if (isWork) return `行，你说的时间线我听到了，但你也不能把流程里所有漏洞都算我一个人的吧？${hook ? `你刚才说“${hook}”，这个我可以补。` : ""}`;
     if (isRelationship) return `我承认这次让你不舒服了，但你别把它上升成我完全不尊重你。${hook ? `你说“${hook}”，这点我会想。` : ""}`;
@@ -521,6 +568,30 @@ function opponentPoolsForDifficulty(difficulty) {
         "你说的这部分我认，确实应该提前讲清楚。"
       ],
       convinced: ["行，这次是我没处理好。以后我会提前说清楚，不让你一直等。"]
+    };
+  }
+  if (difficulty === "hell") {
+    return {
+      strong: [
+        "你现在是在把自己包装成受害者吧？事情哪有你说得那么简单。",
+        "你一直强调这个点，不就是想让我认全责吗？那你的问题呢？",
+        "你说得挺硬，但听起来还是在借题发挥。你敢不敢先说你自己哪里没问题？"
+      ],
+      wavering: [
+        "行，就算我有问题，你也别想把责任全推给我。",
+        "我可以回应一部分，但你这种说法本身也很会带节奏。",
+        "你别拿主线压我，我也有我的理由。"
+      ],
+      defensive: [
+        "我承认这次处理得不好，但你别继续把我说成故意的。",
+        "这件事我可以补，但你也要承认你刚才说话很冲。",
+        "行，这个具体问题我回应，但别再上升到我这个人。"
+      ],
+      nearly_convinced: [
+        "好，这个点我确实没法绕，是我没处理好。",
+        "你说的具体要求我听到了，这部分我认。"
+      ],
+      convinced: ["行，这次是我没处理好。我会按你说的给出明确做法。"]
     };
   }
   return {
@@ -632,9 +703,117 @@ function sharesMeaning(reply, opponent) {
 
 function normalizeDifficulty(value) {
   const text = textOf(value);
-  if (/黄金|王者|hard|困难|高/.test(text)) return "hard";
-  if (/青铜|easy|简单|低/.test(text)) return "easy";
+  if (/地狱|王者|hell|阴阳大师/.test(text)) return "hell";
+  if (/黄金|hard|困难|强势|高/.test(text)) return "hard";
+  if (/青铜|easy|简单|温和|低/.test(text)) return "easy";
   return "medium";
+}
+
+function normalizeToneStrength(value) {
+  const text = textOf(value);
+  if (/低|soft|轻/.test(text)) return "低";
+  if (/高|strong|锋利|攻击/.test(text)) return "高";
+  return "中";
+}
+
+function normalizeSessionControl(value = {}) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  return {
+    replyLength: ["短", "中", "长"].includes(source.replyLength) ? source.replyLength : "中",
+    remindMainline: source.remindMainline === "关闭" ? "关闭" : "开启",
+    allowEscalation: source.allowEscalation === "禁止" ? "禁止" : "允许"
+  };
+}
+
+function normalizeMainline(value, userMainline = "") {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  return {
+    fact: textOf(source.fact) || userMainline,
+    impact: textOf(source.impact),
+    request: textOf(source.request) || userMainline,
+    boundary: textOf(source.boundary)
+  };
+}
+
+function toneStrengthInstruction(value) {
+  if (value === "低") return "低：礼貌克制，攻击性低，少阴阳，句子偏短，重点是坚定但不刺人。";
+  if (value === "高") return "高：更锋利、有压迫感，允许轻微讽刺和拆台，但不能辱骂、人身攻击或威胁；句子短促有冲击力。";
+  return "中：直接、有边界，礼貌和锋利平衡，句子长度中等，不绕弯。";
+}
+
+function difficultyInstruction(value) {
+  if (value === "easy") return "温和：AI 对手基本讲道理，只轻微辩解，不持续回避，不阴阳施压。";
+  if (value === "hard") return "强势：AI 对手明显嘴硬，会回避责任、反问、攻击玩家态度，并持续施压。";
+  if (value === "hell") return "地狱：AI 对手高压、嘴硬、会偷换概念、阴阳怪气、要求玩家自证，并尝试把主线带到玩家情绪或资格上。";
+  return "正常：AI 对手会辩解和轻度转移，但在玩家抓住主线后会逐渐松动。";
+}
+
+function trainingGoalInstruction(goals = []) {
+  const list = goals.length ? goals : ["抓住核心问题"];
+  return list
+    .map((goal) => {
+      if (goal === "不被嘲讽带偏") return "- 不被嘲讽带偏：对手要尝试嘲讽/贴标签；评分重点看用户是否不自证、不追着情绪吵。";
+      if (goal === "抓住核心问题") return "- 抓住核心问题：评分重点看用户是否回到事实、责任、影响、要求。";
+      if (goal === "不情绪失控") return "- 不情绪失控：对手可刺激用户；评分重点看用户是否避免辱骂、威胁和无效发泄。";
+      if (goal === "练习反击阴阳怪气") return "- 练习反击阴阳怪气：对手要使用暗讽；评分重点看用户是否点破话术并要求明说。";
+      if (goal === "坚持提出明确要求") return "- 坚持提出明确要求：评分重点看用户是否给出可执行要求、时间或具体动作。";
+      return `- ${goal}：评分和对手行为都要围绕这个目标。`;
+    })
+    .join("\n");
+}
+
+function sessionControlInstruction(control = {}) {
+  const lengthText =
+    control.replyLength === "短" ? "assistantMessage 1 句，尽量 20-35 个中文字符。" :
+    control.replyLength === "长" ? "assistantMessage 2-3 句，允许 60-100 个中文字符。" :
+    "assistantMessage 1-2 句，约 35-70 个中文字符。";
+  return [
+    `- 每轮回复长度：${control.replyLength}。${lengthText}`,
+    `- 是否提醒回到主线：${control.remindMainline}。`,
+    `- 是否允许升级语气：${control.allowEscalation}。`
+  ].join("\n");
+}
+
+function buildSettingsDebug(input) {
+  return {
+    receivedSettings: {
+      toneStrength: input.toneStrength,
+      difficulty: input.difficulty,
+      trainingGoals: input.trainingGoals,
+      contextSummary: input.contextSummary,
+      userMainline: input.userMainline,
+      sessionControl: input.sessionControl
+    },
+    promptSummary: buildPromptSummary(input)
+  };
+}
+
+function buildPromptSummary(input) {
+  return {
+    scene: input.scene,
+    contextSummary: input.contextSummary || "无额外前情。",
+    userMainline: input.userMainline || input.mainline?.request || input.goal,
+    trainingGoals: input.trainingGoals,
+    difficulty: {
+      value: input.difficulty,
+      instruction: difficultyInstruction(input.difficulty)
+    },
+    toneStrength: {
+      value: input.toneStrength,
+      instruction: toneStrengthInstruction(input.toneStrength)
+    },
+    sessionControl: input.sessionControl,
+    mainline: input.mainline,
+    scoringFocus: trainingGoalInstruction(input.trainingGoals)
+  };
+}
+
+function sharesMainline(reply, mainline) {
+  if (!reply || !mainline) return false;
+  const tokens = Array.from(new Set(String(mainline).match(/[\u4e00-\u9fa5]{2,}/g) || []))
+    .filter((token) => !/角色|对方|自己|这个|问题|事情|明确/.test(token))
+    .slice(0, 8);
+  return tokens.some((token) => reply.includes(token));
 }
 
 function stableIndex(text, length) {
@@ -688,7 +867,11 @@ function normalizeGameConfig(config = {}, input = {}) {
     playerRoleKey,
     aiRoleKey,
     trainingGoals,
-    difficulty: textOf(config.difficulty) || textOf(input.difficulty) || "normal"
+    difficulty: textOf(config.difficulty) || textOf(input.difficulty) || "normal",
+    toneStrength: normalizeToneStrength(config.toneStrength || input.toneStrength),
+    contextSummary: textOf(config.contextSummary) || textOf(input.contextSummary),
+    userMainline: textOf(config.userMainline) || textOf(input.userMainline),
+    sessionControl: normalizeSessionControl(config.sessionControl || input.sessionControl)
   };
 }
 

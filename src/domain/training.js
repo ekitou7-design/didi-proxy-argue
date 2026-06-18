@@ -30,7 +30,11 @@ export function normalizeTrainingGameConfig(config = {}) {
     playerRoleKey,
     aiRoleKey: oppositeRoleKey(playerRoleKey),
     trainingGoals: trainingGoals.length ? trainingGoals : ["抓住核心问题"],
-    difficulty: normalizeConfigDifficulty(config.difficulty)
+    difficulty: normalizeConfigDifficulty(config.difficulty),
+    toneStrength: normalizeToneStrength(config.toneStrength),
+    contextSummary: String(config.contextSummary || "").trim(),
+    userMainline: String(config.userMainline || "").trim(),
+    sessionControl: normalizeSessionControl(config.sessionControl)
   };
 }
 
@@ -66,6 +70,22 @@ export function normalizeConfigDifficulty(value) {
   return "normal";
 }
 
+export function normalizeToneStrength(value) {
+  if (["低", "中", "高"].includes(value)) return value;
+  if (/低|soft|轻/i.test(String(value || ""))) return "低";
+  if (/高|strong|锋利|攻击/i.test(String(value || ""))) return "高";
+  return "中";
+}
+
+export function normalizeSessionControl(value = {}) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  return {
+    replyLength: ["短", "中", "长"].includes(source.replyLength) ? source.replyLength : "中",
+    remindMainline: source.remindMainline === "关闭" ? "关闭" : "开启",
+    allowEscalation: source.allowEscalation === "禁止" ? "禁止" : "允许"
+  };
+}
+
 export function difficultyLabelForConfig(value) {
   return trainingDifficultyOptions.find((item) => item.value === normalizeConfigDifficulty(value))?.label || "正常";
 }
@@ -86,7 +106,11 @@ export function scenarioToGameConfig(scenario = {}, previousConfig = {}) {
     roleB: scenario.roleB || inferred.roleB,
     playerRoleKey: scenario.playerRoleKey === "B" ? "B" : previousConfig.playerRoleKey || "A",
     trainingGoals: goals?.length ? goals : ["抓住核心问题"],
-    difficulty
+    difficulty,
+    toneStrength: previousConfig.toneStrength,
+    contextSummary: previousConfig.contextSummary,
+    userMainline: previousConfig.userMainline,
+    sessionControl: previousConfig.sessionControl
   });
 }
 

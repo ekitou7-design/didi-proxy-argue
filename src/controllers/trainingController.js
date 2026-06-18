@@ -65,6 +65,10 @@ export function updateTrainingSetup(app, parts, value, render = true) {
     playerSide: gameConfig.playerRoleKey,
     aiSide: gameConfig.aiRoleKey,
     goal: formatTrainingGoals(gameConfig.trainingGoals),
+    toneStrength: gameConfig.toneStrength,
+    contextSummary: gameConfig.contextSummary,
+    userMainline: gameConfig.userMainline,
+    sessionControl: gameConfig.sessionControl,
     difficulty: difficultyLabelForConfig(gameConfig.difficulty),
     aiDifficulty: difficultyLabelForConfig(gameConfig.difficulty),
     generatedScenario: null,
@@ -100,6 +104,17 @@ export function toggleTrainingGoal(app, goal) {
 export async function generateRandomTrainingScenario(app) {
   const training = app.state.training;
   if (training.scenarioStatus === "loading") return;
+  const config = getGameConfig(training);
+  const payload = {
+    gameConfig: config,
+    customScene: config.scene,
+    userGoal: config.userMainline || formatTrainingGoals(config.trainingGoals),
+    aiDifficulty: difficultyLabelForConfig(config.difficulty),
+    toneStrength: config.toneStrength,
+    contextSummary: config.contextSummary,
+    userMainline: config.userMainline,
+    sessionControl: config.sessionControl
+  };
 
   app.setState({
     training: {
@@ -110,7 +125,8 @@ export async function generateRandomTrainingScenario(app) {
   });
 
   try {
-    const result = await requestRandomTrainingScenario();
+    console.log("[training/scenario/random] request payload", payload);
+    const result = await requestRandomTrainingScenario(payload);
     if (result.source === "fallback") throw new Error("AI 调用失败：后端返回了 fallback 场景");
     const scenario = result.scenario;
     if (!scenario?.openingMessage) throw new Error("场景生成结果为空");
@@ -135,9 +151,13 @@ export async function generatePresetTrainingScenario(app) {
     ...(training.randomScenarioForm || {}),
     gameConfig: config,
     customScene: config.scene,
-    userGoal: formatTrainingGoals(config.trainingGoals),
+    userGoal: config.userMainline || formatTrainingGoals(config.trainingGoals),
     debateTopic: config.scene,
-    aiDifficulty: difficultyLabelForConfig(config.difficulty)
+    aiDifficulty: difficultyLabelForConfig(config.difficulty),
+    toneStrength: config.toneStrength,
+    contextSummary: config.contextSummary,
+    userMainline: config.userMainline,
+    sessionControl: config.sessionControl
   };
   const requestId = `preset_${Date.now()}`;
   const draftScenario = buildPresetScenarioDraft(request);
@@ -145,6 +165,7 @@ export async function generatePresetTrainingScenario(app) {
   applyGeneratedTrainingScenario(app, draftScenario, "已按本局配置生成训练草稿，正在用 API 精修。精修完成后仍可继续修改。", "loading", requestId);
 
   try {
+    console.log("[training/scenario/preset] request payload", request);
     const result = await requestPresetTrainingScenario(request);
     if (result.source === "fallback") throw new Error("AI 调用失败：后端返回了 fallback 场景");
     const scenario = result.scenario;
@@ -181,6 +202,10 @@ export function applyGeneratedTrainingScenario(app, scenario, scenarioMessage, s
       aiDifficulty: difficultyLabelForConfig(gameConfig.difficulty),
       difficulty: difficultyLabelForConfig(gameConfig.difficulty),
       goal: formatTrainingGoals(gameConfig.trainingGoals),
+      toneStrength: gameConfig.toneStrength,
+      contextSummary: gameConfig.contextSummary,
+      userMainline: gameConfig.userMainline,
+      sessionControl: gameConfig.sessionControl,
       maxRounds: maxRoundsForDifficulty(gameConfig.difficulty),
       opponent: scenario.openingMessage,
       generatedScenario: scenario,
@@ -240,6 +265,10 @@ export function startTrainingGame(app) {
       aiDifficulty: difficultyLabelForConfig(config.difficulty),
       difficulty: difficultyLabelForConfig(config.difficulty),
       goal: formatTrainingGoals(config.trainingGoals),
+      toneStrength: config.toneStrength,
+      contextSummary: config.contextSummary,
+      userMainline: config.userMainline,
+      sessionControl: config.sessionControl,
       generatedScenario: scenario,
       opponent,
       input: "",
@@ -398,6 +427,10 @@ export async function submitTrainingGame(app, { userReply = "", forceEnd = false
     aiDifficulty: difficultyLabelForConfig(config.difficulty),
     difficulty: config.difficulty,
     goal: formatTrainingGoals(config.trainingGoals),
+    toneStrength: config.toneStrength,
+    contextSummary: config.contextSummary,
+    userMainline: config.userMainline,
+    sessionControl: config.sessionControl,
     round: training.round,
     maxRounds: training.maxRounds || 5,
     persuasionScore: training.persuasionScore || 0,
@@ -407,6 +440,8 @@ export async function submitTrainingGame(app, { userReply = "", forceEnd = false
     messages
   };
 
+  console.log("[training/reply] request payload", payload);
+
   app.setState({
     training: {
       ...training,
@@ -414,13 +449,38 @@ export async function submitTrainingGame(app, { userReply = "", forceEnd = false
       isSubmitting: true,
       generationRequestId: requestId,
       scenarioMessage: forceEnd ? "正在结算本轮..." : "正在判断本轮说服度...",
-      messages
+      messages,
+      devDebug: {
+        ...(training.devDebug || {}),
+        lastReplyRequestBody: payload,
+        lastReplyResponseDebug: null,
+        lastAiResponseMeta: null
+      }
     }
   });
 
   try {
     const result = await submitTrainingReply(payload);
     if (app.state.training.generationRequestId !== requestId) return;
+    const responseDebug = result.debug || null;
+    const responseMeta = {
+      source: result.source || "",
+      model: result.model || responseDebug?.model || "",
+      difficulty: result.difficulty || responseDebug?.receivedSettings?.difficulty || config.difficulty,
+      toneStrength: result.toneStrength || responseDebug?.receivedSettings?.toneStrength || config.toneStrength
+    };
+    if (result.source === "fallback") {
+      app.setState({
+        training: {
+          ...app.state.training,
+          devDebug: {
+            ...(app.state.training.devDebug || {}),
+            lastReplyResponseDebug: responseDebug,
+            lastAiResponseMeta: responseMeta
+          }
+        }
+      });
+    }
     if (result.source === "fallback") throw new Error("AI 调用失败：后端返回了 fallback 训练回复");
     const assistantMessage = result.assistantMessage || training.opponent || "";
     const nextMessages = assistantMessage ? [...messages, { role: "assistant", content: assistantMessage }] : messages;
@@ -456,7 +516,12 @@ export async function submitTrainingGame(app, { userReply = "", forceEnd = false
         messages: nextMessages,
         feedbacks: feedback ? [...training.feedbacks, feedback] : training.feedbacks,
         review: result.review || null,
-        result: result.review?.result || ""
+        result: result.review?.result || "",
+        devDebug: {
+          ...(app.state.training.devDebug || {}),
+          lastReplyResponseDebug: responseDebug,
+          lastAiResponseMeta: responseMeta
+        }
       }
     });
   } catch (error) {

@@ -2036,29 +2036,54 @@ textarea:focus {
 
 .training-role-editor {
   display: grid;
-  gap: 8px;
-  padding: 10px;
+  gap: 10px;
+  padding: 12px;
   background: var(--paper);
   border: 2px solid var(--ink);
-  border-radius: 16px;
+  border-radius: 8px;
+  box-shadow: 3px 3px 0 var(--ink);
 }
 
-.training-role-editor h4 {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.2;
+.training-role-card-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
 }
 
-.training-role-editor .training-inline-field input,
-.training-role-editor .training-inline-field textarea {
-  min-height: 40px;
+.training-role-card-head span {
+  padding: 5px 7px;
+  border: 2px solid var(--ink);
+  background: var(--yellow);
+  font-size: 12px;
+  font-weight: 1000;
+}
+
+.training-role-card-head input {
+  min-height: 38px;
+  font-size: 16px;
+  font-weight: 1000;
   border-width: 2px;
-  border-radius: 12px;
+  border-radius: 8px;
+  background: white;
 }
 
-.training-role-editor .training-inline-field textarea {
+.training-role-card-field {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+
+.training-role-card-field b {
+  font-size: 12px;
+}
+
+.training-role-card-field textarea {
   min-height: 58px;
   max-height: 98px;
+  border-width: 2px;
+  border-radius: 8px;
+  background: white;
 }
 
 .training-side-card {
@@ -3515,6 +3540,108 @@ textarea:focus {
   box-shadow: 3px 3px 0 var(--ink);
 }
 
+.training-advanced-settings {
+  border: 1px solid rgba(30, 26, 23, 0.18);
+  background: rgba(255, 255, 255, 0.62);
+  padding: 10px 12px;
+}
+
+.training-main-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.training-advanced-settings summary {
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.training-advanced-settings-body {
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.training-dev-debug-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.training-dev-debug-head h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.training-dev-debug-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.training-dev-debug-meta span {
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  padding: 4px 6px;
+}
+
+.training-dev-debug-block {
+  border: 1px solid rgba(30, 26, 23, 0.2);
+  background: white;
+  padding: 8px;
+}
+
+.training-dev-debug-block summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.training-dev-debug-block pre {
+  max-height: 260px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.training-dev-fab {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 40;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  border: 2px solid var(--ink);
+  background: var(--yellow);
+  color: var(--ink);
+  font-weight: 900;
+  box-shadow: 3px 3px 0 var(--ink);
+  cursor: pointer;
+}
+
+.training-dev-debug-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 45;
+  width: min(520px, 100vw);
+  overflow: auto;
+  border-left: 2px solid var(--ink);
+  background: #fffdf5;
+  padding: 16px;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  font-size: 12px;
+  box-shadow: -5px 0 0 rgba(30, 26, 23, 0.18);
+}
+
 @media (max-width: 440px) {
   .app-shell {
     padding: 0;
@@ -3530,5 +3657,9 @@ textarea:focus {
 
   .page {
     padding: 16px;
+  }
+
+  .training-main-actions {
+    grid-template-columns: 1fr;
   }
 }

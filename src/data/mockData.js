@@ -83,8 +83,8 @@ export const initialProxyPersonaState = {
   selectedPersonaId: "",
   replyForm: {
     opponentMessage: "你怎么又开始了？这点小事也要上纲上线？",
-    background: "昨天约好一起吃饭，他临时说要和朋友出去。",
-    goal: "反击对方逻辑",
+    background: "",
+    goal: "",
     mode: "像我本人",
     strength: "中"
   },
@@ -161,7 +161,15 @@ export const initialTrainingSession = {
     playerRoleKey: "A",
     aiRoleKey: "B",
     trainingGoals: ["不被嘲讽带偏", "抓住核心问题"],
-    difficulty: "normal"
+    difficulty: "normal",
+    toneStrength: "中",
+    contextSummary: "角色B连续几次没有倒垃圾，角色A提醒后，角色B把问题说成角色A小题大做。",
+    userMainline: "让室友承认公共规则需要一起执行，并给出之后怎么轮流倒垃圾的明确做法。",
+    sessionControl: {
+      replyLength: "中",
+      remindMainline: "开启",
+      allowEscalation: "允许"
+    }
   },
   maxRounds: 5,
   persuasionScore: 0,

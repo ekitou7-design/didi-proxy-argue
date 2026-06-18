@@ -95,10 +95,10 @@ export function normalizeScenarioInput(input = {}) {
   const gameConfig = normalizeGameConfig(config, input);
   return {
     category: normalizeOption(input.category, categories),
-    difficulty: normalizeOption(input.difficulty || config.difficulty, difficulties),
+    difficulty: normalizeScenarioDifficulty(input.difficulty || config.difficulty),
     opponentType: normalizeOption(input.opponentType, opponentTypes),
-    customScene: textOf(input.customScene) || textOf(config.scene) || textOf(config.topic),
-    userGoal: gameConfig.trainingGoals.length ? gameConfig.trainingGoals.join("、") : textOf(input.userGoal),
+    customScene: textOf(input.contextSummary) || textOf(config.contextSummary) || textOf(input.customScene) || textOf(config.scene) || textOf(config.topic),
+    userGoal: textOf(input.userMainline) || textOf(config.userMainline) || textOf(input.userGoal) || gameConfig.trainingGoals.join("、"),
     gameConfig,
     scene: gameConfig.scene,
     roleA: gameConfig.roleA,
@@ -107,7 +107,10 @@ export function normalizeScenarioInput(input = {}) {
     aiRoleKey: gameConfig.aiRoleKey,
     playerRole: roleFromConfig(gameConfig, gameConfig.playerRoleKey),
     aiRole: roleFromConfig(gameConfig, gameConfig.aiRoleKey),
-    aiDifficulty: textOf(input.aiDifficulty)
+    aiDifficulty: textOf(input.aiDifficulty),
+    toneStrength: textOf(input.toneStrength) || textOf(config.toneStrength),
+    contextSummary: textOf(input.contextSummary) || textOf(config.contextSummary),
+    userMainline: textOf(input.userMainline) || textOf(config.userMainline)
   };
 }
 
@@ -364,6 +367,15 @@ function normalizeOption(value, allowed) {
   return allowed.includes(text) ? text : "随机";
 }
 
+function normalizeScenarioDifficulty(value) {
+  const text = textOf(value);
+  if (/easy|温和|青铜/i.test(text)) return "青铜";
+  if (/hard|强势|黄金/i.test(text)) return "黄金";
+  if (/hell|地狱|王者|阴阳大师/i.test(text)) return "王者";
+  if (/normal|正常|普通|白银/i.test(text)) return "白银";
+  return normalizeOption(text, difficulties);
+}
+
 function normalizeGameConfig(config = {}, input = {}) {
   const source = config && typeof config === "object" && !Array.isArray(config) ? config : {};
   const playerRoleKey = normalizeRoleKey(source.playerRoleKey || input.playerRoleKey || "A");
@@ -396,7 +408,10 @@ function normalizeGameConfig(config = {}, input = {}) {
     playerRoleKey,
     aiRoleKey: oppositeRoleKey(playerRoleKey),
     trainingGoals,
-    difficulty: textOf(source.difficulty) || textOf(input.difficulty) || "normal"
+    difficulty: textOf(source.difficulty) || textOf(input.difficulty) || "normal",
+    toneStrength: textOf(source.toneStrength) || textOf(input.toneStrength),
+    contextSummary: textOf(source.contextSummary) || textOf(input.contextSummary),
+    userMainline: textOf(source.userMainline) || textOf(input.userMainline)
   };
 }
 
