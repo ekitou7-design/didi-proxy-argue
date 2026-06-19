@@ -39,7 +39,7 @@ export const proxyStyleOptions = ["冷静拆台", "阴阳怪气", "高压控场"
 export const proxyReplyModes = ["像我本人", "说得更清楚", "攻击力加强"];
 export const proxyReplyStrengths = ["低", "中", "高"];
 export const difficultyOptions = ["热身", "普通", "嘴硬", "阴阳大师"];
-export const trainingGoalOptions = ["不被嘲讽带偏", "抓住核心问题", "不情绪失控", "练习反击阴阳怪气", "坚持提出明确要求"];
+export const trainingGoalOptions = ["抓住核心问题", "不被嘲讽带偏", "不情绪失控", "练习反击阴阳怪气", "坚持提出明确要求"];
 export const trainingDifficultyOptions = [
   { value: "easy", label: "温和" },
   { value: "normal", label: "正常" },
@@ -145,22 +145,22 @@ export const initialTrainingSession = {
   aiSide: "B",
   aiDifficulty: "正常争论",
   difficulty: "普通",
-  goal: "守住主线，不被角色B带偏",
+  goal: "抓住核心问题、不被嘲讽带偏",
   gameConfig: {
     scene: "宿舍里，角色B一直不倒垃圾。角色A提醒后，角色B还嘲讽角色A小题大做。",
     roleA: {
       name: "角色A",
-      description: "被室友不倒垃圾影响的人",
+      description: "有理方 / 提出要求的一方，被室友不倒垃圾影响的人",
       goal: "让室友承担责任，不要再嘲讽和转移话题"
     },
     roleB: {
       name: "室友",
-      description: "不想倒垃圾，还觉得角色A管太多",
-      goal: "为自己辩解，反驳角色A，说角色A小题大做"
+      description: "理亏方 / 辩解转移的一方，不想倒垃圾，还觉得角色A管太多",
+      goal: "嘴硬拖延，强调自己也有理由，尽量不承认核心问题"
     },
     playerRoleKey: "A",
     aiRoleKey: "B",
-    trainingGoals: ["不被嘲讽带偏", "抓住核心问题"],
+    trainingGoals: ["抓住核心问题", "不被嘲讽带偏"],
     difficulty: "normal",
     toneStrength: "中",
     contextSummary: "角色B连续几次没有倒垃圾，角色A提醒后，角色B把问题说成角色A小题大做。",

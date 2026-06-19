@@ -1,4 +1,5 @@
 import {
+  buildScenarioFromGameConfig,
   buildPresetScenarioDraft,
   difficultyLabelForConfig,
   formatTrainingGoals,
@@ -22,6 +23,7 @@ import { getMessageContent, normalizeMessage } from "../utils/messageModel.js";
 
 export function updateTrainingSetup(app, parts, value, render = true) {
   const training = app.state.training;
+  const isTrainingStoryInput = parts[0] === "training" && parts[1] === "gameConfig" && parts[2] === "contextSummary";
   const nextTraining =
     parts.length === 4
       ? {
@@ -47,7 +49,15 @@ export function updateTrainingSetup(app, parts, value, render = true) {
           [parts[1]]: value
         };
 
-  const rawConfig = nextTraining.gameConfig || {};
+  const rawConfig = {
+    ...(nextTraining.gameConfig || {}),
+    ...(isTrainingStoryInput
+      ? {
+          contextSummary: value,
+          scene: summarizeTrainingStory(value)
+        }
+      : {})
+  };
   const playerRoleKey = rawConfig.playerRoleKey === "B" ? "B" : "A";
   const gameConfig = normalizeTrainingGameConfig({
     ...rawConfig,
@@ -82,13 +92,20 @@ export function updateTrainingSetup(app, parts, value, render = true) {
     offTrackStreak: 0,
     round: 1,
     scenarioStatus: "idle",
-    scenarioMessage: "设置已修改，将按中间区域的本局配置开始训练。",
+    scenarioMessage: "设置已修改，将按中间区域的本局配置开始对练。",
     scenarioRequestId: "",
     generationRequestId: ""
   };
 
   if (render) app.setState({ training: updatedTraining });
   else app.state.training = updatedTraining;
+}
+
+function summarizeTrainingStory(value) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  const firstSentence = text.split(/[。！？!?]/).find(Boolean) || text;
+  return firstSentence.length > 80 ? `${firstSentence.slice(0, 80)}...` : firstSentence;
 }
 
 export function toggleTrainingGoal(app, goal) {
@@ -144,7 +161,7 @@ export async function generateRandomTrainingScenario(app) {
     const scenario = { ...(result.scenario || {}), source: result.source };
     if (!scenario?.openingMessage) throw new Error("场景生成结果为空");
 
-    applyGeneratedTrainingScenario(app, scenario, "真实 AI 已生成完整训练局，你可以修改场景、角色和目标，再开始训练。");
+    applyGeneratedTrainingScenario(app, scenario, "真实 AI 已生成完整训练局，你可以修改剧情、角色和目标，再开始对练。");
   } catch (error) {
     app.setState({
       training: {
@@ -164,13 +181,13 @@ function freeCreativeScenarioConfig(config) {
     userMainline: "",
     roleA: {
       name: "角色A",
-      description: "冲突中需要表达诉求、守住边界的一方",
+      description: "有理方 / 提出要求的一方",
       goal: formatTrainingGoals(config.trainingGoals)
     },
     roleB: {
       name: "角色B",
-      description: "冲突中会辩解、回避或反击的一方",
-      goal: "为自己的行为找理由，反驳角色A，并试图转移重点"
+      description: "理亏方 / 辩解转移的一方",
+      goal: "嘴硬、辩解、转移和拖延，尽量顶住有理方追问"
     }
   };
 }
@@ -188,9 +205,9 @@ export async function generatePresetTrainingScenario(app) {
     ...(training.randomScenarioForm || {}),
     scenarioMode: "expand",
     gameConfig: config,
-    customScene: config.scene,
+    customScene: config.contextSummary || config.scene,
     userGoal: config.userMainline || formatTrainingGoals(config.trainingGoals),
-    debateTopic: config.scene,
+    debateTopic: config.contextSummary || config.scene,
     aiDifficulty: difficultyLabelForConfig(config.difficulty),
     toneStrength: config.toneStrength,
     contextSummary: config.contextSummary,
@@ -210,7 +227,7 @@ export async function generatePresetTrainingScenario(app) {
     if (!scenario?.openingMessage) throw new Error("场景生成结果为空");
     if (app.state.training.scenarioRequestId !== requestId || app.state.training.gameState !== "idle") return;
 
-    applyGeneratedTrainingScenario(app, scenario, "真实 AI 已生成完整训练局，你可以修改场景、角色和目标，再开始训练。");
+    applyGeneratedTrainingScenario(app, scenario, "真实 AI 已生成完整训练局，你可以修改剧情、角色和目标，再开始对练。");
   } catch (error) {
     if (app.state.training.scenarioRequestId !== requestId || app.state.training.gameState !== "idle") return;
     app.setState({
@@ -225,6 +242,7 @@ export async function generatePresetTrainingScenario(app) {
 
 export function applyGeneratedTrainingScenario(app, scenario, scenarioMessage, scenarioStatus = "done", scenarioRequestId = "") {
   const gameConfig = scenarioToGameConfig(scenario, app.state.training.gameConfig);
+  const normalizedScenario = normalizeScenarioForCurrentRoles(scenario, gameConfig);
   app.setState({
     training: {
       ...app.state.training,
@@ -244,9 +262,9 @@ export function applyGeneratedTrainingScenario(app, scenario, scenarioMessage, s
       contextSummary: gameConfig.contextSummary,
       userMainline: gameConfig.userMainline,
       sessionControl: gameConfig.sessionControl,
-      maxRounds: maxRoundsForDifficulty(gameConfig.difficulty),
-      opponent: scenario.openingMessage,
-      generatedScenario: scenario,
+      maxRounds: maxRoundsForConfig(gameConfig),
+      opponent: normalizedScenario.openingMessage,
+      generatedScenario: normalizedScenario,
       messages: [],
       feedbacks: [],
       review: null,
@@ -265,14 +283,14 @@ export function applyGeneratedTrainingScenario(app, scenario, scenarioMessage, s
 
 export async function startTrainingGame(app) {
   const training = app.state.training;
-  let config = getGameConfig(training);
-  let playerRole = getPlayerRoleFromConfig(config);
-  let aiRole = getAiRoleFromConfig(config);
+  const config = getGameConfig(training);
+  const playerRole = getPlayerRoleFromConfig(config);
+  const aiRole = getAiRoleFromConfig(config);
   if (!config.scene.trim()) {
     app.setState({
       training: {
         ...training,
-        scenarioMessage: "请先填写本局场景。"
+        scenarioMessage: "请先填写本局剧情。"
       }
     });
     return;
@@ -287,45 +305,12 @@ export async function startTrainingGame(app) {
     return;
   }
 
-  let scenario = training.generatedScenario;
-  if (!scenario?.openingMessage) {
-    app.setState({
-      training: {
-        ...training,
-        scenarioStatus: "loading",
-        scenarioMessage: "正在调用 AI 生成开场白..."
-      }
-    });
-    try {
-      const result = await requestRandomTrainingScenario({
-        gameConfig: config,
-        customScene: config.scene,
-        userGoal: config.userMainline || formatTrainingGoals(config.trainingGoals),
-        aiDifficulty: difficultyLabelForConfig(config.difficulty),
-        toneStrength: config.toneStrength,
-        contextSummary: config.contextSummary,
-        userMainline: config.userMainline,
-        sessionControl: config.sessionControl,
-        creativitySeed: `start_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-      });
-      assertAiSource(result, "训练开场");
-      scenario = { ...(result.scenario || {}), source: result.source };
-      if (!scenario?.openingMessage) throw new Error("AI 训练场景返回不完整");
-      config = scenarioToGameConfig(scenario, config);
-      playerRole = getPlayerRoleFromConfig(config);
-      aiRole = getAiRoleFromConfig(config);
-    } catch (error) {
-      app.setState({
-        training: {
-          ...app.state.training,
-          scenarioStatus: "error",
-          scenarioMessage: `AI 生成失败，请检查 API key / 后端服务 / 模型配置：${error.message || "训练场景生成失败。"}`
-        }
-      });
-      return;
-    }
-  }
-
+  const currentConfigScenario = {
+    ...buildScenarioFromGameConfig(config),
+    source: "current_game_config",
+    openingMessageUsedFrom: "current_game_config"
+  };
+  const scenario = normalizeScenarioForCurrentRoles(currentConfigScenario, config);
   const opponent = scenario.openingMessage;
   app.setState({
     training: {
@@ -351,7 +336,7 @@ export async function startTrainingGame(app) {
       input: "",
       isSubmitting: false,
       round: 1,
-      maxRounds: maxRoundsForDifficulty(config.difficulty),
+      maxRounds: maxRoundsForConfig(config),
       persuasionScore: 0,
       persuasionDelta: 0,
       opponentState: "strong",
@@ -364,6 +349,110 @@ export async function startTrainingGame(app) {
       generationRequestId: ""
     }
   });
+}
+
+function maxRoundsForConfig(config) {
+  return config.playerRoleKey === "B" ? 5 : maxRoundsForDifficulty(config.difficulty);
+}
+
+export function normalizeScenarioForCurrentRoles(scenario = {}, config) {
+  const playerRole = getPlayerRoleFromConfig(config);
+  const aiRole = getAiRoleFromConfig(config);
+  const openingMessageInfo = openingMessageForAiRole(scenario, config, { playerRole, aiRole });
+  return {
+    ...scenario,
+    playerRoleKey: config.playerRoleKey,
+    aiRoleKey: config.aiRoleKey,
+    playerIdentity: playerRole.name,
+    aiIdentity: aiRole.name,
+    openingMessage: openingMessageInfo.message,
+    openingMessageSpeaker: config.aiRoleKey,
+    openingMessageSpeakerName: aiRole.name,
+    openingMessageUsedFrom: scenario.openingMessageUsedFrom || openingMessageInfo.usedFrom,
+    assistantMessageRoleKey: config.aiRoleKey,
+    assistantMessageRoleName: aiRole.name
+  };
+}
+
+function openingMessageForAiRole(scenario = {}, config, { playerRole, aiRole }) {
+  const text = String(scenario.openingMessage || "").trim();
+  const sourceSpeaker = normalizeOptionalRoleKey(scenario.openingMessageSpeaker);
+  if (sourceSpeaker && sourceSpeaker !== config.aiRoleKey) {
+    return {
+      message: fallbackOpeningForAiRole(config, { playerRole, aiRole, scenario }),
+      usedFrom: `regenerated_speaker_mismatch_${sourceSpeaker}_to_${config.aiRoleKey}`
+    };
+  }
+  if (config.aiRoleKey === "A") {
+    if (!text || looksLikeRoleBOpening(text)) {
+      return {
+        message: fallbackOpeningForAiRole(config, { playerRole, aiRole, scenario }),
+        usedFrom: text ? "regenerated_inferred_roleB_opening" : "generated_fallback_empty"
+      };
+    }
+    return { message: text, usedFrom: sourceSpeaker ? "scenario_verified_speaker" : "scenario_inferred_ai_role" };
+  }
+  if (!text || looksLikeRoleAOpening(text)) {
+    return {
+      message: fallbackOpeningForAiRole(config, { playerRole, aiRole, scenario }),
+      usedFrom: text ? "regenerated_inferred_roleA_opening" : "generated_fallback_empty"
+    };
+  }
+  return { message: text, usedFrom: sourceSpeaker ? "scenario_verified_speaker" : "scenario_inferred_ai_role" };
+}
+
+function fallbackOpeningForAiRole(config, { playerRole, aiRole, scenario = {} }) {
+  if (config.aiRoleKey === "A") return buildRoleAOpening(config, { playerRole, aiRole, scenario });
+  return buildRoleBOpening(config, { playerRole, aiRole });
+}
+
+function buildRoleAOpening(config, { playerRole, aiRole, scenario = {} }) {
+  const text = [
+    config.contextSummary,
+    config.scene,
+    scenario.scene,
+    scenario.background,
+    scenario.stanceJudgment?.aJustification,
+    scenario.stanceJudgment?.bFault,
+    scenario.mainline?.fact,
+    scenario.mainline?.request
+  ]
+    .filter(Boolean)
+    .join(" ");
+  if (/黑色|白色|颜色随机|外套|商品详情|退货|退款|运费|卖家|买家/.test(text)) {
+    return `${aiRole.name}先开口：我买的是黑色外套，你发来的是白色。商品详情没有清楚写明可以随便发色，现在请你处理退货、退款和运费。`;
+  }
+  if (/寄养|猫|跳蚤|抓伤|延期|寄养费|医疗费/.test(text)) {
+    return `${aiRole.name}先开口：先别扯别的。你延期不接、隐瞒情况造成的费用，现在要给一个明确处理方式。`;
+  }
+  const bFault = String(scenario.stanceJudgment?.bFault || scenario.mainline?.fact || config.userMainline || config.scene || "这件事").trim();
+  return `${aiRole.name}先开口：${playerRole.name}，别把责任往我身上推。${trimSentence(bFault, 42)}，你现在给个明确说法。`;
+}
+
+function buildRoleBOpening(config, { aiRole }) {
+  const goal = String(aiRole.goal || "").trim();
+  return goal ? `${aiRole.name}先开口：${goal}。` : "哎呀，不就一点小事吗，你别这么上纲上线。";
+}
+
+function looksLikeRoleBOpening(text) {
+  if (!text) return true;
+  return /不就|小事|上纲上线|不是故意|不能全怪我|你别|你太敏感|你想太多|都是我的问题|我也有|商品详情|颜色随机|你自己不看|没看清楚|怪我|不退|凭什么退|发货没问题|别找茬|找茬|我写了|详情里/.test(text);
+}
+
+function looksLikeRoleAOpening(text) {
+  if (!text) return true;
+  return /我买的是|你发的是|退款|退货|运费|你答应|你承诺|你没有|你没按|你延期|你隐瞒|你弄坏|你迟到|你不接|你已读不回|正面处理|给个说法/.test(text);
+}
+
+function normalizeOptionalRoleKey(value) {
+  if (value === "A" || value === "B") return value;
+  return "";
+}
+
+function trimSentence(value, maxLength) {
+  const text = String(value || "").replace(/\s+/g, "");
+  if (!text) return "这件事已经造成影响";
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
 }
 
 export function resetTrainingGame(app) {
@@ -496,6 +585,7 @@ export async function submitTrainingGame(app, { userReply = "", forceEnd = false
   const requestId = `training-reply-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const generatedScenario = training.generatedScenario;
   const config = getGameConfig(training);
+  const isVillainMode = config.playerRoleKey === "B";
   const userMessage = userReply ? { role: "user", content: userReply } : null;
   const messages = userMessage ? [...training.messages, userMessage] : training.messages;
   const payload = {
@@ -514,7 +604,8 @@ export async function submitTrainingGame(app, { userReply = "", forceEnd = false
     forceEnd,
     offTrackStreak: training.offTrackStreak || 0,
     mainline: generatedScenario?.mainline,
-    messages
+    messages,
+    openingMessageSpeaker: generatedScenario?.openingMessageSpeaker || config.aiRoleKey
   };
 
   console.log("[training/reply] request payload", payload);
@@ -525,7 +616,7 @@ export async function submitTrainingGame(app, { userReply = "", forceEnd = false
       input: userReply ? "" : training.input,
       isSubmitting: true,
       generationRequestId: requestId,
-      scenarioMessage: forceEnd ? "正在结算本轮..." : "正在判断本轮说服度...",
+      scenarioMessage: forceEnd ? "正在结算本轮..." : isVillainMode ? "正在判断本轮抗压结果..." : "正在判断本轮说服度...",
       messages,
       devDebug: {
         ...(training.devDebug || {}),

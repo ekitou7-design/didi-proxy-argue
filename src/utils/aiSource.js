@@ -13,12 +13,13 @@ export function assertAiSource(result, label = "AI 响应") {
 
 export function aiSourceText(source) {
   if (source === "ai") return "真实 AI";
+  if (source === "current_game_config") return "本局配置";
   if (source === "fallback") return "fallback/demo";
   return "来源异常";
 }
 
 export function AiSourceBadge(source, successLabel = "真实 AI") {
-  const type = source === "ai" ? "ai" : source === "fallback" ? "fallback" : "unknown";
+  const type = source === "ai" ? "ai" : source === "current_game_config" ? "local" : source === "fallback" ? "fallback" : "unknown";
   const label = source === "ai" ? successLabel : aiSourceText(source);
   return `<span class="ai-source-pill ${type}">${escapeHtml(label)}</span>`;
 }

@@ -726,6 +726,12 @@ textarea:focus {
   white-space: nowrap;
 }
 
+.ai-source-pill.local,
+.training-round-feedback .ai-source-pill.local {
+  background: var(--yellow);
+  color: var(--ink);
+}
+
 .ai-source-pill.fallback,
 .ai-source-pill.unknown,
 .training-round-feedback .ai-source-pill.fallback,
@@ -2114,6 +2120,23 @@ textarea:focus {
   border-width: 2px;
   border-radius: 8px;
   background: white;
+}
+
+.training-stance-judgment {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  background: var(--yellow);
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+}
+
+.training-stance-judgment p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 900;
 }
 
 .training-side-card {

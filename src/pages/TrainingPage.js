@@ -28,15 +28,15 @@ function TrainingSetupStatus(session, config) {
       <div class="training-setup-status">
         <div>
           <span class="persona-kicker">本局训练预览</span>
-          <h2>${escapeHtml(config.scene || "还没有本局场景")}</h2>
+          <h2>${escapeHtml(trainingStoryValue(config) || "还没有本局剧情")}</h2>
           <p>${escapeHtml(formatGoals(config.trainingGoals))} · ${escapeHtml(difficultyLabel(config.difficulty))}</p>
         </div>
         <div class="training-status-actions">
           <button class="secondary-button warm compact-action" data-action="generate-random-training-scenario" data-tour="training-generate" ${session.scenarioStatus === "loading" ? "disabled" : ""}>
-            ${session.scenarioStatus === "loading" ? "生成中..." : "AI随机生成一局"}
+            ${session.scenarioStatus === "loading" ? "生成中..." : "随机开一局"}
           </button>
-          <button class="secondary-button compact-action" data-action="generate-preset-training-scenario" ${session.scenarioStatus === "loading" ? "disabled" : ""}>基于当前设定扩写</button>
-          <button class="primary-button compact-action" data-action="start-training-game" data-tour="training-start" ${session.scenarioStatus === "loading" ? "disabled" : ""}>开始训练</button>
+          <button class="secondary-button compact-action" data-action="generate-preset-training-scenario" ${session.scenarioStatus === "loading" ? "disabled" : ""}>按我的设定生成</button>
+          <button class="primary-button compact-action" data-action="start-training-game" data-tour="training-start" ${session.scenarioStatus === "loading" ? "disabled" : ""}>开始对练</button>
         </div>
       </div>
       ${session.scenarioMessage ? `<p class="section-note compact-status-note">${escapeHtml(session.scenarioMessage)}</p>` : ""}
@@ -54,10 +54,12 @@ function TrainingStartSettings(session, config) {
         </div>
       </div>
 
-      <div class="training-setting-group">
-        <h3>前情提要</h3>
-        ${TrainingTextArea("冲突背景", "training.gameConfig.contextSummary", config.contextSummary, "补充这件事之前发生了什么、谁做了什么、为什么现在爆发。")}
-      </div>
+      ${TrainingTextArea(
+        "本局剧情",
+        "training.gameConfig.contextSummary",
+        trainingStoryValue(config),
+        "描述这局发生了什么、双方关系、冲突事件和当前局面。"
+      )}
 
       <div class="training-setting-group">
         <h3>我想守住的主线</h3>
@@ -65,49 +67,13 @@ function TrainingStartSettings(session, config) {
       </div>
 
       <div class="training-setting-group">
-        <h3>训练目标</h3>
-        <div class="training-choice-grid" data-tour="training-goals">
-          ${trainingGoalOptions
-            .map(
-              (goal) => `
-                <button class="chip tiny-chip ${config.trainingGoals.includes(goal) ? "active" : ""}" data-action="toggle-training-goal" data-goal="${escapeAttr(goal)}">
-                  ${escapeHtml(goal)}
-                </button>
-              `
-            )
-            .join("")}
-        </div>
-      </div>
-
-      <div class="training-setting-group">
-        <h3>难度</h3>
-        <div class="training-choice-grid difficulty-choice-grid">
-          ${trainingDifficultyOptions
-            .map(
-              (item) => `
-                <button
-                  class="chip tiny-chip ${config.difficulty === item.value ? "active" : ""}"
-                  data-chip-session="training.gameConfig"
-                  data-chip-field="difficulty"
-                  data-chip-value="${escapeAttr(item.value)}"
-                >
-                  ${escapeHtml(item.label)}
-                </button>
-              `
-            )
-            .join("")}
-        </div>
-      </div>
-
-      ${TrainingTextArea("本局场景", "training.gameConfig.scene", config.scene, "例如：宿舍里，角色B一直不倒垃圾。角色A提醒后，角色B还嘲讽角色A小题大做。")}
-
-      <div class="training-setting-group">
         <h3>本局角色</h3>
-        <p class="training-setting-note">角色 A / B 是冲突里的两方，不等于玩家；你会在下方选择本局练习视角。</p>
+        <p class="training-setting-note">角色A：有理方 / 提出要求的一方；角色B：理亏方 / 辩解转移的一方。A/B 是冲突里的两方，不等于玩家。</p>
         <div class="training-role-edit-grid">
-          ${RoleEditor("角色A", "roleA", config.roleA)}
-          ${RoleEditor("角色B", "roleB", config.roleB)}
+          ${RoleEditor(roleTitle("A"), "roleA", config.roleA)}
+          ${RoleEditor(roleTitle("B"), "roleB", config.roleB)}
         </div>
+        ${StanceJudgmentSummary(session)}
       </div>
 
       <div class="training-setting-group">
@@ -117,17 +83,18 @@ function TrainingStartSettings(session, config) {
           ${RoleChoice("B", config)}
         </div>
         <p class="training-setting-note">你选择其中一个角色练习发言，AI 对手自动扮演另一方。</p>
+        ${config.playerRoleKey === "B" ? `<p class="training-setting-note">反派抗压模式：AI 会扮演有理方，试图说服你承认问题、让步或停止转移话题。</p>` : ""}
       </div>
 
       ${AdvancedTrainingSettings(session, config)}
 
       <div class="training-main-actions">
-        <button class="primary-button compact-full-button" data-action="start-training-game" data-tour="training-start" ${session.scenarioStatus === "loading" ? "disabled" : ""}>开始训练</button>
+        <button class="primary-button compact-full-button" data-action="start-training-game" data-tour="training-start" ${session.scenarioStatus === "loading" ? "disabled" : ""}>开始对练</button>
         <button class="secondary-button warm compact-full-button" data-action="generate-random-training-scenario" data-tour="training-generate" ${session.scenarioStatus === "loading" ? "disabled" : ""}>
-          ${session.scenarioStatus === "loading" ? "生成中..." : "AI 随机生成一局"}
+          ${session.scenarioStatus === "loading" ? "生成中..." : "随机开一局"}
         </button>
         <button class="secondary-button compact-full-button" data-action="generate-preset-training-scenario" ${session.scenarioStatus === "loading" ? "disabled" : ""}>
-          基于当前设定扩写
+          按我的设定生成
         </button>
       </div>
       ${session.scenarioMessage ? `<p class="section-note compact-status-note">${escapeHtml(session.scenarioMessage)}</p>` : ""}
@@ -140,6 +107,41 @@ function AdvancedTrainingSettings(session, config) {
     <details class="training-advanced-settings">
       <summary>更多训练偏好</summary>
       <div class="training-advanced-settings-body">
+        <div class="training-setting-group">
+          <h3>训练目标</h3>
+          <div class="training-choice-grid" data-tour="training-goals">
+            ${trainingGoalOptions
+              .map(
+                (goal) => `
+                  <button class="chip tiny-chip ${config.trainingGoals.includes(goal) ? "active" : ""}" data-action="toggle-training-goal" data-goal="${escapeAttr(goal)}">
+                    ${escapeHtml(goal)}
+                  </button>
+                `
+              )
+              .join("")}
+          </div>
+        </div>
+
+        <div class="training-setting-group">
+          <h3>难度</h3>
+          <div class="training-choice-grid difficulty-choice-grid">
+            ${trainingDifficultyOptions
+              .map(
+                (item) => `
+                  <button
+                    class="chip tiny-chip ${config.difficulty === item.value ? "active" : ""}"
+                    data-chip-session="training.gameConfig"
+                    data-chip-field="difficulty"
+                    data-chip-value="${escapeAttr(item.value)}"
+                  >
+                    ${escapeHtml(item.label)}
+                  </button>
+                `
+              )
+              .join("")}
+          </div>
+        </div>
+
         <div class="training-setting-group">
           <h3>语气强度</h3>
           <div class="training-choice-grid">
@@ -194,10 +196,43 @@ function RoleEditor(title, key, role) {
   `;
 }
 
+function trainingStoryValue(config) {
+  return config.contextSummary || config.scene || "";
+}
+
+function getStanceJudgment(session = {}) {
+  const stance = session.generatedScenario?.stanceJudgment;
+  return stance && typeof stance === "object" && !Array.isArray(stance) ? stance : null;
+}
+
+function StanceJudgmentSummary(session = {}) {
+  const stance = getStanceJudgment(session);
+  if (!stance?.aJustification && !stance?.bFault) return "";
+  return `
+    <div class="training-stance-judgment">
+      ${stance.aJustification ? `<p><b>A 方为什么有理：</b>${escapeHtml(stance.aJustification)}</p>` : ""}
+      ${stance.bFault ? `<p><b>B 方哪里理亏：</b>${escapeHtml(stance.bFault)}</p>` : ""}
+    </div>
+  `;
+}
+
+function StanceJudgmentPreview(session = {}) {
+  const stance = getStanceJudgment(session);
+  if (!stance?.aJustification && !stance?.bFault) return "";
+  return `
+    ${stance.aJustification ? `<p><b>A 方为什么有理：</b>${escapeHtml(stance.aJustification)}</p>` : ""}
+    ${stance.bFault ? `<p><b>B 方哪里理亏：</b>${escapeHtml(stance.bFault)}</p>` : ""}
+  `;
+}
+
 function RoleChoice(key, config) {
   const role = getRole(config, key);
   const aiKey = oppositeRoleKey(key);
   const aiRole = getRole(config, aiKey);
+  const sideLabel = roleSideLabel(key);
+  const aiSideLabel = roleSideLabel(aiKey);
+  const choiceTitle = key === "A" ? "我当有理方" : "我当理亏方";
+  const choiceDescription = key === "A" ? "守住重点，逼对方回应核心问题。" : "嘴硬到底，顶住 AI 的追问和劝说。";
   return `
     <button
       class="training-side-option ${config.playerRoleKey === key ? "active" : ""}"
@@ -205,9 +240,10 @@ function RoleChoice(key, config) {
       data-chip-field="playerRoleKey"
       data-chip-value="${key}"
     >
-      <strong>练习角色${key}：${escapeHtml(role.name || `角色${key}`)}</strong>
+      <strong>${escapeHtml(choiceTitle)} · 角色${key}：${escapeHtml(role.name || `角色${key}`)}</strong>
+      <span>${escapeHtml(choiceDescription)}</span>
       <span>${escapeHtml(role.description || "待填写角色描述")}</span>
-      <small>AI 对手将扮演角色${aiKey}：${escapeHtml(aiRole.name || `角色${aiKey}`)}</small>
+      <small>AI 将扮演${escapeHtml(aiSideLabel)} · 角色${aiKey}：${escapeHtml(aiRole.name || `角色${aiKey}`)}</small>
     </button>
   `;
 }
@@ -228,10 +264,11 @@ export function TrainingPreviewContent(session, config = getGameConfig(session),
   return `
     <div class="training-preview-content">
       <h2>本局预览</h2>
-      <p><b>场景：</b>${escapeHtml(config.scene || "未填写")}</p>
-      <p><b>你的练习视角：</b>角色${escapeHtml(config.playerRoleKey)} · ${escapeHtml(playerRole.name || "未选择")}</p>
+      <p><b>剧情：</b>${escapeHtml(trainingStoryValue(config) || "未填写")}</p>
+      ${StanceJudgmentPreview(session)}
+      <p><b>你的练习视角：</b>${escapeHtml(roleTitle(config.playerRoleKey))} · ${escapeHtml(playerRole.name || "未选择")}</p>
       <p><b>练习视角目标：</b>${escapeHtml(playerRole.goal || "未填写")}</p>
-      <p><b>AI 对手：</b>角色${escapeHtml(config.aiRoleKey)} · ${escapeHtml(aiRole.name || "未选择")}</p>
+      <p><b>AI 对手：</b>${escapeHtml(roleTitle(config.aiRoleKey))} · ${escapeHtml(aiRole.name || "未选择")}</p>
       <p><b>AI 对手目标：</b>${escapeHtml(aiRole.goal || "未填写")}</p>
       <p${goalTourAttr}><b>训练目标：</b>${escapeHtml(formatGoals(config.trainingGoals))}</p>
       <p><b>难度：</b>${escapeHtml(difficultyLabel(config.difficulty))}</p>
@@ -260,6 +297,7 @@ function TrainingGameHud(session) {
   const playerRole = getPlayerRole(config);
   const aiRole = getAiRole(config);
   const score = clampScore(session.persuasionScore);
+  const isVillainMode = config.playerRoleKey === "B";
   return `
     <section class="realtime-settings-card training-settings-card training-hud">
       <div class="training-hud-head">
@@ -276,7 +314,7 @@ function TrainingGameHud(session) {
       </div>
       <div class="training-progress-meta">
         <span>第 ${escapeHtml(session.round || 1)} / ${escapeHtml(session.maxRounds || 5)} 回合</span>
-        <b>AI 对手松动值：${score}%</b>
+        <b>${isVillainMode ? "AI 说服进度" : "AI 对手松动值"}：${score}%</b>
       </div>
       <div class="training-persuasion-track"><i style="width:${score}%"></i></div>
       ${session.scenarioMessage ? `<p class="section-note compact-status-note">${escapeHtml(session.scenarioMessage)}</p>` : ""}
@@ -293,7 +331,7 @@ function TrainingChatPanel(session) {
         ${
           messages.length
             ? messages.map((message, index) => MessageBubble(message, session.feedbacks, index, config)).join("")
-            : EmptyConversationState("当前还没有对话。", "开始训练或发送回复后，这里只显示本轮真实训练对话。")
+            : EmptyConversationState("当前还没有对话。", "开始对练或发送回复后，这里只显示本轮真实训练对话。")
         }
       </div>
     </section>
@@ -319,25 +357,39 @@ function MessageBubble(message, feedbacks, index, config) {
     label: isUser ? `你：${role.name}` : `AI 对手：${role.name}`,
     avatar: isUser ? "我" : "AI",
     content: getMessageContent(message),
-    meta: !isUser ? (feedback ? RoundFeedback(feedback) : AiSourceBadge(message.source, "真实 AI")) : "",
+    meta: !isUser ? (feedback ? RoundFeedback(feedback, config) : AiSourceBadge(message.source, "真实 AI")) : "",
     className: "training-message-bubble"
   });
 }
 
-function RoundFeedback(item) {
+function RoundFeedback(item, config = {}) {
   const delta = Number(item.persuasionDelta || 0);
   const roundScore = item.roundScore || {};
   const scores = roundScore.scores || {};
+  const isVillainMode = config.playerRoleKey === "B";
   return `
     <details class="training-round-feedback">
       <summary>本轮反馈 ${delta >= 0 ? `+${delta}` : delta} ${AiSourceBadge(item.source, "真实 AI")}</summary>
       <p>${escapeHtml(item.feedback || "本轮已记录。")}</p>
-      ${roundScore.overallScore != null ? `<strong>综合评分：${clampScore(roundScore.overallScore)}</strong>` : ""}
-      ${ScoreRow("逻辑", scores.logic)}
-      ${ScoreRow("气势", scores.power)}
-      ${ScoreRow("边界", scores.boundary)}
-      ${ScoreRow("主线", scores.mainline)}
-      ${ScoreRow("风险", scores.risk, "danger-score")}
+      ${roundScore.overallScore != null ? `<strong>${isVillainMode ? "综合抗压评分" : "综合评分"}：${clampScore(roundScore.overallScore)}</strong>` : ""}
+      ${
+        isVillainMode
+          ? `
+            ${ScoreRow("嘴硬存活率", scores.survival)}
+            ${ScoreRow("转移话题成功率", scores.deflection)}
+            ${ScoreRow("抗压能力", scores.pressure)}
+            ${ScoreRow("逻辑破绽", scores.flaw, "danger-score")}
+            ${ScoreRow("被说服风险", scores.persuadedRisk, "danger-score")}
+            ${ScoreRow("违规攻击风险", scores.violationRisk, "danger-score")}
+          `
+          : `
+            ${ScoreRow("逻辑", scores.logic)}
+            ${ScoreRow("气势", scores.power)}
+            ${ScoreRow("边界", scores.boundary)}
+            ${ScoreRow("主线", scores.mainline)}
+            ${ScoreRow("风险", scores.risk, "danger-score")}
+          `
+      }
       ${FeedbackText("优点", roundScore.advantages)}
       ${FeedbackText("建议", roundScore.suggestion || roundScore.weaknesses)}
       ${FeedbackText("优化版", roundScore.betterReply)}
@@ -369,6 +421,9 @@ function TrainingDevDebugPanel(session, config = getGameConfig(session)) {
   const debug = session.devDebug || {};
   const responseDebug = debug.lastReplyResponseDebug || {};
   const meta = debug.lastAiResponseMeta || {};
+  const playerRole = getPlayerRole(config);
+  const aiRole = getAiRole(config);
+  const generatedScenario = session.generatedScenario || {};
   const isOpen = Boolean(session.devDebugDrawerOpen);
   return `
     <button class="training-dev-fab" data-action="open-training-dev-debug" aria-label="打开训练 DEV 调试" ${isOpen ? "hidden" : ""}>DEV</button>
@@ -386,6 +441,14 @@ function TrainingDevDebugPanel(session, config = getGameConfig(session)) {
             <div class="training-dev-debug-meta">
               <span>source: <b>${escapeHtml(meta.source || "未请求")}</b></span>
               <span>model: <b>${escapeHtml(meta.model || "未返回")}</b></span>
+              <span>playerRoleKey: <b>${escapeHtml(config.playerRoleKey)}</b></span>
+              <span>aiRoleKey: <b>${escapeHtml(config.aiRoleKey)}</b></span>
+              <span>playerRole: <b>${escapeHtml(`${playerRole.name} / ${roleSideLabel(config.playerRoleKey)}`)}</b></span>
+              <span>aiRole: <b>${escapeHtml(`${aiRole.name} / ${roleSideLabel(config.aiRoleKey)}`)}</b></span>
+              <span>openingMessageSpeaker: <b>${escapeHtml(generatedScenario.openingMessageSpeaker || config.aiRoleKey)}</b></span>
+              <span>openingMessageUsedFrom: <b>${escapeHtml(generatedScenario.openingMessageUsedFrom || "未开始")}</b></span>
+              <span>assistantMessageRoleKey: <b>${escapeHtml(generatedScenario.assistantMessageRoleKey || config.aiRoleKey)}</b></span>
+              <span>assistantMessageRoleName: <b>${escapeHtml(generatedScenario.assistantMessageRoleName || aiRole.name)}</b></span>
               <span>difficulty: <b>${escapeHtml(meta.difficulty || config.difficulty || "")}</b></span>
               <span>toneStrength: <b>${escapeHtml(meta.toneStrength || config.toneStrength || "")}</b></span>
             </div>
@@ -442,16 +505,18 @@ function TrainingInputBar(session) {
 }
 
 function TrainingFinishedPage(session) {
+  const config = getGameConfig(session);
   const review = session.review || {};
   const result = review.result || session.result || "draw";
+  const isVillainMode = config.playerRoleKey === "B";
   return `
     <div class="page training-game-page training-finished-page">
       <button class="tiny-button training-back-button" data-action="reset-training-game">返回训练设置</button>
       <section class="training-review-card result-${escapeAttr(result)}">
         <span class="persona-kicker">本轮结束</span>
-        <h2>${escapeHtml(resultTitle(result))}</h2>
+        <h2>${escapeHtml(resultTitle(result, config))}</h2>
         <div class="training-progress-meta">
-          <span>最终说服度</span>
+          <span>${isVillainMode ? "最终 AI 说服进度" : "最终说服度"}</span>
           <b>${clampScore(review.persuasionScore ?? session.persuasionScore)} / 100</b>
         </div>
         <div class="training-persuasion-track"><i style="width:${clampScore(review.persuasionScore ?? session.persuasionScore)}%"></i></div>
@@ -543,7 +608,12 @@ function SessionControlChoice(label, field, options, active) {
   `;
 }
 
-function resultTitle(result) {
+function resultTitle(result, config = {}) {
+  if (config.playerRoleKey === "B") {
+    if (result === "win") return "反派抗压成功";
+    if (result === "lose") return "被 AI 说服了";
+    return "勉强撑住";
+  }
   if (result === "win") return "你吵赢了";
   if (result === "lose") return "被带偏了";
   return "打平";
@@ -553,9 +623,15 @@ export function getGameConfig(session) {
   const source = session.gameConfig || {};
   const playerRoleKey = normalizeRoleKey(source.playerRoleKey);
   const config = {
-    scene: source.scene || session.scene || session.generatedScenario?.background || session.generatedScenario?.title || "",
-    roleA: normalizeRole(source.roleA, { name: "角色A", description: "场景中的主动表达者", goal: "说清问题，守住主线" }),
-    roleB: normalizeRole(source.roleB, { name: "角色B", description: "场景中的冲突对象", goal: "反驳另一方，制造压力" }),
+    scene:
+      source.scene ||
+      summarizeTrainingStory(source.contextSummary || session.contextSummary || "") ||
+      session.scene ||
+      session.generatedScenario?.background ||
+      session.generatedScenario?.title ||
+      "",
+    roleA: normalizeRole(source.roleA, { name: "角色A", description: "有理方 / 提出要求的一方", goal: "说清事实、影响和要求，守住主线" }),
+    roleB: normalizeRole(source.roleB, { name: "角色B", description: "理亏方 / 辩解转移的一方", goal: "嘴硬、辩解、转移和拖延，尽量顶住有理方追问" }),
     playerRoleKey,
     aiRoleKey: oppositeRoleKey(playerRoleKey),
     trainingGoals: normalizeGoals(source.trainingGoals || source.goals || session.goal || session.generatedScenario?.userGoal),
@@ -583,7 +659,14 @@ function normalizeGoals(value) {
         .split(/[、,，/]/)
         .map((item) => item.trim())
         .filter(Boolean);
-  return goals.length ? goals : ["抓住核心问题"];
+  return goals.length ? goals : ["抓住核心问题", "不被嘲讽带偏"];
+}
+
+function summarizeTrainingStory(value) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  const firstSentence = text.split(/[。！？!?]/).find(Boolean) || text;
+  return firstSentence.length > 80 ? `${firstSentence.slice(0, 80)}...` : firstSentence;
 }
 
 function getRole(config, key) {
@@ -604,6 +687,15 @@ function normalizeRoleKey(value) {
 
 function oppositeRoleKey(value) {
   return normalizeRoleKey(value) === "A" ? "B" : "A";
+}
+
+function roleSideLabel(value) {
+  return normalizeRoleKey(value) === "A" ? "有理方 / 提出要求的一方" : "理亏方 / 辩解转移的一方";
+}
+
+function roleTitle(value) {
+  const key = normalizeRoleKey(value);
+  return `角色${key}：${roleSideLabel(key)}`;
 }
 
 function normalizeDifficulty(value) {
