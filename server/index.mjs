@@ -1,9 +1,9 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readFile } from "node:fs/promises";
 import {
   buildAnalyzeChatPrompt,
   buildTempChatPrompt,
@@ -11,7 +11,7 @@ import {
   buildTempScenarioPrompt,
   buildTestResultPrompt
 } from "./prompts.mjs";
-import { requestJsonFromAI } from "./openaiClient.mjs";
+import { getModelName, hasAIKeyConfigured, isDemoMode, requestJsonFromAI } from "./openaiClient.mjs";
 import { extractPersonaProfile } from "./personaExtractorSkill.mjs";
 import { generatePersonaReply } from "./personaReplySkill.mjs";
 import { handleFeishuEvent, handleFeishuWebhookSend } from "./feishuBot.mjs";
@@ -21,18 +21,9 @@ import { scoreTrainingReply } from "./services/trainingScoreService.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
+const distRoot = join(root, "dist");
+const frontendRoot = existsSync(join(distRoot, "index.html")) ? distRoot : root;
 const port = Number(process.env.PORT || 3000);
-const isCheck = process.argv.includes("--check");
-
-if (isCheck) {
-  await Promise.all([
-    readFile(join(root, "index.html"), "utf8"),
-    readFile(join(root, "src", "main.js"), "utf8"),
-    readFile(join(root, "src", "styles.css"), "utf8")
-  ]);
-  console.log("Express app and static frontend files are present.");
-  process.exit(0);
-}
 
 const app = express();
 
@@ -46,7 +37,10 @@ if (!process.env.FEISHU_APP_ID || !process.env.FEISHU_APP_SECRET) {
 app.get("/api/health", (request, response) => {
   response.json({
     ok: true,
-    name: "didi-proxy-argue-backend"
+    name: "didi-proxy-argue-backend",
+    demoMode: isDemoMode(),
+    aiConfigured: hasAIKeyConfigured(),
+    model: hasAIKeyConfigured() ? getModelName() : null
   });
 });
 
@@ -163,10 +157,23 @@ async function handlePersonaReply(request, response) {
   }
 }
 
-app.use(express.static(root));
+app.use("/src", express.static(join(frontendRoot, "src")));
+app.use("/public", express.static(join(frontendRoot, "public")));
+
+app.get("/", (request, response) => {
+  response.sendFile(join(frontendRoot, "index.html"));
+});
+
+app.use((request, response, next) => {
+  if (request.path.includes(".")) {
+    response.status(404).json({ error: "Not found" });
+    return;
+  }
+  next();
+});
 
 app.use((request, response) => {
-  response.sendFile(join(root, "index.html"));
+  response.sendFile(join(frontendRoot, "index.html"));
 });
 
 app.listen(port, () => {

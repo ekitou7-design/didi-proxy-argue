@@ -4,5 +4,6 @@ _archive_didi-proxy-argue/
 .env.development
 .env.production
 node_modules/
+dist/
 .DS_Store
 .DS_Store

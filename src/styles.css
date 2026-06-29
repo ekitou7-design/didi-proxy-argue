@@ -14,6 +14,9 @@
   --white: #fffdf7;
   --shadow: 5px 5px 0 var(--ink);
   --line: 3px solid var(--ink);
+  --top-bar-height: 88px;
+  --bottom-nav-height: 86px;
+  --mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
   font-family: "Comic Sans MS", "Kaiti SC", "STKaiti", "PingFang SC", system-ui, sans-serif;
 }
 
@@ -24,6 +27,7 @@
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   overflow-x: hidden;
   background:
     radial-gradient(circle at 20% 20%, rgba(255, 111, 145, 0.18) 0 10%, transparent 11%),
@@ -51,6 +55,7 @@ button {
 
 .phone-frame {
   width: 100%;
+  height: 100dvh;
   min-height: 100vh;
   position: relative;
   overflow: hidden;
@@ -70,6 +75,7 @@ button {
 
 .desktop-workspace {
   min-height: 0;
+  height: calc(100dvh - var(--top-bar-height) - var(--bottom-nav-height) - var(--mobile-safe-bottom));
 }
 
 .desktop-sidebar,
@@ -78,7 +84,7 @@ button {
 }
 
 .top-bar {
-  height: 88px;
+  height: var(--top-bar-height);
   display: grid;
   grid-template-columns: 52px 1fr 52px;
   align-items: center;
@@ -146,9 +152,9 @@ button {
 }
 
 .page-scroll {
-  height: calc(100dvh - 88px);
+  height: 100%;
   overflow-y: auto;
-  padding-bottom: 104px;
+  padding-bottom: 16px;
 }
 
 .page {
@@ -1637,17 +1643,19 @@ textarea:focus {
   right: 0;
   bottom: 0;
   left: 0;
+  z-index: 10;
+  min-height: calc(var(--bottom-nav-height) + var(--mobile-safe-bottom));
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 6px;
-  padding: 9px 8px 12px;
+  padding: 9px 8px calc(12px + var(--mobile-safe-bottom));
   background: var(--white);
   border-top: var(--line);
 }
 
 .realtime-scroll,
 .persona-scroll {
-  height: calc(100% - 88px - 92px);
+  height: 100%;
   overflow: hidden;
   padding-bottom: 0;
 }
@@ -1907,6 +1915,8 @@ textarea:focus {
 }
 
 .realtime-input-bar {
+  position: relative;
+  z-index: 4;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 118px;
   gap: 8px;
@@ -1923,6 +1933,7 @@ textarea:focus {
 .realtime-input-bar textarea {
   min-height: 46px;
   max-height: 78px;
+  font-size: 16px;
   resize: none;
 }
 
@@ -2708,6 +2719,7 @@ textarea:focus {
 }
 
 .persona-input-bar {
+  position: relative;
   z-index: 3;
   display: grid;
   gap: 8px;
@@ -2718,6 +2730,7 @@ textarea:focus {
 .persona-input-bar textarea {
   min-height: 48px;
   max-height: 82px;
+  font-size: 16px;
   resize: none;
 }
 
@@ -3230,6 +3243,10 @@ textarea:focus {
 }
 
 @media (max-width: 380px) {
+  :root {
+    --bottom-nav-height: 76px;
+  }
+
   .persona-header-card {
     grid-template-columns: 1fr;
   }
@@ -3244,6 +3261,38 @@ textarea:focus {
 
   .persona-bubble {
     width: 94%;
+  }
+
+  .nav-item {
+    height: 54px;
+    font-size: 11px;
+  }
+
+  .nav-mark {
+    width: 24px;
+    height: 24px;
+  }
+
+  .realtime-chat-page,
+  .persona-chat-page {
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .realtime-settings-card {
+    max-height: 138px;
+  }
+
+  .realtime-input-bar {
+    grid-template-columns: minmax(0, 1fr) 104px;
+    padding: 8px;
+  }
+
+  .temp-input-actions .primary-button,
+  .temp-input-actions .secondary-button {
+    min-height: 32px;
+    padding: 6px 7px;
+    font-size: 11px;
   }
 }
 
@@ -3696,16 +3745,38 @@ textarea:focus {
 }
 
 @media (max-width: 440px) {
+  :root {
+    --top-bar-height: 76px;
+    --bottom-nav-height: 80px;
+  }
+
   .app-shell {
     padding: 0;
   }
 
   .phone-frame {
     width: 100%;
+    height: 100dvh;
     min-height: 100dvh;
     border: 0;
     border-radius: 0;
     box-shadow: none;
+  }
+
+  .top-bar {
+    grid-template-columns: 44px 1fr 44px;
+    gap: 10px;
+    padding: 10px 14px;
+  }
+
+  .top-bar h1 {
+    font-size: 22px;
+  }
+
+  .mini-sticker {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
   }
 
   .page {
@@ -3714,5 +3785,11 @@ textarea:focus {
 
   .training-main-actions {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 380px) {
+  :root {
+    --bottom-nav-height: 76px;
   }
 }

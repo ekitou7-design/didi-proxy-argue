@@ -482,15 +482,9 @@ function isDevDebugEnabled() {
 function ensureImportMetaEnv() {
   if (import.meta.env) return;
   Object.defineProperty(import.meta, "env", {
-    value: { DEV: isLocalDevelopmentRuntime() },
+    value: { DEV: false },
     configurable: true
   });
-}
-
-function isLocalDevelopmentRuntime() {
-  if (typeof window === "undefined") return false;
-  const host = window.location.hostname;
-  return window.location.protocol === "file:" || host === "localhost" || host === "127.0.0.1" || host === "::1";
 }
 
 function TrainingInputBar(session) {
