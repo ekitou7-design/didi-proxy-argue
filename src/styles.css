@@ -2880,10 +2880,10 @@ textarea:focus {
 .persona-sheet-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 8;
+  z-index: 30;
   display: flex;
   align-items: flex-end;
-  padding: 12px 12px calc(12px + var(--mobile-safe-bottom));
+  padding: 12px 12px calc(var(--bottom-nav-height) + var(--mobile-safe-bottom) + 12px);
   overflow-y: auto;
   background: rgba(33, 20, 15, 0.2);
   -webkit-overflow-scrolling: touch;
@@ -2891,7 +2891,7 @@ textarea:focus {
 
 .persona-create-sheet {
   width: 100%;
-  max-height: calc(var(--app-viewport-height) - 24px - var(--mobile-safe-bottom));
+  max-height: calc(var(--app-viewport-height) - var(--bottom-nav-height) - var(--mobile-safe-bottom) - 24px);
   overflow-y: auto;
   padding: 14px;
   background: var(--white);
@@ -2900,7 +2900,7 @@ textarea:focus {
 
 .persona-info-sheet {
   width: 100%;
-  max-height: calc(var(--app-viewport-height) - 24px - var(--mobile-safe-bottom));
+  max-height: calc(var(--app-viewport-height) - var(--bottom-nav-height) - var(--mobile-safe-bottom) - 24px);
   display: grid;
   gap: 14px;
   overflow-y: auto;
@@ -2950,12 +2950,12 @@ textarea:focus {
 }
 
 .reply-settings-backdrop {
-  z-index: 9;
+  z-index: 30;
 }
 
 .reply-settings-sheet {
   width: 100%;
-  max-height: calc(var(--app-viewport-height) - 24px - var(--mobile-safe-bottom));
+  max-height: calc(var(--app-viewport-height) - var(--bottom-nav-height) - var(--mobile-safe-bottom) - 24px);
   overflow-y: auto;
   display: grid;
   gap: 14px;
@@ -3004,12 +3004,12 @@ textarea:focus {
 }
 
 .feishu-settings-backdrop {
-  z-index: 9;
+  z-index: 30;
 }
 
 .feishu-settings-sheet {
   width: 100%;
-  max-height: calc(var(--app-viewport-height) - 24px - var(--mobile-safe-bottom));
+  max-height: calc(var(--app-viewport-height) - var(--bottom-nav-height) - var(--mobile-safe-bottom) - 24px);
   overflow-y: auto;
   display: grid;
   gap: 12px;
@@ -3281,19 +3281,94 @@ textarea:focus {
 }
 
 @media (max-width: 767px) {
+  :root {
+    --bottom-nav-height: 80px;
+  }
+
+  .page {
+    gap: 20px;
+    padding: 18px 16px;
+  }
+
+  .primary-button,
+  .secondary-button {
+    min-height: 44px;
+    padding: 8px 12px;
+    border-radius: 14px;
+    box-shadow: 3px 3px 0 var(--ink);
+    font-size: 15px;
+  }
+
+  .compact-full-button {
+    min-height: 38px;
+    margin-top: 10px;
+    font-size: 13px;
+  }
+
+  .compact-action {
+    min-height: 36px;
+    padding: 6px 9px;
+    border-radius: 13px;
+    font-size: 12px;
+  }
+
+  .tiny-button {
+    min-height: 30px;
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+
+  .mini-copy {
+    padding: 6px 9px;
+    font-size: 12px;
+  }
+
+  .random-scenario-button {
+    min-height: 38px;
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  .button-row,
+  .result-actions,
+  .training-main-actions,
+  .training-status-actions {
+    gap: 12px;
+  }
+
   .bottom-nav {
-    gap: 4px;
-    padding-right: 6px;
-    padding-left: 6px;
+    gap: 6px;
+    padding: 8px 8px calc(10px + var(--mobile-safe-bottom));
   }
 
   .realtime-input-bar,
   .training-input-boundary {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) 88px;
+    align-items: stretch;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .realtime-input-bar textarea {
+    min-height: 72px;
   }
 
   .temp-input-actions {
     grid-template-columns: 1fr;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    height: 100%;
+  }
+
+  .temp-input-actions .primary-button,
+  .temp-input-actions .secondary-button,
+  .training-input-boundary .primary-button {
+    width: 100%;
+    min-height: 0;
+    height: 100%;
+    padding: 6px 7px;
+    font-size: 12px;
+    line-height: 1.2;
   }
 
   .temp-settings-card .settings-title-row,
@@ -3306,18 +3381,49 @@ textarea:focus {
   }
 
   .temp-settings-actions {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
   }
 
   .temp-settings-actions .random-scenario-button,
   .training-status-actions .compact-action {
     width: 100%;
   }
+
+  .persona-input-bar {
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .persona-send-row {
+    grid-template-columns: minmax(0, 1fr) 104px;
+    gap: 10px;
+  }
+
+  .settings-icon-button {
+    min-height: 38px;
+    padding: 6px 9px;
+    border-radius: 12px;
+    font-size: 12px;
+  }
+
+  .settings-icon-button span {
+    width: 22px;
+    height: 22px;
+    border-radius: 8px;
+  }
+
+  .realtime-chat-page,
+  .persona-chat-page,
+  .training-game-page {
+    gap: 12px;
+    padding: 14px;
+  }
 }
 
 @media (max-width: 380px) {
   :root {
-    --bottom-nav-height: 76px;
+    --bottom-nav-height: 74px;
   }
 
   .persona-header-card {
@@ -3336,20 +3442,10 @@ textarea:focus {
     width: 94%;
   }
 
-  .nav-item {
-    height: 54px;
-    font-size: 11px;
-  }
-
-  .nav-mark {
-    width: 24px;
-    height: 24px;
-  }
-
   .realtime-chat-page,
   .persona-chat-page {
-    gap: 8px;
-    padding: 10px;
+    gap: 10px;
+    padding: 12px;
   }
 
   .realtime-settings-card {
@@ -3357,14 +3453,18 @@ textarea:focus {
   }
 
   .realtime-input-bar {
-    grid-template-columns: minmax(0, 1fr) 104px;
+    grid-template-columns: minmax(0, 1fr) 78px;
     padding: 8px;
+  }
+
+  .realtime-input-bar textarea {
+    min-height: 68px;
   }
 
   .temp-input-actions .primary-button,
   .temp-input-actions .secondary-button {
-    min-height: 32px;
-    padding: 6px 7px;
+    min-height: 0;
+    padding: 5px 6px;
     font-size: 11px;
   }
 }
@@ -3400,6 +3500,32 @@ textarea:focus {
   border: 2px solid var(--ink);
   border-radius: 10px;
   background: var(--paper-deep);
+}
+
+@media (max-width: 767px) {
+  .nav-item {
+    height: 54px;
+    border-radius: 14px;
+    font-size: 11px;
+  }
+
+  .nav-mark {
+    width: 24px;
+    height: 24px;
+    border-radius: 9px;
+  }
+}
+
+@media (max-width: 380px) {
+  .nav-item {
+    height: 50px;
+    font-size: 10px;
+  }
+
+  .nav-mark {
+    width: 22px;
+    height: 22px;
+  }
 }
 
 @media (min-width: 768px) {
@@ -3888,6 +4014,6 @@ textarea:focus {
 
 @media (max-width: 380px) {
   :root {
-    --bottom-nav-height: 76px;
+    --bottom-nav-height: 74px;
   }
 }
