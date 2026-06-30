@@ -1,4 +1,5 @@
 import { trainingDifficultyOptions, trainingGoalOptions } from "../data/mockData.js";
+import { normalizeTrainingRoleName } from "./trainingNicknames.js";
 
 export function maxRoundsForDifficulty(difficulty) {
   const text = String(difficulty || "");
@@ -9,6 +10,7 @@ export function maxRoundsForDifficulty(difficulty) {
 
 export function normalizeTrainingGameConfig(config = {}) {
   const playerRoleKey = config.playerRoleKey === "B" ? "B" : "A";
+  const sceneSeed = config.scene || config.contextSummary || config.userMainline || config.debateTopic || "";
   const trainingGoals = Array.isArray(config.trainingGoals)
     ? config.trainingGoals.filter(Boolean)
     : String(config.trainingGoals || config.goals || "")
@@ -18,15 +20,15 @@ export function normalizeTrainingGameConfig(config = {}) {
   return {
     scene: String(config.scene || summarizeTrainingStory(config.contextSummary) || "").trim(),
     roleA: normalizeRoleConfig(config.roleA, {
-      name: "角色A",
+      name: normalizeTrainingRoleName("A", config.roleA?.name, sceneSeed),
       description: "有理方 / 提出要求的一方",
       goal: "说清事实、影响和要求，守住主线"
-    }),
+    }, "A", sceneSeed),
     roleB: normalizeRoleConfig(config.roleB, {
-      name: "角色B",
+      name: normalizeTrainingRoleName("B", config.roleB?.name, sceneSeed),
       description: "理亏方 / 辩解转移的一方",
       goal: "嘴硬、辩解、转移和拖延，尽量顶住有理方追问"
-    }),
+    }, "B", sceneSeed),
     playerRoleKey,
     aiRoleKey: oppositeRoleKey(playerRoleKey),
     trainingGoals: trainingGoals.length ? trainingGoals : ["抓住核心问题", "不被嘲讽带偏"],
@@ -38,9 +40,9 @@ export function normalizeTrainingGameConfig(config = {}) {
   };
 }
 
-export function normalizeRoleConfig(role, fallback) {
+export function normalizeRoleConfig(role, fallback, roleKey = "A", seed = "") {
   return {
-    name: String(role?.name || fallback.name || "").trim(),
+    name: normalizeTrainingRoleName(roleKey, role?.name || fallback.name, seed),
     description: String(role?.description || fallback.description || "").trim(),
     goal: String(role?.goal || fallback.goal || "").trim()
   };
@@ -141,25 +143,25 @@ export function inferScenarioRoles(scenario = {}, previousConfig = {}) {
   const text = `${scenario.title || ""} ${scenario.background || ""} ${scenario.relationship || ""} ${scenario.category || ""}`;
   if (/男朋友|女朋友|情侣|恋爱|冷战|对象/.test(text)) {
     return {
-      roleA: { name: "角色A", description: "有理方 / 被临时改约影响的人", goal: "说清感受和要求，不被太敏感带偏" },
+      roleA: { name: normalizeTrainingRoleName("A", "", text), description: "有理方 / 被临时改约影响的人", goal: "说清感受和要求，不被太敏感带偏" },
       roleB: { name: "男朋友", description: "理亏方 / 临时改约后试图辩解的人", goal: "嘴硬解释临时改约，转移到对方太敏感，尽量顶住追问" }
     };
   }
   if (/室友|宿舍|合租|垃圾/.test(text)) {
     return {
-      roleA: { name: "角色A", description: "有理方 / 被室友不倒垃圾影响的人", goal: "让室友承担责任，不要再嘲讽和转移话题" },
+      roleA: { name: normalizeTrainingRoleName("A", "", text), description: "有理方 / 被室友不倒垃圾影响的人", goal: "让室友承担责任，不要再嘲讽和转移话题" },
       roleB: { name: "室友", description: "理亏方 / 不想倒垃圾并试图转移重点的人", goal: "嘴硬拖延，强调自己也有理由，尽量不承认核心问题" }
     };
   }
   if (/同事|职场|工作|项目|客户/.test(text)) {
     return {
-      roleA: { name: "角色A", description: "有理方 / 被同事甩锅影响的人", goal: "澄清责任，要求同事正面处理问题" },
+      roleA: { name: normalizeTrainingRoleName("A", "", text), description: "有理方 / 被同事甩锅影响的人", goal: "澄清责任，要求同事正面处理问题" },
       roleB: { name: "同事", description: "理亏方 / 把工作压力和责任推给另一方的人", goal: "嘴硬甩锅，模糊责任边界，顶住对方追问" }
     };
   }
   return {
-    roleA: previousConfig.roleA || { name: "角色A", description: "有理方 / 提出要求的一方", goal: "说清事实、影响和要求，守住主线" },
-    roleB: previousConfig.roleB || { name: "角色B", description: "理亏方 / 辩解转移的一方", goal: "嘴硬、辩解、转移和拖延，尽量顶住有理方追问" }
+    roleA: previousConfig.roleA || { name: normalizeTrainingRoleName("A", "", text), description: "有理方 / 提出要求的一方", goal: "说清事实、影响和要求，守住主线" },
+    roleB: previousConfig.roleB || { name: normalizeTrainingRoleName("B", "", text), description: "理亏方 / 辩解转移的一方", goal: "嘴硬、辩解、转移和拖延，尽量顶住有理方追问" }
   };
 }
 
@@ -167,8 +169,8 @@ export function buildScenarioFromGameConfig(config) {
   const playerRole = getPlayerRoleFromConfig(config);
   const aiRole = getAiRoleFromConfig(config);
   const goal = formatTrainingGoals(config.trainingGoals);
-  const playerName = playerRole.name || `角色${config.playerRoleKey}`;
-  const aiName = aiRole.name || `角色${config.aiRoleKey}`;
+  const playerName = playerRole.name || normalizeTrainingRoleName(config.playerRoleKey, "", config.scene);
+  const aiName = aiRole.name || normalizeTrainingRoleName(config.aiRoleKey, "", config.scene);
   const concreteScene = buildConcreteSceneDraft(config.scene, {
     playerName,
     aiName,
@@ -201,7 +203,11 @@ export function buildScenarioFromGameConfig(config) {
     userGoal: goal,
     realMainline: buildPlayerMainlineText(config, { playerName, aiName, fact: concreteScene.fact }),
     mainline,
-    stanceJudgment: buildStanceJudgmentFromConfig(config, { fact: concreteScene.fact, roleAName: config.roleA.name || "角色A", roleBName: config.roleB.name || "角色B" }),
+    stanceJudgment: buildStanceJudgmentFromConfig(config, {
+      fact: concreteScene.fact,
+      roleAName: config.roleA.name || normalizeTrainingRoleName("A", "", config.scene),
+      roleBName: config.roleB.name || normalizeTrainingRoleName("B", "", config.scene)
+    }),
     traps: buildRoleAwareTraps(config, { playerName, aiName }),
     trainingFocus: config.trainingGoals.length
       ? config.trainingGoals
@@ -294,6 +300,8 @@ export function buildPresetScenarioDraft(input = {}) {
   const title = customScene || `${category}里的${opponentType}训练`;
   const mainline = buildPresetMainline({ category, customScene, userGoal });
   const inferred = inferScenarioRoles({ title, category, background: customScene }, {});
+  const roleAName = inferred.roleA.name;
+  const roleBName = inferred.roleB.name;
 
   return {
     id: `preset_draft_${Date.now()}`,
@@ -314,7 +322,7 @@ export function buildPresetScenarioDraft(input = {}) {
     },
     openingMessage: openingForOpponentType({ opponentType, customScene, category }),
     userGoal,
-    realMainline: `这局要守住的是：${mainline.fact}。角色A是有理方 / 提出要求的一方，角色B是理亏方 / 辩解转移的一方；不要把 A/B 和玩家/AI 混同。`,
+    realMainline: `这局要守住的是：${mainline.fact}。${roleAName}是有理方 / 提出要求的一方，${roleBName}是理亏方 / 辩解转移的一方；玩家可以选择其中一方练习。`,
     mainline,
     traps: trapsForOpponentType(opponentType),
     trainingFocus: [
@@ -341,9 +349,12 @@ export function pickSetupValue(value, fallback) {
 }
 
 export function buildPresetMainline({ category, customScene, userGoal }) {
+  const seed = customScene || category || "这件事";
+  const playerName = normalizeTrainingRoleName("A", "", seed);
+  const aiName = normalizeTrainingRoleName("B", "", seed);
   const concreteScene = buildConcreteSceneDraft(customScene || category || "这件事", {
-    playerName: "角色A",
-    aiName: "角色B",
+    playerName,
+    aiName,
     userGoal
   });
   return {
@@ -355,13 +366,16 @@ export function buildPresetMainline({ category, customScene, userGoal }) {
 }
 
 export function buildPresetBackground({ category, difficulty, opponentType, customScene, userGoal }) {
+  const seed = customScene || category || "一场冲突";
+  const playerName = normalizeTrainingRoleName("A", "", seed);
+  const aiName = normalizeTrainingRoleName("B", "", seed);
   const concreteScene = buildConcreteSceneDraft(customScene || `一场${category}冲突`, {
-    playerName: "角色A",
-    aiName: "角色B",
+    playerName,
+    aiName,
     userGoal,
     difficulty
   });
-  return `${concreteScene.background} 本局难度：${difficulty}；角色A是有理方 / 提出要求的一方，角色B是理亏方 / 辩解转移的一方；训练目标是：${userGoal}。`;
+  return `${concreteScene.background} 本局难度：${difficulty}；${playerName}是有理方 / 提出要求的一方，${aiName}是理亏方 / 辩解转移的一方；训练目标是：${userGoal}。`;
 }
 
 export function relationshipForCategory(category) {
@@ -396,9 +410,10 @@ export function trapsForOpponentType(opponentType) {
 }
 
 export function openingForOpponentType({ opponentType, customScene, category }) {
+  const seed = customScene || category || "这件事";
   const concreteScene = buildConcreteSceneDraft(customScene || category || "这件事", {
-    playerName: "角色A",
-    aiName: "角色B"
+    playerName: normalizeTrainingRoleName("A", "", seed),
+    aiName: normalizeTrainingRoleName("B", "", seed)
   });
   const scene = concreteScene.shortEvent;
   if (/阴阳/.test(opponentType)) return `行，就你最有道理，${scene}都能被你说得这么严重。`;
@@ -410,8 +425,8 @@ export function openingForOpponentType({ opponentType, customScene, category }) 
 
 export function buildConcreteSceneDraft(rawScene, options = {}) {
   const scene = String(rawScene || "").trim() || "一件被拖着没有解决的具体冲突";
-  const playerName = options.playerName || "角色A";
-  const aiName = options.aiName || "角色B";
+  const playerName = options.playerName || normalizeTrainingRoleName("A", "", scene);
+  const aiName = options.aiName || normalizeTrainingRoleName("B", "", scene);
   const userGoal = String(options.userGoal || "").trim() || `让${aiName}正面回应并给出具体做法`;
   const shortEvent = scene.replace(/[。！？!?，,；;：:]+$/g, "");
   const detail = inferConcreteSceneDetail(shortEvent, { playerName, aiName });

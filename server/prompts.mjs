@@ -305,15 +305,15 @@ export function buildRandomTrainingScenarioPrompt(input = {}) {
 不要写成模板作文。不要只写“你们发生了矛盾”。必须有具体触发事件、对方动机、用户要守住的主线和话术陷阱。
 openingMessage 要像真实人会说的一句话，不要像 AI 总结。
 生成要有新鲜感，允许随心所欲地发散到生活里少见但成立的冲突现场，例如排练室、宠物寄养、剧本杀组局、二手交易、拼车、合租厨房、实习署名、亲戚饭局、楼上噪音、婚礼伴郎伴娘分工、同城搭子爽约、线上社群管理等。不要总是宿舍、情侣、借钱、职场。
-固定角色语义：角色A = 有理方 / 提出要求的一方；角色B = 理亏方 / 有明确过错但辩解转移的一方。玩家可以选择 A 或 B，AI 必须自动扮演另一方。
-你不能生成责任不明的普通纠纷。角色B 必须存在可被指出的具体过错，角色A 的要求必须有事实基础。
-角色B 的理亏必须是“已发生且明确”的事实，不能只是角色A的怀疑、双方各执一词或需要进一步调查的争议。
-禁止把以下模糊情况写成角色B理亏：角色A怀疑角色B、角色B可能有问题、不知道是不是角色B、双方各执一词、也可能是运输/误会/使用不当、角色B声称发货前正常且责任不明。
-允许角色B有借口，但借口不能推翻核心过错。可以写“角色B明知道商品有瑕疵却没说明，但辩称不影响使用”；不可以写“发货前测试正常，收货后坏了，责任不明”。
-服务/保管责任边界：如果角色A是寄养店、修理店、保管方、代管方、服务提供方，而物品/宠物在角色A保管或服务期间损坏、生病、出现跳蚤、抓伤、丢失等，不能直接设定角色B明确理亏，除非场景明确写出该问题在交付前已存在且角色B明知并隐瞒。
-不合格例子：猫送来时好好的，在角色A寄养店期间出现抓伤和跳蚤，角色A要求角色B支付医疗费。这个有合理争议空间，不能固定角色B理亏。
-合格例子：角色B送猫来寄养前明知道猫已有跳蚤和抓伤却没有告知，且延期 5 天不接猫、已读不回、拒付延期寄养费和因隐瞒病况产生的额外处理费。
-除 openingMessage 外，title、scene、background、userGoal、realMainline、mainline、traps、trainingFocus、scoreFocus、suggestedFirstReplyHint 不要用“我、别人、对方、玩家”指代冲突方。必须使用明确角色名、roleA.name、roleB.name，或“角色A”“角色B”。
+固定角色语义：roleA = 有理方 / 提出要求的一方；roleB = 理亏方 / 有明确过错但辩解转移的一方。玩家可以选择 A 或 B，AI 必须自动扮演另一方。
+你不能生成责任不明的普通纠纷。roleB 必须存在可被指出的具体过错，roleA 的要求必须有事实基础。
+roleB 的理亏必须是“已发生且明确”的事实，不能只是 roleA 的怀疑、双方各执一词或需要进一步调查的争议。
+禁止把以下模糊情况写成 roleB 理亏：有理方怀疑理亏方、理亏方可能有问题、不知道是不是理亏方、双方各执一词、也可能是运输/误会/使用不当、理亏方声称发货前正常且责任不明。
+允许 roleB 有借口，但借口不能推翻核心过错。可以写“卖家明知道商品有瑕疵却没说明，但辩称不影响使用”；不可以写“发货前测试正常，收货后坏了，责任不明”。
+服务/保管责任边界：如果 roleA 是寄养店、修理店、保管方、代管方、服务提供方，而物品/宠物在 roleA 保管或服务期间损坏、生病、出现跳蚤、抓伤、丢失等，不能直接设定 roleB 明确理亏，除非场景明确写出该问题在交付前已存在且 roleB 明知并隐瞒。
+不合格例子：猫送来时好好的，在小雨的寄养店期间出现抓伤和跳蚤，小雨要求阿杰支付医疗费。这个有合理争议空间，不能固定阿杰理亏。
+合格例子：阿杰送猫来寄养前明知道猫已有跳蚤和抓伤却没有告知，且延期 5 天不接猫、已读不回、拒付延期寄养费和因隐瞒病况产生的额外处理费。
+必须为 roleA 和 roleB 生成便于玩家区分的昵称或具体称呼。除 openingMessage 外，title、scene、background、userGoal、realMainline、mainline、traps、trainingFocus、scoreFocus、suggestedFirstReplyHint 不要用“我、别人、对方、玩家”指代冲突方，也不要用“角色A/角色B”。必须使用 roleA.name、roleB.name 或更具体的关系称呼。
 `,
     user: `
 输入偏好：
@@ -358,16 +358,16 @@ ${JSON.stringify(input, null, 2)}
 如果 creativitySeed 有内容，把它当作随机灵感种子；同样输入也要生成不同角度。
 不要生成抽象观点题，不要写成支持/反对某观点，不要使用“正方”“反方”“立场A”“立场B”“辩论主题”。
 要生成真实生活吵架场景，例如：
-- 宿舍里角色B不倒垃圾，还嘲讽角色A小题大做
-- 角色A的男朋友临时改约，并说角色A太敏感
-- 同事把工作甩给角色A，出问题后还怪角色A没提醒
-- 家庭聚餐上亲戚催婚，还拿表妹二胎来压角色A
-- 朋友总是迟到，被指出后反说角色A太计较
+- 宿舍里室友不倒垃圾，还嘲讽小雨小题大做
+- 小雨的男朋友临时改约，并说小雨太敏感
+- 同事把工作甩给阿宁，出问题后还怪阿宁没提醒
+- 家庭聚餐上亲戚催婚，还拿表妹二胎来压林夏
+- 朋友总是迟到，被指出后反说周舟太计较
 
 如果 gameConfig 有内容，必须沿用里面的训练偏好：
 - 只有 scenarioMode=expand 时，gameConfig.scene 才是本局场景；如果用户在 scene 里自由创作，必须优先保留这个设定。
 - scenarioMode=random 时，即使 gameConfig.scene/contextSummary/userMainline 有内容，也视为旧页面状态，不得沿用。
-- gameConfig.roleA / roleB 是两个生活场景角色，各自有 name、description、goal。角色A必须是有理方 / 提出要求的一方；角色B必须是理亏方 / 有明确过错但辩解转移的一方。可以在不违背用户设定的情况下让角色描述更具体、更像真实人物。
+- gameConfig.roleA / roleB 是两个生活场景角色，各自有 name、description、goal。roleA 必须是有理方 / 提出要求的一方；roleB 必须是理亏方 / 有明确过错但辩解转移的一方。可以在不违背用户设定的情况下让角色描述更具体、更像真实人物；如果 name 仍像占位符，必须改成昵称或具体称呼。
 - gameConfig.playerRoleKey 是玩家选择的角色，aiRoleKey 必须自动取另一个角色。
 - gameConfig.trainingGoals 是玩家训练目标。
 - gameConfig.difficulty 是训练难度。
@@ -375,16 +375,16 @@ ${JSON.stringify(input, null, 2)}
 - gameConfig.contextSummary / contextSummary 是用户补充的前情提要，必须影响 background、scene、mainline，不得丢弃。
 - gameConfig.userMainline / userMainline 是用户想表达或想守住的主线，必须影响 userGoal、realMainline、mainline.request、scoreFocus.mainline。
 - gameConfig.sessionControl 是会话控制，必须在 suggestedFirstReplyHint 中体现回复长度、是否提醒回主线、是否允许升级语气。
-- title/background/userGoal/realMainline/mainline/traps/trainingFocus/scoreFocus/suggestedFirstReplyHint 里描述冲突双方时，用 roleA.name / roleB.name 或“角色A / 角色B”，不要用“我、别人、对方、玩家”。
+- title/background/userGoal/realMainline/mainline/traps/trainingFocus/scoreFocus/suggestedFirstReplyHint 里描述冲突双方时，用 roleA.name / roleB.name 或具体关系称呼，不要用“我、别人、对方、玩家”，也不要用“角色A / 角色B”。
 - openingMessage 必须由 AI 角色发出，站在 AI 角色目标上说话，不得替玩家说话。
 - openingMessageSpeaker 必须等于当前 aiRoleKey，用来标记 openingMessage 由谁说出。
-- 如果 playerRoleKey 是 "A"，openingMessage 必须站在角色B的理亏、辩解、转移立场说话。
-- 如果 playerRoleKey 是 "B"，openingMessage 必须站在角色A的有理、追问、提出要求立场说话，不能继续让角色B先开口。
-- traps、trainingFocus、scoreFocus 要围绕“玩家当前选择的角色如何应对 AI 另一方的压力”生成，不要写死“角色A是玩家”或“角色B是AI”。
-- 如果玩家选择角色B，这是“反派抗压模式”：玩家目标是嘴硬、辩解、转移、拖延并顶住有理方追问；评分不能奖励辱骂、威胁、人身攻击或严重恶意内容。
-- 必须生成 stanceJudgment，明确写出 A 为什么有理、B 明确做错了什么、真正争议焦点、B 可以怎么嘴硬但仍然理亏、A 应该抓住什么追问。
+- 如果 playerRoleKey 是 "A"，openingMessage 必须站在 roleB 的理亏、辩解、转移立场说话。
+- 如果 playerRoleKey 是 "B"，openingMessage 必须站在 roleA 的有理、追问、提出要求立场说话，不能继续让 roleB 先开口。
+- traps、trainingFocus、scoreFocus 要围绕“玩家当前选择的角色如何应对 AI 另一方的压力”生成，不要写死 roleA 是玩家或 roleB 是 AI。
+- 如果玩家选择 roleB，这是“反派抗压模式”：玩家目标是嘴硬、辩解、转移、拖延并顶住有理方追问；评分不能奖励辱骂、威胁、人身攻击或严重恶意内容。
+- 必须生成 stanceJudgment，明确写出 roleA 为什么有理、roleB 明确做错了什么、真正争议焦点、roleB 可以怎么嘴硬但仍然理亏、roleA 应该抓住什么追问。
 - stanceJudgment.bFault 必须是确定性描述，不能包含“可能、怀疑、似乎、也许、双方说法不一、责任不明、无法确认、不知道是不是、各执一词”等表述。
-- 如果场景涉及寄养、托管、保管、维修、修理、洗护等服务关系，stanceJudgment.bFault 必须说明角色B的过错发生在交付前或服务关系之外，或角色B明知并隐瞒；不能把角色A服务期间发生的损害直接写成角色B赔偿责任。
+- 如果场景涉及寄养、托管、保管、维修、修理、洗护等服务关系，stanceJudgment.bFault 必须说明 roleB 的过错发生在交付前或服务关系之外，或 roleB 明知并隐瞒；不能把 roleA 服务期间发生的损害直接写成 roleB 赔偿责任。
 
 必须返回这个 JSON 结构：
 {
@@ -447,19 +447,19 @@ ${JSON.stringify(input, null, 2)}
 }
 
 字段要求：
-- title 要具体，例如“室友连续三次不倒垃圾，还说角色A太计较”。
+- title 要具体，例如“室友连续三次不倒垃圾，还说小雨太计较”。
 - scene 是完整生活场景，不是观点题。
 - scene 不要机械复读 customScene，要把用户设定扩写成完整现场；但必须保留用户设定的核心。
-- roleA 和 roleB 必须是场景里的具体人物，例如“角色A / 室友”“女朋友 / 男朋友”“员工 / 同事”；roleA 保持有理方 / 提出要求的一方，roleB 保持理亏方 / 辩解转移的一方。
+- roleA 和 roleB 必须是场景里的具体人物，例如“小雨 / 室友”“女朋友 / 男朋友”“员工 / 同事”；roleA 保持有理方 / 提出要求的一方，roleB 保持理亏方 / 辩解转移的一方。不要把 name 写成“角色A”或“角色B”。
 - 每个 role.goal 都要像真实吵架里的角色目标，不要写成抽象观点。
-- playerRoleKey 默认可以是 "A"，aiRoleKey 必须是另一个角色；不要把角色A固定成玩家，也不要把角色B固定成 AI。
-- background 必须有完整前情，包含触发事件和角色B为什么会这样说。
-- background 这类说明性字段必须让玩家在设置页一眼看出谁做了什么：使用“角色A”“角色B”或具体角色名，不要写“我提醒后”“别人说”“对方觉得”“玩家被说”。
+- playerRoleKey 默认可以是 "A"，aiRoleKey 必须是另一个角色；不要把 roleA 固定成玩家，也不要把 roleB 固定成 AI。
+- background 必须有完整前情，包含触发事件和 roleB 为什么会这样说。
+- background 这类说明性字段必须让玩家在设置页一眼看出谁做了什么：使用昵称、具体角色名或关系称呼，不要写“角色A”“角色B”“我提醒后”“别人说”“对方觉得”“玩家被说”。
 - realMainline 是本局真正要守住的争吵主线。
 - mainline 必须是 FIRB：Fact 事实、Impact 影响、Request 诉求、Boundary 边界。
-- stanceJudgment.aJustification 要说明角色A为什么有理；stanceJudgment.bFault 要写角色B明确做错了什么；stanceJudgment.disputeFocus 要写真正争议焦点；stanceJudgment.bExcuseSpace 要写角色B还能如何嘴硬但仍然理亏；stanceJudgment.aPressurePoint 要写角色A该抓住什么追问。
+- stanceJudgment.aJustification 要说明 roleA 为什么有理；stanceJudgment.bFault 要写 roleB 明确做错了什么；stanceJudgment.disputeFocus 要写真正争议焦点；stanceJudgment.bExcuseSpace 要写 roleB 还能如何嘴硬但仍然理亏；stanceJudgment.aPressurePoint 要写 roleA 该抓住什么追问。
 - stanceJudgment.bFault 必须是已发生且明确的事实，不能写成“可能坏了”“怀疑没做”“责任不明”“双方说法不一”。
-- 服务/保管场景里，如果损害发生在角色A保管/服务期间，必须改写为角色B交付前已知并隐瞒，或者不要生成这个方向。
+- 服务/保管场景里，如果损害发生在 roleA 保管/服务期间，必须改写为 roleB 交付前已知并隐瞒，或者不要生成这个方向。
 - traps 至少 3 条，必须是 AI 当前角色可能给玩家当前角色制造的压力或话术陷阱。
 - trainingFocus 至少 3 条。
 - scoreFocus 五项都要有清楚观察点。

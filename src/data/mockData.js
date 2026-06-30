@@ -137,9 +137,9 @@ export const initialTrainingSession = {
   type: "吵架训练",
   step: "setup",
   gameState: "idle",
-  scene: "宿舍里，角色B一直不倒垃圾。角色A提醒后，角色B还嘲讽角色A小题大做。",
-  debateTopic: "宿舍里，角色B一直不倒垃圾。角色A提醒后，角色B还嘲讽角色A小题大做。",
-  playerIdentity: "角色A",
+  scene: "宿舍里，室友一直不倒垃圾。小雨提醒后，室友还嘲讽小雨小题大做。",
+  debateTopic: "宿舍里，室友一直不倒垃圾。小雨提醒后，室友还嘲讽小雨小题大做。",
+  playerIdentity: "小雨",
   aiIdentity: "室友",
   playerSide: "A",
   aiSide: "B",
@@ -147,15 +147,15 @@ export const initialTrainingSession = {
   difficulty: "普通",
   goal: "抓住核心问题、不被嘲讽带偏",
   gameConfig: {
-    scene: "宿舍里，角色B一直不倒垃圾。角色A提醒后，角色B还嘲讽角色A小题大做。",
+    scene: "宿舍里，室友一直不倒垃圾。小雨提醒后，室友还嘲讽小雨小题大做。",
     roleA: {
-      name: "角色A",
+      name: "小雨",
       description: "有理方 / 提出要求的一方，被室友不倒垃圾影响的人",
       goal: "让室友承担责任，不要再嘲讽和转移话题"
     },
     roleB: {
       name: "室友",
-      description: "理亏方 / 辩解转移的一方，不想倒垃圾，还觉得角色A管太多",
+      description: "理亏方 / 辩解转移的一方，不想倒垃圾，还觉得小雨管太多",
       goal: "嘴硬拖延，强调自己也有理由，尽量不承认核心问题"
     },
     playerRoleKey: "A",
@@ -163,7 +163,7 @@ export const initialTrainingSession = {
     trainingGoals: ["抓住核心问题", "不被嘲讽带偏"],
     difficulty: "normal",
     toneStrength: "中",
-    contextSummary: "角色B连续几次没有倒垃圾，角色A提醒后，角色B把问题说成角色A小题大做。",
+    contextSummary: "室友连续几次没有倒垃圾，小雨提醒后，室友把问题说成小雨小题大做。",
     userMainline: "让室友承认公共规则需要一起执行，并给出之后怎么轮流倒垃圾的明确做法。",
     sessionControl: {
       replyLength: "中",

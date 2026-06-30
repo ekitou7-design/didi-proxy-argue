@@ -20,6 +20,7 @@ import { TRAINING_CHAT_HISTORY_KEY } from "../constants/storageKeys.js";
 import { assertAiSource } from "../utils/aiSource.js";
 import { readJson, writeJson } from "../utils/storage.js";
 import { getMessageContent, normalizeMessage } from "../utils/messageModel.js";
+import { normalizeTrainingRoleName } from "../domain/trainingNicknames.js";
 
 export function updateTrainingSetup(app, parts, value, render = true) {
   const training = app.state.training;
@@ -174,18 +175,19 @@ export async function generateRandomTrainingScenario(app) {
 }
 
 function freeCreativeScenarioConfig(config) {
+  const seed = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   return {
     ...config,
     scene: "",
     contextSummary: "",
     userMainline: "",
     roleA: {
-      name: "角色A",
+      name: normalizeTrainingRoleName("A", "", seed),
       description: "有理方 / 提出要求的一方",
       goal: formatTrainingGoals(config.trainingGoals)
     },
     roleB: {
-      name: "角色B",
+      name: normalizeTrainingRoleName("B", "", seed),
       description: "理亏方 / 辩解转移的一方",
       goal: "嘴硬、辩解、转移和拖延，尽量顶住有理方追问"
     }

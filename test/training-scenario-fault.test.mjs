@@ -131,4 +131,16 @@ for (const item of validCases) {
   assert.equal(scenario.aiRoleKey, "B");
 }
 
+const genericNameScenario = normalizeScenario(
+  scenarioFrom({
+    title: "通用占位名会被昵称替换",
+    scene: "阿宁提醒阿泽收拾厨房，阿泽反说阿宁事多。",
+    bFault: "阿泽连续没有处理约定好的公共区责任。"
+  }),
+  baseInput
+);
+assert.notEqual(genericNameScenario.roleA.name, "角色A");
+assert.notEqual(genericNameScenario.roleB.name, "角色B");
+assert.notEqual(genericNameScenario.roleA.name, genericNameScenario.roleB.name);
+
 console.log("training scenario fault validation test passed");

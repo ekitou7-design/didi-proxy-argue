@@ -1,5 +1,6 @@
 import { buildRandomTrainingScenarioPrompt } from "../prompts.mjs";
 import { isDemoMode, requestJsonFromAI } from "../openaiClient.mjs";
+import { normalizeTrainingRoleName } from "../../src/domain/trainingNicknames.js";
 
 const randomValues = new Set(["", "随机"]);
 const categories = ["宿舍卫生", "情侣冷战", "朋友借钱不还", "小组作业", "商家扯皮", "职场甩锅", "家庭催婚", "网友阴阳怪气"];
@@ -236,8 +237,9 @@ export function normalizeScenario(scenario, input = {}) {
   const traps = arrayOfText(scenario.traps);
   const trainingFocus = arrayOfText(scenario.trainingFocus);
   const baseConfig = normalizeGameConfig(input.gameConfig || scenario, input);
-  const roleA = normalizeRole(scenario.roleA, baseConfig.roleA);
-  const roleB = normalizeRole(scenario.roleB, baseConfig.roleB);
+  const roleSeed = textOf(scenario.scene) || textOf(scenario.background) || textOf(scenario.title) || input.scene;
+  const roleA = normalizeRole(scenario.roleA, baseConfig.roleA, "A", roleSeed);
+  const roleB = normalizeRole(scenario.roleB, baseConfig.roleB, "B", roleSeed);
   const playerRoleKey = normalizeRoleKey(input.playerRoleKey || baseConfig.playerRoleKey || scenario.playerRoleKey);
   const aiRoleKey = oppositeRoleKey(playerRoleKey);
   const playerRole = roleFromParts(roleA, roleB, playerRoleKey);
@@ -270,7 +272,9 @@ export function normalizeScenario(scenario, input = {}) {
     difficulty,
     relationship: textOf(scenario.relationship) || "日常关系",
     background:
-      textOf(scenario.background) || scene || "一次具体冲突已经发生，角色A提出要求，角色B试图辩解或转移重点。",
+      textOf(scenario.background) ||
+      scene ||
+      `一次具体冲突已经发生，${roleA.name}提出要求，${roleB.name}试图辩解或转移重点。`,
     opponentProfile: {
       type: opponentType,
       personality: textOf(opponentProfile.personality) || "会为自己辩解，也会试图转移重点。",
@@ -387,12 +391,12 @@ function mockScenarios() {
   return [
     {
       id: "scenario_dorm_trash",
-      title: "室友连续三次不倒垃圾，还说角色A太计较",
+      title: "室友连续三次不倒垃圾，还说小雨太计较",
       category: "宿舍卫生",
       difficulty: "黄金",
       relationship: "同寝室室友",
       background:
-        "宿舍约定垃圾桶满了就轮流倒。过去一周轮到室友三次，室友都说下课回来再倒，最后都是角色A看不下去拿走。今天垃圾又堆到门口，角色A提醒后，室友觉得角色A当着其他室友面让室友没面子。",
+        "宿舍约定垃圾桶满了就轮流倒。过去一周轮到室友三次，室友都说下课回来再倒，最后都是小雨看不下去拿走。今天垃圾又堆到门口，小雨提醒后，室友觉得小雨当着其他室友面让室友没面子。",
       opponentProfile: {
         type: "阴阳怪气型",
         personality: "平时不爱正面承认问题，被提醒后会用玩笑和反讽把自己包装成被针对的人。",
@@ -403,11 +407,11 @@ function mockScenarios() {
       realMainline: "问题不是谁更爱干净，而是共同生活规则被反复破坏。",
       mainline: {
         fact: "轮到室友倒垃圾的三次都没有按约定完成。",
-        impact: "公共区域有异味，角色A被迫多次替室友处理，宿舍规则也失效了。",
+        impact: "公共区域有异味，小雨被迫多次替室友处理，宿舍规则也失效了。",
         request: "今天这袋垃圾由室友处理，后续按轮值表执行。",
-        boundary: "室友不要再把公共规则说成角色A个人洁癖或针对室友。"
+        boundary: "室友不要再把公共规则说成小雨个人洁癖或针对室友。"
       },
-      traps: ["攻击角色A太计较", "把角色A的提醒说成不给面子", "用玩笑稀释责任"],
+      traps: ["攻击小雨太计较", "把小雨的提醒说成不给面子", "用玩笑稀释责任"],
       trainingFocus: ["有理方不自证是不是洁癖", "把话题拉回轮值事实", "提出清楚可执行的要求"],
       scoreFocus: {
         logic: "有理方是否抓住轮值事实，而不是争谁更爱干净。",
@@ -425,10 +429,10 @@ function mockScenarios() {
       difficulty: "王者",
       relationship: "课程小组队友",
       background:
-        "小组展示明天上午截止，队友负责数据整理，上周在群里确认过没问题。今晚角色A催进度，队友才说自己不会做，还说角色A作为组长应该早点发现。队友希望角色A熬夜补上，并暗示如果分数低大家都有责任。",
+        "小组展示明天上午截止，队友负责数据整理，上周在群里确认过没问题。今晚林夏催进度，队友才说自己不会做，还说林夏作为组长应该早点发现。队友希望林夏熬夜补上，并暗示如果分数低大家都有责任。",
       opponentProfile: {
         type: "偷换概念型",
-        personality: "遇到责任会把问题转成角色A管理不到位，擅长让角色A自证是不是好组长。",
+        personality: "遇到责任会把问题转成林夏管理不到位，擅长让林夏自证是不是好组长。",
         tactics: ["甩锅给组长", "把失约说成能力问题", "用集体成绩压你兜底"]
       },
       openingMessage: "你现在怪我也没用啊，你是组长，你早点问清楚不就不会这样了吗？",
@@ -440,7 +444,7 @@ function mockScenarios() {
         request: "队友今晚先交出能完成的基础整理，并同步不会的部分。",
         boundary: "不能把已确认任务的失约转成组长一个人的责任。"
       },
-      traps: ["要求角色A自证是不是合格组长", "把不会做当作免责任理由", "用小组分数逼角色A兜底"],
+      traps: ["要求林夏自证是不是合格组长", "把不会做当作免责任理由", "用小组分数逼林夏兜底"],
       trainingFocus: ["拒绝管理责任偷换", "要求具体补救动作", "保留分工证据"],
       scoreFocus: {
         logic: "有理方是否区分组长协调和成员承诺的责任。",
@@ -453,12 +457,12 @@ function mockScenarios() {
     },
     {
       id: "scenario_work_blame",
-      title: "同事把漏发客户邮件的锅甩给角色A",
+      title: "同事把漏发客户邮件的锅甩给阿宁",
       category: "职场甩锅",
       difficulty: "白银",
       relationship: "同项目同事",
       background:
-        "客户昨天催一份报价更新，同事负责发最终版邮件，角色A负责给同事数据。角色A下午三点已在工作群发了数据，同事没确认也没发。今天客户追问，同事在会上说是角色A数据给晚了，导致邮件没法发。",
+        "客户昨天催一份报价更新，同事负责发最终版邮件，阿宁负责给同事数据。阿宁下午三点已在工作群发了数据，同事没确认也没发。今天客户追问，同事在会上说是阿宁数据给晚了，导致邮件没法发。",
       opponentProfile: {
         type: "嘴硬型",
         personality: "怕承担工作失误，会抓住流程里的模糊点为自己找理由。",
@@ -466,14 +470,14 @@ function mockScenarios() {
       },
       openingMessage: "我昨天确实没收到你明确说可以发的版本啊，这事不能只算我一个人的吧。",
       userGoal: "澄清时间线，让同事承认邮件未发送是同事的执行遗漏。",
-      realMainline: "角色A已按时给出数据，同事未确认和未发送邮件才是客户延误原因。",
+      realMainline: "阿宁已按时给出数据，同事未确认和未发送邮件才是客户延误原因。",
       mainline: {
-        fact: "角色A昨天下午三点在群里发了最终数据，同事负责发送邮件。",
-        impact: "客户没有及时收到报价，会议上责任被错误归到角色A身上。",
+        fact: "阿宁昨天下午三点在群里发了最终数据，同事负责发送邮件。",
+        impact: "客户没有及时收到报价，会议上责任被错误归到阿宁身上。",
         request: "请同事当场澄清时间线，并补发邮件。",
         boundary: "不能用“没看到”抹掉已经公开同步的交付记录。"
       },
-      traps: ["把明确交付说成没确认", "把个人遗漏说成团队责任", "让角色A陷入解释流程细节"],
+      traps: ["把明确交付说成没确认", "把个人遗漏说成团队责任", "让阿宁陷入解释流程细节"],
       trainingFocus: ["按时间线说话", "不被团队责任稀释事实", "要求公开澄清"],
       scoreFocus: {
         logic: "有理方是否用时间线证明责任归属。",
@@ -486,12 +490,12 @@ function mockScenarios() {
     },
     {
       id: "scenario_friend_money",
-      title: "朋友借钱两个月不还，还说角色A催得太现实",
+      title: "朋友借钱两个月不还，还说周舟催得太现实",
       category: "朋友借钱不还",
       difficulty: "王者",
       relationship: "关系不错的朋友",
       background:
-        "两个月前朋友说临时周转，借了角色A 1200 元，承诺月底还。到期后朋友先说工资晚发，后来开始不回消息。今天角色A再次提醒，朋友发语音说最近压力很大，觉得角色A一直催让朋友很寒心。",
+        "两个月前朋友说临时周转，借了周舟 1200 元，承诺月底还。到期后朋友先说工资晚发，后来开始不回消息。今天周舟再次提醒，朋友发语音说最近压力很大，觉得周舟一直催让朋友很寒心。",
       opponentProfile: {
         type: "情绪勒索型",
         personality: "不想还钱时会把债务问题包装成友情和信任问题。",
@@ -502,7 +506,7 @@ function mockScenarios() {
       realMainline: "借款承诺已经到期，友情不能取消还款责任。",
       mainline: {
         fact: "朋友借了 1200 元并承诺月底归还，现在已拖延两个月。",
-        impact: "角色A的预算被影响，也承担了反复提醒的情绪成本。",
+        impact: "周舟的预算被影响，也承担了反复提醒的情绪成本。",
         request: "请朋友给出明确还款日期和分期安排。",
         boundary: "朋友不要再把正常还钱要求说成有理方不重视朋友。"
       },
@@ -519,12 +523,12 @@ function mockScenarios() {
     },
     {
       id: "scenario_online_sarcasm",
-      title: "网友在评论区阴阳怪气角色A认真讨论",
+      title: "网友在评论区阴阳怪气小禾认真讨论",
       category: "网友阴阳怪气",
       difficulty: "黄金",
       relationship: "同一评论区网友",
       background:
-        "角色A在一个帖子下认真回复了自己的经历和观点，网友没有回应内容本身，而是连续评论角色A“太有优越感”“小作文写得真努力”。其他人开始跟着起哄，讨论重点从原话题偏到角色A本人。",
+        "小禾在一个帖子下认真回复了自己的经历和观点，网友没有回应内容本身，而是连续评论小禾“太有优越感”“小作文写得真努力”。其他人开始跟着起哄，讨论重点从原话题偏到小禾本人。",
       opponentProfile: {
         type: "阴阳怪气型",
         personality: "喜欢用轻飘飘的嘲讽制造围观感，不承担正面论证责任。",
@@ -532,10 +536,10 @@ function mockScenarios() {
       },
       openingMessage: "哇，写这么长，看来你真的很需要证明自己比别人懂哦。",
       userGoal: "不被带偏到自证，要求网友回应具体观点或停止扣帽子。",
-      realMainline: "争议点是观点内容，不是角色A写得长不长或是否有优越感。",
+      realMainline: "争议点是观点内容，不是小禾写得长不长或是否有优越感。",
       mainline: {
-        fact: "角色A提出了具体观点，网友没有回应内容，只评价角色A的表达动机。",
-        impact: "讨论被带偏，其他人也开始围绕角色A本人起哄。",
+        fact: "小禾提出了具体观点，网友没有回应内容，只评价小禾的表达动机。",
+        impact: "讨论被带偏，其他人也开始围绕小禾本人起哄。",
         request: "请网友回应具体观点，不要继续扣动机帽子。",
         boundary: "如果网友只做人身化暗讽，有理方不会继续陪聊。"
       },
@@ -594,16 +598,17 @@ function normalizeScenarioDifficulty(value) {
 function normalizeGameConfig(config = {}, input = {}) {
   const source = config && typeof config === "object" && !Array.isArray(config) ? config : {};
   const playerRoleKey = normalizeRoleKey(source.playerRoleKey || input.playerRoleKey || "A");
+  const seed = textOf(source.scene) || textOf(source.contextSummary) || textOf(input.customScene) || textOf(input.creativitySeed);
   const roleA = normalizeRole(source.roleA, {
-    name: textOf(source.playerIdentity) || textOf(input.playerIdentity) || "角色A",
+    name: normalizeTrainingRoleName("A", textOf(source.playerIdentity) || textOf(input.playerIdentity), seed),
     description: "有理方 / 提出要求的一方",
     goal: textOf(input.userGoal) || textOf(source.userGoal) || "让理亏方正面回应问题，并给出具体做法"
-  });
+  }, "A", seed);
   const roleB = normalizeRole(source.roleB, {
-    name: textOf(source.aiIdentity) || textOf(input.aiIdentity) || inferOpponentName(source, input),
+    name: normalizeTrainingRoleName("B", textOf(source.aiIdentity) || textOf(input.aiIdentity) || inferOpponentName(source, input), seed),
     description: "理亏方 / 辩解转移的一方",
     goal: "嘴硬、辩解、转移和拖延，尽量顶住有理方追问"
-  });
+  }, "B", seed);
   const trainingGoals = Array.isArray(source.trainingGoals)
     ? source.trainingGoals.map(textOf).filter(Boolean)
     : Array.isArray(source.goals)
@@ -617,7 +622,7 @@ function normalizeGameConfig(config = {}, input = {}) {
       textOf(input.scene) ||
       textOf(input.customScene) ||
       textOf(source.topic) ||
-      "一次真实生活冲突已经发生，角色A提出要求，角色B正在辩解或转移重点。",
+      `一次真实生活冲突已经发生，${roleA.name}提出要求，${roleB.name}正在辩解或转移重点。`,
     roleA,
     roleB,
     playerRoleKey,
@@ -630,10 +635,10 @@ function normalizeGameConfig(config = {}, input = {}) {
   };
 }
 
-function normalizeRole(role, fallback) {
+function normalizeRole(role, fallback, roleKey = "A", seed = "") {
   const source = role && typeof role === "object" && !Array.isArray(role) ? role : {};
   return {
-    name: textOf(source.name) || fallback.name,
+    name: normalizeTrainingRoleName(roleKey, textOf(source.name) || fallback.name, seed),
     description: textOf(source.description) || fallback.description,
     goal: textOf(source.goal) || fallback.goal
   };
@@ -665,7 +670,7 @@ function inferOpponentName(source = {}, input = {}) {
   if (/商家|客服|退款/.test(text)) return "商家";
   if (/网友|评论/.test(text)) return "网友";
   if (/队友|小组作业|同学/.test(text)) return "队友";
-  return "角色B";
+  return normalizeTrainingRoleName("B", "", textOf(source.title) || textOf(source.background) || textOf(input.customScene));
 }
 
 function buildCustomSceneBackground(input, scenario, customDraft = null) {
@@ -681,8 +686,8 @@ function buildCustomOpeningMessage(input, customDraft = null) {
   const lead = customDraft?.openingLead || "";
   const type = input.opponentType;
   if (input.aiRoleKey === "A") {
-    const aiName = customDraft?.aiName || input.aiRole?.name || "角色A";
-    const playerName = customDraft?.playerName || input.playerRole?.name || "角色B";
+    const aiName = customDraft?.aiName || input.aiRole?.name || normalizeTrainingRoleName("A", "", scene);
+    const playerName = customDraft?.playerName || input.playerRole?.name || normalizeTrainingRoleName("B", "", scene);
     return `${aiName}先开口：${playerName}，现在说的是${scene}这件事，你先正面回应，不要再把重点转开。`;
   }
   if (/阴阳/.test(type)) return `行，就你最有道理，${lead}${scene}都能被你说得这么严重。`;
@@ -728,8 +733,9 @@ function buildCustomStanceJudgment(input, customDraft = null) {
 }
 
 function buildMockStanceJudgment(scenario = {}) {
-  const roleAName = scenario.roleA?.name || "角色A";
-  const roleBName = scenario.roleB?.name || "角色B";
+  const seed = scenario.scene || scenario.background || scenario.title || "";
+  const roleAName = scenario.roleA?.name || normalizeTrainingRoleName("A", "", seed);
+  const roleBName = scenario.roleB?.name || normalizeTrainingRoleName("B", "", seed);
   const fact = [scenario.mainline?.fact, scenario.realMainline, scenario.background].map(textOf).filter(Boolean).join("，");
   return {
     aJustification: `${roleAName}的要求有事实基础：${fact}`,
@@ -741,8 +747,8 @@ function buildMockStanceJudgment(scenario = {}) {
 }
 
 function buildCustomTraps(input, customDraft = null) {
-  const playerName = customDraft?.playerName || "角色A";
-  const aiName = customDraft?.aiName || "角色B";
+  const playerName = customDraft?.playerName || normalizeTrainingRoleName(input.playerRoleKey, "", input.customScene);
+  const aiName = customDraft?.aiName || normalizeTrainingRoleName(input.aiRoleKey, "", input.customScene);
   if (input.playerRoleKey === "B") {
     return [
       `${aiName}追问${playerName}的具体责任，${playerName}不要用攻击或继续转移逃避`,
@@ -844,9 +850,10 @@ function meaningfulChunks(text) {
 }
 
 function buildConcreteCustomScenario(input, scenario = {}) {
-  const playerName = input.playerRole?.name || input.roleA?.name || "角色A";
+  const seed = input.customScene || scenario.title || "";
+  const playerName = input.playerRole?.name || input.roleA?.name || normalizeTrainingRoleName(input.playerRoleKey, "", seed);
   const aiName = input.aiRole?.name || input.roleB?.name || inferOpponentName(scenario, input);
-  const roleAName = input.roleA?.name || "角色A";
+  const roleAName = input.roleA?.name || normalizeTrainingRoleName("A", "", seed);
   const roleBName = input.roleB?.name || inferOpponentName(scenario, input);
   const shortEvent = input.customScene.replace(/[。！？!?，,；;：:]+$/g, "");
   const detail = inferConcreteCustomDetail(shortEvent, { playerName: roleAName, aiName: roleBName });
@@ -933,11 +940,12 @@ function inferConcreteCustomDetail(scene, { playerName, aiName }) {
 }
 
 function fallbackTraps(opponentType) {
-  const traps = ["把具体行为说成角色A的情绪问题", "要求角色A自证是不是太计较", "用一句反问把责任推回角色A身上"];
-  if (/阴阳/.test(opponentType)) traps.push("用反讽激角色A失控");
+  const roleAName = normalizeTrainingRoleName("A", "", opponentType);
+  const traps = [`把具体行为说成${roleAName}的情绪问题`, `要求${roleAName}自证是不是太计较`, `用一句反问把责任推回${roleAName}身上`];
+  if (/阴阳/.test(opponentType)) traps.push(`用反讽激${roleAName}失控`);
   if (/嘴硬/.test(opponentType)) traps.push("明明有记录也继续否认");
-  if (/偷换/.test(opponentType)) traps.push("把原问题偷换成角色A的态度问题");
-  if (/情绪勒索/.test(opponentType)) traps.push("用委屈让角色A放弃要求");
+  if (/偷换/.test(opponentType)) traps.push(`把原问题偷换成${roleAName}的态度问题`);
+  if (/情绪勒索/.test(opponentType)) traps.push(`用委屈让${roleAName}放弃要求`);
   return traps;
 }
 
@@ -962,7 +970,7 @@ function fallbackTrapsForPlayerRole(playerRoleKey, playerRole, aiRole, opponentT
 function fallbackTrainingFocus(category, difficulty) {
   return [
     `围绕${category || "当前场景"}里的具体事实发言`,
-    "识别角色B转移重点的话术",
+    "识别理亏方转移重点的话术",
     "提出清楚、可执行的下一步要求",
     difficulty === "王者" ? "在高压话术下保持主线不散" : "有理方不为了缓和气氛放弃边界"
   ];

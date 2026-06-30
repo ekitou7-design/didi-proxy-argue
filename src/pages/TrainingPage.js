@@ -3,6 +3,7 @@ import { ChatBubble } from "../components/ChatBubble.js";
 import { AiSourceBadge } from "../utils/aiSource.js";
 import { escapeAttr, escapeHtml } from "../utils/html.js";
 import { getMessageContent } from "../utils/messageModel.js";
+import { normalizeTrainingRoleName } from "../domain/trainingNicknames.js";
 
 ensureImportMetaEnv();
 
@@ -68,10 +69,10 @@ function TrainingStartSettings(session, config) {
 
       <div class="training-setting-group">
         <h3>本局角色</h3>
-        <p class="training-setting-note">角色A：有理方 / 提出要求的一方；角色B：理亏方 / 辩解转移的一方。A/B 是冲突里的两方，不等于玩家。</p>
+        <p class="training-setting-note">系统会给双方生成昵称：有理方负责提出要求，理亏方负责辩解转移。你可以改成室友、同事、男朋友等更具体的称呼。</p>
         <div class="training-role-edit-grid">
-          ${RoleEditor(roleTitle("A"), "roleA", config.roleA)}
-          ${RoleEditor(roleTitle("B"), "roleB", config.roleB)}
+          ${RoleEditor(roleTitle("A"), "roleA", config.roleA, "A")}
+          ${RoleEditor(roleTitle("B"), "roleB", config.roleB, "B")}
         </div>
         ${StanceJudgmentSummary(session)}
       </div>
@@ -177,12 +178,12 @@ function AdvancedTrainingSettings(session, config) {
   `;
 }
 
-function RoleEditor(title, key, role) {
+function RoleEditor(title, key, role, roleKey) {
   return `
     <article class="training-role-editor">
       <div class="training-role-card-head">
         <span>${escapeHtml(title)}</span>
-        <input data-setup-input="training.gameConfig.${key}.name" value="${escapeAttr(role.name)}" placeholder="例如：角色A、室友" />
+        <input data-setup-input="training.gameConfig.${key}.name" value="${escapeAttr(role.name)}" placeholder="${escapeAttr(roleKey === "A" ? "例如：小雨、买家" : "例如：阿杰、室友")}" />
       </div>
       <label class="training-role-card-field">
         <b>角色描述</b>
@@ -210,8 +211,8 @@ function StanceJudgmentSummary(session = {}) {
   if (!stance?.aJustification && !stance?.bFault) return "";
   return `
     <div class="training-stance-judgment">
-      ${stance.aJustification ? `<p><b>A 方为什么有理：</b>${escapeHtml(stance.aJustification)}</p>` : ""}
-      ${stance.bFault ? `<p><b>B 方哪里理亏：</b>${escapeHtml(stance.bFault)}</p>` : ""}
+      ${stance.aJustification ? `<p><b>有理方为什么有理：</b>${escapeHtml(stance.aJustification)}</p>` : ""}
+      ${stance.bFault ? `<p><b>理亏方哪里理亏：</b>${escapeHtml(stance.bFault)}</p>` : ""}
     </div>
   `;
 }
@@ -220,8 +221,8 @@ function StanceJudgmentPreview(session = {}) {
   const stance = getStanceJudgment(session);
   if (!stance?.aJustification && !stance?.bFault) return "";
   return `
-    ${stance.aJustification ? `<p><b>A 方为什么有理：</b>${escapeHtml(stance.aJustification)}</p>` : ""}
-    ${stance.bFault ? `<p><b>B 方哪里理亏：</b>${escapeHtml(stance.bFault)}</p>` : ""}
+    ${stance.aJustification ? `<p><b>有理方为什么有理：</b>${escapeHtml(stance.aJustification)}</p>` : ""}
+    ${stance.bFault ? `<p><b>理亏方哪里理亏：</b>${escapeHtml(stance.bFault)}</p>` : ""}
   `;
 }
 
@@ -240,10 +241,10 @@ function RoleChoice(key, config) {
       data-chip-field="playerRoleKey"
       data-chip-value="${key}"
     >
-      <strong>${escapeHtml(choiceTitle)} · 角色${key}：${escapeHtml(role.name || `角色${key}`)}</strong>
+      <strong>${escapeHtml(choiceTitle)} · ${escapeHtml(sideLabel)}：${escapeHtml(role.name)}</strong>
       <span>${escapeHtml(choiceDescription)}</span>
       <span>${escapeHtml(role.description || "待填写角色描述")}</span>
-      <small>AI 将扮演${escapeHtml(aiSideLabel)} · 角色${aiKey}：${escapeHtml(aiRole.name || `角色${aiKey}`)}</small>
+      <small>AI 将扮演${escapeHtml(aiSideLabel)}：${escapeHtml(aiRole.name)}</small>
     </button>
   `;
 }
@@ -624,8 +625,8 @@ export function getGameConfig(session) {
       session.generatedScenario?.background ||
       session.generatedScenario?.title ||
       "",
-    roleA: normalizeRole(source.roleA, { name: "角色A", description: "有理方 / 提出要求的一方", goal: "说清事实、影响和要求，守住主线" }),
-    roleB: normalizeRole(source.roleB, { name: "角色B", description: "理亏方 / 辩解转移的一方", goal: "嘴硬、辩解、转移和拖延，尽量顶住有理方追问" }),
+    roleA: normalizeRole(source.roleA, { name: normalizeTrainingRoleName("A", source.roleA?.name, source.scene || source.contextSummary), description: "有理方 / 提出要求的一方", goal: "说清事实、影响和要求，守住主线" }, "A", source.scene || source.contextSummary),
+    roleB: normalizeRole(source.roleB, { name: normalizeTrainingRoleName("B", source.roleB?.name, source.scene || source.contextSummary), description: "理亏方 / 辩解转移的一方", goal: "嘴硬、辩解、转移和拖延，尽量顶住有理方追问" }, "B", source.scene || source.contextSummary),
     playerRoleKey,
     aiRoleKey: oppositeRoleKey(playerRoleKey),
     trainingGoals: normalizeGoals(source.trainingGoals || source.goals || session.goal || session.generatedScenario?.userGoal),
@@ -638,9 +639,9 @@ export function getGameConfig(session) {
   return config;
 }
 
-function normalizeRole(role, fallback) {
+function normalizeRole(role, fallback, roleKey = "A", seed = "") {
   return {
-    name: String(role?.name || fallback.name || "").trim(),
+    name: normalizeTrainingRoleName(roleKey, role?.name || fallback.name, seed),
     description: String(role?.description || fallback.description || "").trim(),
     goal: String(role?.goal || fallback.goal || "").trim()
   };
@@ -689,7 +690,7 @@ function roleSideLabel(value) {
 
 function roleTitle(value) {
   const key = normalizeRoleKey(value);
-  return `角色${key}：${roleSideLabel(key)}`;
+  return roleSideLabel(key);
 }
 
 function normalizeDifficulty(value) {
